@@ -98,6 +98,33 @@
     </div>
   </div>
 
-<script src="./src/game.js"></script>
+<script>
+(() => {
+  const scripts = [
+    "./src/state.js",
+    "./src/input.js",
+    "./src/run-state.js",
+    "./src/entities.js",
+    "./src/dungeon.js",
+    "./src/simulation.js",
+    "./src/inventory.js",
+    "./src/ui.js",
+    "./src/rendering.js",
+    "./src/main.js"
+  ];
+
+  const gameScript = document.createElement("script");
+  gameScript.textContent = scripts.map(src => {
+    const request = new XMLHttpRequest();
+    request.open("GET", src, false);
+    request.send(null);
+    if (request.status && request.status >= 400) {
+      throw new Error(`Failed to load ${src}`);
+    }
+    return request.responseText;
+  }).join("\n");
+  document.body.appendChild(gameScript);
+})();
+</script>
 </body>
 </html>
