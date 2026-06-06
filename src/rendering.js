@@ -31,6 +31,105 @@ function fitEngravedFont(lines, startingFontSize, maxWidth) {
 }
 
 
+const ENGRAVING_FLOOR_TILES = new Set([".", "S", "E", "C"]);
+
+function isEngravableFloorTile(room, x, y) {
+  return roomContainsTile(room, x, y) && ENGRAVING_FLOOR_TILES.has(map[y]?.[x]);
+}
+
+function contiguousFloorRun(room, startX, startY, dx, dy, componentTiles) {
+  let length = 0;
+  let x = startX;
+  let y = startY;
+
+  while (componentTiles.has(`${x},${y}`) && isEngravableFloorTile(room, x, y)) {
+    length++;
+    x += dx;
+    y += dy;
+  }
+
+  return length;
+}
+
+function largestEngravingFloorComponent(room) {
+  const floorTiles = roomTileList(room).filter(t => isEngravableFloorTile(room, t.x, t.y));
+  const unvisited = new Set(floorTiles.map(t => `${t.x},${t.y}`));
+  let largest = [];
+
+  for (const tile of floorTiles) {
+    const startKey = `${tile.x},${tile.y}`;
+    if (!unvisited.has(startKey)) continue;
+
+    const component = [];
+    const queue = [tile];
+    unvisited.delete(startKey);
+
+    for (let i = 0; i < queue.length; i++) {
+      const current = queue[i];
+      component.push(current);
+
+      for (const direction of CARDINAL_DIRECTIONS) {
+        const next = { x: current.x + direction.dx, y: current.y + direction.dy };
+        const key = `${next.x},${next.y}`;
+        if (!unvisited.has(key) || !isEngravableFloorTile(room, next.x, next.y)) continue;
+        unvisited.delete(key);
+        queue.push(next);
+      }
+    }
+
+    if (component.length > largest.length) largest = component;
+  }
+
+  return largest;
+}
+
+function chooseEngravingPlacement(room) {
+  const component = largestEngravingFloorComponent(room);
+  if (component.length === 0) {
+    return {
+      cx: room.cx * TILE + TILE / 2,
+      cy: room.cy * TILE + TILE / 2,
+      tileWidth: Math.max(1, room.w) * TILE,
+      tileHeight: Math.max(1, room.h) * TILE,
+      centerTile: { x: room.cx, y: room.cy }
+    };
+  }
+
+  const componentTiles = new Set(component.map(t => `${t.x},${t.y}`));
+  const centroid = component.reduce((sum, t) => ({ x: sum.x + t.x, y: sum.y + t.y }), { x: 0, y: 0 });
+  centroid.x /= component.length;
+  centroid.y /= component.length;
+
+  let best = component[0];
+  let bestWidth = 1;
+  let bestHeight = 1;
+  let bestScore = -Infinity;
+
+  for (const tile of component) {
+    const horizontal = contiguousFloorRun(room, tile.x, tile.y, -1, 0, componentTiles) +
+      contiguousFloorRun(room, tile.x + 1, tile.y, 1, 0, componentTiles);
+    const vertical = contiguousFloorRun(room, tile.x, tile.y, 0, -1, componentTiles) +
+      contiguousFloorRun(room, tile.x, tile.y + 1, 0, 1, componentTiles);
+    const distancePenalty = Math.hypot(tile.x - centroid.x, tile.y - centroid.y) * 0.35;
+    const score = horizontal * vertical + Math.min(horizontal, vertical) * 3 + horizontal * 0.8 - distancePenalty;
+
+    if (score > bestScore) {
+      best = tile;
+      bestWidth = horizontal;
+      bestHeight = vertical;
+      bestScore = score;
+    }
+  }
+
+  return {
+    cx: best.x * TILE + TILE / 2,
+    cy: best.y * TILE + TILE / 2,
+    tileWidth: bestWidth * TILE,
+    tileHeight: bestHeight * TILE,
+    centerTile: best
+  };
+}
+
 function drawEngravedRoomNames(camX, camY) {
   if (!rooms || !visible) return;
 
@@ -41,8 +140,10 @@ function drawEngravedRoomNames(camX, camY) {
   for (const room of rooms) {
     if (!room.seen || !room.name) continue;
 
-    const cx = room.cx * TILE + TILE / 2;
-    const cy = room.cy * TILE + TILE / 2;
+    const placement = chooseEngravingPlacement(room);
+    const cx = placement.cx;
+    const cy = placement.cy;
+    const centerTile = placement.centerTile;
 
     if (cx < camX - 260 || cx > camX + canvas.width + 260 || cy < camY - 200 || cy > camY + canvas.height + 200) continue;
 
@@ -59,8 +160,8 @@ function drawEngravedRoomNames(camX, camY) {
     if (isRevealingThisRoom) {
       centerVisible = true;
     } else {
-      for (let y = room.cy - 1; y <= room.cy + 1; y++) {
-        for (let x = room.cx - 1; x <= room.cx + 1; x++) {
+      for (let y = centerTile.y - 1; y <= centerTile.y + 1; y++) {
+        for (let x = centerTile.x - 1; x <= centerTile.x + 1; x++) {
           if (visible[y]?.[x]) centerVisible = true;
         }
       }
@@ -68,8 +169,8 @@ function drawEngravedRoomNames(camX, camY) {
 
     if (!centerVisible) continue;
 
-    const roomPixelW = room.w * TILE;
-    const roomPixelH = room.h * TILE;
+    const roomPixelW = placement.tileWidth;
+    const roomPixelH = placement.tileHeight;
     const usableWidth = Math.max(40, roomPixelW * 0.72);
     const usableHeight = Math.max(28, roomPixelH * 0.50);
 
