@@ -30,6 +30,12 @@ function equipItem(id){
  const old=player.equipment[item.slot]; player.equipment[item.slot]=item; player.inventory.splice(idx,1); if(old)player.inventory.push(old);
  recalcEquipmentStats(); achievement("EQUIPPED",`You equipped ${item.name}. ${itemDescription(item)}`,`equip_${item.id}`); updateInventoryUI(); updateHUD(); visibilityDirty=true;
 }
+function unequipItem(slot){
+ if(!Object.prototype.hasOwnProperty.call(player.equipment,slot))return;
+ const item=player.equipment[slot]; if(!item)return;
+ player.equipment[slot]=null; player.inventory.push(item);
+ recalcEquipmentStats(); announcer(`You unequipped ${item.name}. ${item.type==="light"?"The crawler is now relying on dungeon ambience and questionable courage.":"It returns to your pack."}`); updateInventoryUI(); updateHUD(); visibilityDirty=true;
+}
 function openLootBox(id){
  const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const box=player.inventory[idx]; if(box.type!=="lootbox")return;
  if(!player.safe){announcer("Loot boxes may only be opened in safe rooms. The dungeon believes in responsible dopamine distribution.");return;}
@@ -53,6 +59,8 @@ function setupInventoryActionHandlers(){
  panel.addEventListener("click",e=>{
   const weaponButton=e.target.closest("button[data-weapon-id]");
   if(weaponButton){setPlayerWeapon(weaponButton.dataset.weaponId);updateInventoryUI();return;}
+  const unequipButton=e.target.closest("button[data-action='unequip'][data-slot]");
+  if(unequipButton){unequipItem(unequipButton.dataset.slot);return;}
   const button=e.target.closest("button[data-action][data-item-id]");
   if(!button)return;
   const id=button.dataset.itemId;
@@ -78,7 +86,8 @@ function renderItemCard(item, extraClass=""){
 function renderEquipmentSlot(slot){
  const item=player.equipment[slot];
  if(!item)return `<div class="equipSlot empty"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipEmpty">Empty</div></div>`;
- return `<div class="equipSlot ${rarityClass(item)} ${typeClass(item)}"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipName">${escapeHtml(item.name)}</div><div class="equipMeta">${escapeHtml(itemDescription(item))}</div></div>`;
+ const unequipAction=slot==="light"?`<div class="itemActions"><button class="itemBtn" type="button" data-action="unequip" data-slot="${escapeHtml(slot)}">Unequip</button></div>`:"";
+ return `<div class="equipSlot ${rarityClass(item)} ${typeClass(item)}"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipName">${escapeHtml(item.name)}</div><div class="equipMeta">${escapeHtml(itemDescription(item))}</div>${unequipAction}</div>`;
 }
 function renderWeaponGrid(){
  return WEAPON_ORDER.map(id=>{
