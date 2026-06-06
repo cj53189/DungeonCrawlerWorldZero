@@ -1,0 +1,416 @@
+
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: Arial, sans-serif; color: white; }
+    canvas { display: block; background: #171717; }
+
+
+    #hud {
+      position: fixed; top: 12px; left: 12px; z-index: 10;
+      background: rgba(0,0,0,0.64); padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.22); border-radius: 10px;
+      line-height: 1.2; font-size: 14px; width: 245px; min-width: 0;
+      box-shadow: 0 0 18px rgba(0,0,0,0.25);
+    }
+
+    .hudTop {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+      letter-spacing: 0.03em;
+    }
+
+    .hudCoins {
+      color: #ffd86b;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .hudBar {
+      position: relative;
+      height: 18px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.22);
+      margin: 5px 0;
+    }
+
+    .hudBarFill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 100%;
+      transition: width 0.18s linear;
+    }
+
+    .hpBar .hudBarFill {
+      background: linear-gradient(90deg, #8f1515, #e64242);
+    }
+
+    .xpBar .hudBarFill {
+      background: linear-gradient(90deg, #9f7a13, #ffd86b);
+    }
+
+    .hudBarText {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      text-shadow: 0 1px 2px #000, 0 0 4px #000;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+    }
+
+    .hudMeta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 7px;
+      font-size: 12px;
+      color: #ddd;
+    }
+
+    .hudMeta span span {
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .hudStair {
+      display: none;
+      margin-top: 6px;
+      font-size: 11px;
+      color: #9db1ff;
+      font-weight: bold;
+      text-shadow: 0 1px 2px #000;
+    }
+
+    .hudStair.visible {
+      display: block;
+    }
+
+    #announcer {
+      position: fixed; right: 16px; top: 16px; width: 340px; z-index: 20;
+      display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+    }
+
+    .popup {
+      background: rgba(15, 15, 15, 0.94); border: 2px solid #d6b55c;
+      border-radius: 10px; padding: 12px; box-shadow: 0 0 22px rgba(214,181,92,0.25);
+      animation: slideIn 0.25s ease-out, fadeOut 0.5s ease-in 7.2s forwards;
+    }
+    .popup .title { color: #ffd86b; font-weight: bold; font-size: 16px; margin-bottom: 4px; text-transform: uppercase; }
+    .popup .body { font-size: 14px; color: #eee; line-height: 1.35; }
+
+    #prompt {
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+      z-index: 12; background: rgba(0,0,0,0.68); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px; padding: 8px 14px; font-size: 14px; display: none;
+    }
+
+    #logPanel {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      pointer-events: auto;
+      position: fixed; left: 12px; bottom: 12px; width: 380px; max-height: 240px; overflow-y: auto;
+      z-index: 120; background: rgba(0,0,0,0.82); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px; padding: 10px; font-size: 13px; display: none;
+    }
+    #logPanel h3 { margin: 0 0 8px 0; color: #ffd86b; font-size: 14px; }
+    .logEntry { border-top: 1px solid rgba(255,255,255,0.12); padding: 7px 0; color: #ddd; }
+    .logEntry:first-of-type { border-top: none; }
+    .logTitle { color: #ffd86b; font-weight: bold; }
+
+    #safeRoomRecap {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      pointer-events: auto;
+      position: fixed; left: 12px; bottom: 12px; width: 245px; z-index: 120;
+      background: rgba(0,0,0,0.82); border: 1px solid rgba(123, 224, 123, 0.35);
+      border-radius: 10px; padding: 8px; display: none;
+      box-shadow: 0 0 16px rgba(123,224,123,0.10); font-size: 11px;
+      max-height: 210px; overflow-y: auto;
+    }
+    #safeRoomRecap h3 { margin: 0 0 5px 0; color: #9cff9c; font-size: 11px; text-transform: uppercase; }
+    .recapLine { display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.10); padding: 3px 0; gap: 10px; }
+    .recapLine:first-of-type { border-top: none; }
+    .recapComment { margin-top: 5px; color: #ddd; font-style: italic; line-height: 1.25; }
+
+    #centerMessage {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      z-index: 30; background: rgba(0,0,0,0.72); text-align: center; padding: 30px;
+    }
+    #centerMessage .box {
+      max-width: 650px; background: #1d1d1d; border: 2px solid #d6b55c;
+      border-radius: 14px; padding: 24px; box-shadow: 0 0 30px rgba(214,181,92,0.25);
+    }
+    #centerMessage h1 { margin-top: 0; color: #ffd86b; }
+    #centerMessage button {
+      margin-top: 16px; font-size: 16px; padding: 10px 18px; border: none;
+      border-radius: 8px; cursor: pointer; background: #d6b55c; color: #111; font-weight: bold;
+    }
+
+    @keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { to { opacity: 0; transform: translateX(20px); } }
+  
+    #touchControls {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 25;
+      pointer-events: none;
+      touch-action: none;
+      user-select: none;
+    }
+
+    body.showTouchControls #touchControls { display: block; }
+
+    #stickBase {
+      position: absolute;
+      left: 24px;
+      bottom: 24px;
+      width: 128px;
+      height: 128px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.10);
+      border: 2px solid rgba(255,255,255,0.20);
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    #stickKnob {
+      position: absolute;
+      left: 39px;
+      top: 39px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.38);
+      border: 1px solid rgba(255,255,255,0.45);
+    }
+
+    .touchButton {
+      position: absolute;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(214,181,92,0.24);
+      border: 2px solid rgba(255,216,107,0.45);
+      color: #fff;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      touch-action: none;
+      text-shadow: 0 1px 2px #000;
+    }
+
+    #btnAttack { right: 34px; bottom: 40px; }
+    #btnInteract { right: 116px; bottom: 100px; width: 64px; height: 64px; }
+    #btnLog { right: 24px; top: 74px; width: 52px; height: 52px; font-size: 12px; }
+    #btnRecap { right: 84px; top: 74px; width: 52px; height: 52px; font-size: 11px; }
+    #btnNew { right: 144px; top: 74px; width: 52px; height: 52px; font-size: 11px; }
+
+    #controllerHint {
+      display: none;
+      position: absolute;
+      left: 50%;
+      top: 8px;
+      transform: translateX(-50%);
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: #ddd;
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (hover: none) and (pointer: coarse), (max-width: 900px) {
+      html, body {
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+
+      #touchControls {
+        display: none;
+      }
+
+      #hud {
+        top: 8px;
+        left: 8px;
+        width: 178px;
+        font-size: 10px;
+        line-height: 1.15;
+        padding: 7px 8px;
+        max-width: 44vw;
+      }
+
+      .hudBar {
+        height: 15px;
+        margin: 4px 0;
+      }
+
+      .hudBarText {
+        font-size: 9px;
+      }
+
+      .hudMeta {
+        font-size: 9px;
+        margin-top: 5px;
+      }
+
+      .hudCoins {
+        font-size: 10px;
+      }
+
+      .hudStair {
+        font-size: 9px;
+      }
+
+      #announcer {
+        top: 8px;
+        right: 8px;
+        width: 260px;
+        max-width: 45vw;
+        gap: 6px;
+      }
+
+      .popup {
+        padding: 8px;
+        border-width: 1px;
+      }
+
+      .popup .title {
+        font-size: 12px;
+      }
+
+      .popup .body {
+        font-size: 11px;
+        line-height: 1.25;
+      }
+
+      #prompt {
+        bottom: 10px;
+        font-size: 11px;
+        padding: 5px 9px;
+        max-width: 42vw;
+        white-space: nowrap;
+      }
+
+      #logPanel {
+        left: 8px;
+        bottom: 160px;
+        width: 310px;
+        max-width: 52vw;
+        max-height: 160px;
+        font-size: 11px;
+      }
+
+      #safeRoomRecap {
+        left: 8px;
+        bottom: 8px;
+        width: 220px;
+        max-width: 36vw;
+        font-size: 10px;
+      }
+
+      #safeRoomRecap h3 {
+        font-size: 10px;
+      }
+
+      .recapLine {
+        padding: 3px 0;
+      }
+
+      #centerMessage .box {
+        max-width: 80vw;
+        padding: 16px;
+      }
+
+      #centerMessage h1 {
+        font-size: 20px;
+      }
+
+      #centerMessage p {
+        font-size: 13px;
+      }
+
+      #centerMessage button {
+        font-size: 14px;
+        padding: 8px 12px;
+      }
+    }
+
+    @media (orientation: portrait) and (hover: none) {
+      #centerMessage {
+        display: flex;
+      }
+
+      #centerTitle::after {
+        content: "";
+      }
+    }
+
+  
+    .panelClose {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 16px;
+      line-height: 20px;
+      cursor: pointer;
+      z-index: 100;
+    }
+
+  
+
+    #inventoryPanel {
+      -webkit-overflow-scrolling: touch; overscroll-behavior: contain; pointer-events: auto;
+      position: fixed; left: 12px; bottom: 12px; width: 330px; max-height: 300px; overflow-y: auto;
+      z-index: 120; background: rgba(0,0,0,0.84); border: 1px solid rgba(214,181,92,0.35);
+      border-radius: 10px; padding: 10px; font-size: 12px; display: none;
+    }
+    #inventoryPanel h3 { margin: 0 0 8px 0; color: #ffd86b; font-size: 13px; text-transform: uppercase; }
+    .equipGrid { display: grid; grid-template-columns: 72px 1fr; gap: 4px 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.14); }
+    .invItem { border-top: 1px solid rgba(255,255,255,0.12); padding: 7px 0; color: #ddd; }
+    .invItem:first-child { border-top: none; }
+    .itemName { color: #ffd86b; font-weight: bold; }
+    .itemMeta { color: #bbb; font-size: 11px; line-height: 1.25; margin-top: 2px; }
+    .itemActions { margin-top: 5px; display:flex; gap:5px; flex-wrap:wrap; }
+    .itemBtn { border:1px solid rgba(255,255,255,0.22); border-radius:6px; background:rgba(255,255,255,0.08); color:#fff; padding:4px 7px; font-size:11px; cursor:pointer; }
+    #inventoryHelp { color:#aaa; font-size:11px; margin-top:8px; font-style:italic; }
+    #btnInv { right:204px; top:74px; width:52px; height:52px; font-size:11px; }
+    @media (hover:none) and (pointer:coarse), (max-width:900px) {
+      #inventoryPanel { left:8px; bottom:8px; width:300px; max-width:54vw; max-height:170px; font-size:10px; }
+      #inventoryPanel h3 { font-size:10px; }
+      .itemMeta,#inventoryHelp,.itemBtn { font-size:9px; }
+    }
+
+  
+    #floorSplash {
+      position: fixed; inset: 0; z-index: 28; display: none; align-items: center; justify-content: center;
+      pointer-events: none; font-size: clamp(42px, 8vw, 96px); font-weight: 900; letter-spacing: 0.08em;
+      text-transform: uppercase; color: #ffd86b;
+      text-shadow: 0 0 18px rgba(214,181,92,0.55), 0 4px 10px #000;
+      background: rgba(0,0,0,0.18); animation: floorSplashFade 1.8s ease-out forwards;
+    }
+    @keyframes floorSplashFade {
+      0% { opacity: 0; transform: scale(0.96); }
+      18% { opacity: 1; transform: scale(1); }
+      70% { opacity: 1; }
+      100% { opacity: 0; transform: scale(1.04); }
+    }
+
+  
