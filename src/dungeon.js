@@ -912,11 +912,12 @@ function getFarthestRoom(fromRoom) {
 const VISUAL_FLOOR_TYPES = ["crack", "scratch", "rubble", "stain", "worn"];
 const VISUAL_DECAL_TYPES = ["debris", "brokenStone", "dust", "scorch", "coins", "marking"];
 const VISUAL_DECORATION_TILES = new Set([".", "S"]);
-const ENVIRONMENTAL_LIGHT_TYPES = ["torch", "lantern", "crystal"];
+const ENVIRONMENTAL_LIGHT_TYPES = ["torch", "lantern", "crystal", "campfire"];
 const ENVIRONMENTAL_LIGHT_COLORS = {
   torch: { inner: "rgba(255,182,76,", outer: "rgba(255,112,36," },
   lantern: { inner: "rgba(255,220,136,", outer: "rgba(255,175,70," },
-  crystal: { inner: "rgba(134,214,255,", outer: "rgba(82,126,255," }
+  crystal: { inner: "rgba(134,214,255,", outer: "rgba(82,126,255," },
+  campfire: { inner: "rgba(255,205,112,", outer: "rgba(255,92,28," }
 };
 const HALLWAY_TORCH_MIN_SPACING = 8;
 const HALLWAY_TORCH_TARGET_STEP = 22;
@@ -978,15 +979,27 @@ function canPlaceVisualDecal(x, y) {
 }
 
 
-function createEnvironmentalLight(type, x, y, radius, intensity) {
+function nearestWallDirection(x, y) {
+  let best = null;
+  for (const dir of CARDINAL_DIRECTIONS) {
+    if (map[y + dir.dy]?.[x + dir.dx] !== "#") continue;
+    if (!best || tileHash(x + dir.dx, y + dir.dy, 89) > best.roll) best = { ...dir, roll: tileHash(x + dir.dx, y + dir.dy, 89) };
+  }
+  return best || { dx: 0, dy: -1 };
+}
+
+function createEnvironmentalLight(type, x, y, radius, intensity, fixture = {}) {
+  const wallDir = fixture.wallMounted ? nearestWallDirection(x, y) : null;
+  const offset = wallDir ? TILE * 0.34 : 0;
   return {
     type,
-    x: x * TILE + TILE / 2,
-    y: y * TILE + TILE / 2,
+    x: x * TILE + TILE / 2 + (wallDir?.dx || 0) * offset,
+    y: y * TILE + TILE / 2 + (wallDir?.dy || 0) * offset,
     tileX: x,
     tileY: y,
     radius,
-    intensity
+    intensity,
+    fixture: { ...fixture, wallDir }
   };
 }
 
@@ -1076,7 +1089,59 @@ function buildEnvironmentalLights() {
 
     const radius = 104 + Math.floor(tileHash(tile.x, tile.y, 84) * 22);
     const intensity = 0.31 + tileHash(tile.x, tile.y, 85) * 0.07;
-    environmentalLights.push(createEnvironmentalLight("torch", tile.x, tile.y, radius, intensity));
+    environmentalLights.push(createEnvironmentalLight("torch", tile.x, tile.y, radius, intensity, { wallMounted: true, fixtureType: "wallTorch" }));
+  }
+
+  buildRoomEnvironmentalLights();
+}
+
+function roomWallLightCandidateScore(room, x, y) {
+  if (!roomContainsTile(room, x, y)) return -Infinity;
+  if (map[y]?.[x] !== "." && map[y]?.[x] !== "S") return -Infinity;
+  if (x === Math.floor(player.x / TILE) && y === Math.floor(player.y / TILE)) return -Infinity;
+  const wallNeighbors = countCardinalWallNeighbors(x, y);
+  if (wallNeighbors <= 0) return -Infinity;
+  const edgeBias = Math.min(x - room.x, room.x + room.w - 1 - x, y - room.y, room.y + room.h - 1 - y);
+  return wallNeighbors * 18 - edgeBias * 2 + tileHash(x, y, 90) * 10;
+}
+
+function roomCampfireTile(room) {
+  const tiles = roomTileList(room, 2).filter(t => map[t.y]?.[t.x] === "." && canPlaceVisualDecal(t.x, t.y));
+  if (!tiles.length) return null;
+  tiles.sort((a, b) => {
+    const da = Math.hypot(a.x - room.cx, a.y - room.cy) + tileHash(a.x, a.y, 91);
+    const db = Math.hypot(b.x - room.cx, b.y - room.cy) + tileHash(b.x, b.y, 91);
+    return da - db;
+  });
+  return tiles[0];
+}
+
+function buildRoomEnvironmentalLights() {
+  for (const room of rooms) {
+    if (room.type === "safe") continue;
+
+    if ((room.sizeClass === "large" || room.type === "boss") && tileHash(room.id, currentFloor, 92) < 0.72) {
+      const camp = roomCampfireTile(room);
+      if (camp) {
+        environmentalLights.push(createEnvironmentalLight("campfire", camp.x, camp.y, 134, 0.34, { fixtureType: "campfire" }));
+      }
+    }
+
+    const candidates = roomTileList(room, 0)
+      .map(t => ({ ...t, score: roomWallLightCandidateScore(room, t.x, t.y) }))
+      .filter(t => Number.isFinite(t.score))
+      .sort((a, b) => b.score - a.score);
+    const target = room.sizeClass === "large" || room.type === "boss" ? 2 : tileHash(room.id, currentFloor, 93) < 0.58 ? 1 : 0;
+
+    for (const tile of candidates) {
+      const placedInRoom = environmentalLights.filter(light => roomContainsTile(room, light.tileX, light.tileY)).length;
+      if (placedInRoom >= target + (room.sizeClass === "large" || room.type === "boss" ? 1 : 0)) break;
+      if (environmentalLights.some(light => Math.hypot(light.tileX - tile.x, light.tileY - tile.y) < 5)) continue;
+      const type = tileHash(tile.x, tile.y, 94) < 0.16 ? "crystal" : "torch";
+      const radius = type === "crystal" ? 118 : 108;
+      const intensity = type === "crystal" ? 0.27 : 0.32;
+      environmentalLights.push(createEnvironmentalLight(type, tile.x, tile.y, radius, intensity, { wallMounted: true, fixtureType: type === "crystal" ? "wallCrystal" : "wallTorch" }));
+    }
   }
 }
 
@@ -1131,7 +1196,7 @@ function validateDungeonVisualsAreVisualOnly() {
     ENVIRONMENTAL_LIGHT_TYPES.includes(light.type) &&
     typeof light.x === "number" && typeof light.y === "number" &&
     light.radius > 0 && light.intensity > 0 &&
-    isHallwayOrDoorwayFloor(light.tileX, light.tileY)
+    (isHallwayOrDoorwayFloor(light.tileX, light.tileY) || isRoomInteriorTile(light.tileX, light.tileY))
   );
   const decalsOk = dungeonVisuals.decals.every(decal =>
     VISUAL_DECAL_TYPES.includes(decal.type) &&

@@ -257,7 +257,7 @@ function restoreRunProgress(snapshot) {
   player.aimX = snapshot.player.aimX || 1;
   player.aimY = snapshot.player.aimY || 0;
   player.inventory = snapshot.player.inventory.map(item => ({ ...item }));
-  player.equipment = Object.fromEntries(Object.entries(snapshot.player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null]));
+  player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null,light:null, ...Object.fromEntries(Object.entries(snapshot.player.equipment || {}).map(([slot, item]) => [slot, item ? { ...item } : null]))};
 
   for (const key of Object.keys(stats)) stats[key] = snapshot.stats[key] ?? 0;
   audienceScore = snapshot.audienceScore;
@@ -397,12 +397,16 @@ function restartGame() { pendingFloorAdvance = false; resetState(); }
 function updateLightingToggleLabel() {
   const button = document.getElementById("lightingToggle");
   if (!button) return;
-  button.textContent = lightingEnabled ? "Lighting ON" : "Lighting OFF";
-  button.setAttribute("aria-pressed", lightingEnabled ? "true" : "false");
-  button.classList.toggle("off", !lightingEnabled);
+  lightingEnabled = true;
+  button.textContent = "Lighting LOCKED";
+  button.setAttribute("aria-pressed", "true");
+  button.disabled = true;
+  button.classList.remove("off");
+  button.classList.add("locked");
 }
 
 function toggleLighting() {
-  lightingEnabled = !lightingEnabled;
+  lightingEnabled = true;
   updateLightingToggleLabel();
+  announcer("Lighting controls are disabled. Equip a torch if you want the crawler lit.");
 }

@@ -486,13 +486,17 @@ function drawAtmosphericLighting(startX, endX, startY, endY) {
   if (!lightingEnabled) return;
 
   const playerFlicker = 0.94 + Math.sin(frameCount * 0.19) * 0.045 + Math.sin(frameCount * 0.47) * 0.018;
-  const lights = [{
-    type: "lantern",
-    x: player.x,
-    y: player.y,
-    radius: isMobileLike() ? 142 : 164,
-    intensity: 0.36 * playerFlicker
-  }];
+  const lights = [];
+  if (typeof hasEquippedLightSource === "function" && hasEquippedLightSource()) {
+    const torch = player.equipment.light;
+    lights.push({
+      type: "torch",
+      x: player.x,
+      y: player.y,
+      radius: torch.radius || (isMobileLike() ? 142 : 164),
+      intensity: (torch.intensity || 0.36) * playerFlicker
+    });
+  }
 
   for (const light of environmentalLights) {
     if (!shouldDrawEnvironmentalLight(light, startX, endX, startY, endY)) continue;
@@ -532,7 +536,27 @@ function drawEnvironmentalLightFixtures() {
     if (!visible[light.tileY]?.[light.tileX]) continue;
     ctx.save();
     ctx.translate(light.x, light.y);
-    if (light.type === "crystal") {
+    if (light.type === "campfire") {
+      ctx.fillStyle = "rgba(92,56,32,0.9)";
+      ctx.beginPath();
+      ctx.ellipse(0, 7, 12, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(45,27,16,0.8)";
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,112,38,0.9)";
+      ctx.beginPath();
+      ctx.moveTo(-5, 4);
+      ctx.quadraticCurveTo(-1, -9, 2, 3);
+      ctx.quadraticCurveTo(8, -5, 5, 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,221,120,0.92)";
+      ctx.beginPath();
+      ctx.moveTo(-1, 4);
+      ctx.quadraticCurveTo(2, -5, 4, 5);
+      ctx.closePath();
+      ctx.fill();
+    } else if (light.type === "crystal") {
       ctx.fillStyle = "rgba(115,210,255,0.88)";
       ctx.beginPath();
       ctx.moveTo(0, -8);
@@ -544,15 +568,18 @@ function drawEnvironmentalLightFixtures() {
       ctx.strokeStyle = "rgba(220,245,255,0.7)";
       ctx.stroke();
     } else {
-      ctx.fillStyle = light.type === "torch" ? "rgba(255,145,44,0.92)" : "rgba(255,220,130,0.86)";
+      const dir = light.fixture?.wallDir || { dx: 0, dy: -1 };
+      ctx.strokeStyle = "rgba(82,50,25,0.92)";
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(0, -2, light.type === "torch" ? 4.2 : 5.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(90,58,28,0.85)";
-      ctx.beginPath();
-      ctx.moveTo(0, 2);
-      ctx.lineTo(0, 10);
+      ctx.moveTo(-dir.dx * 2, -dir.dy * 2);
+      ctx.lineTo(-dir.dx * 12, -dir.dy * 12);
       ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.fillStyle = "rgba(255,145,44,0.92)";
+      ctx.beginPath();
+      ctx.arc(0, 0, 4.2, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.restore();
   }

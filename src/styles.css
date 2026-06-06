@@ -446,3 +446,5 @@
     }
 
   
+.hudToggle.locked, .hudToggle:disabled { opacity: 0.62; cursor: not-allowed; }
+.touchButton.disabled { display: none; }

@@ -1,4 +1,4 @@
-const SLOT_LABELS={head:"Head",chest:"Chest",legs:"Legs",feet:"Feet",accessory:"Accessory"};
+const SLOT_LABELS={head:"Head",chest:"Chest",legs:"Legs",feet:"Feet",accessory:"Accessory",light:"Light"};
 const ITEM_BASES={head:["Helmet","Cap","Crown","Hood"],chest:["Vest","Tunic","Breastplate","Jacket"],legs:["Pants","Greaves","Shorts","Trousers"],feet:["Boots","Sandals","Crocs","Footwraps"],accessory:["Ring","Charm","Badge","Pendant"]};
 const ITEM_PREFIXES=["Goblin","Rat-hide","Bone","Rusty","Lucky","Crawler","Moldy","Questionable","Royal","Screaming"];
 const ROOM_NAMES={small:["Crypt Nook","Goblin Pantry","Collapsed Alcove","Rat Nest","Old Guard Room"],medium:["Bone Gallery","Broken Armory","Forgotten Shrine","Goblin Barracks","Hall of Echoes","Mushroom Chapel"],large:["Feast Hall","The Drowned Hall","Cavern of Teeth","Hall of Rusted Banners"],boss:["The Rat King's Court","The Bone Collector's Pit","Champion's Den","The Blood-Marked Chamber","The Old Arena"]};
@@ -15,17 +15,20 @@ function generateGear(forceRare=false){
  return item;
 }
 function generateLootBox(forceRare=false){const rarity=rollRarity(forceRare);return{id:makeId("box"),type:"lootbox",rarity,name:`${rarity} Prize Box`,opened:false};}
-function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room."; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
+function generateTorchItem(){return{id:makeId("torch"),type:"light",slot:"light",rarity:"Common",name:"Crawler Torch",radius:isMobileLike()?142:164,intensity:.36};}
+function hasEquippedLightSource(){return !!player.equipment?.light && player.equipment.light.type==="light";}
+function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room."; if(i.type==="light")return"Equipped light source. Illuminates the crawler while carried."; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
 function addItem(item){
  player.inventory.push(item);
  if(item.type==="lootbox"){stats.lootBoxesFound++; achievement("NEW LOOT BOX",`You found a ${item.name}. It can only be opened in a safe room.`,`box_${item.id}`);}
+ else if(item.type==="light"){achievement("NEW LIGHT",`You found ${item.name}. ${itemDescription(item)}`,`light_${item.id}`);}
  else{stats.gearFound++; achievement("NEW GEAR",`You found ${item.name}. ${itemDescription(item)}`,`gear_${item.id}`);}
  updateInventoryUI(); updateHUD();
 }
 function equipItem(id){
- const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const item=player.inventory[idx]; if(item.type!=="gear")return;
+ const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const item=player.inventory[idx]; if(item.type!=="gear"&&item.type!=="light")return;
  const old=player.equipment[item.slot]; player.equipment[item.slot]=item; player.inventory.splice(idx,1); if(old)player.inventory.push(old);
- recalcEquipmentStats(); achievement("EQUIPPED",`You equipped ${item.name}. ${itemDescription(item)}`,`equip_${item.id}`); updateInventoryUI(); updateHUD();
+ recalcEquipmentStats(); achievement("EQUIPPED",`You equipped ${item.name}. ${itemDescription(item)}`,`equip_${item.id}`); updateInventoryUI(); updateHUD(); visibilityDirty=true;
 }
 function openLootBox(id){
  const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const box=player.inventory[idx]; if(box.type!=="lootbox")return;
@@ -38,7 +41,7 @@ function openLootBox(id){
 }
 function discardItem(id){const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const [item]=player.inventory.splice(idx,1); announcer(`You discarded ${item.name}. The dungeon has sold it to someone with lower standards.`); updateInventoryUI(); updateHUD();}
 function recalcEquipmentStats(){
- let hp=0,atk=0,spd=0,def=0,aud=0; for(const item of Object.values(player.equipment)){if(!item)continue; hp+=item.hp||0; atk+=item.attack||0; spd+=item.speed||0; def+=item.defense||0; aud+=item.audience||0;}
+ let hp=0,atk=0,spd=0,def=0,aud=0; for(const item of Object.values(player.equipment)){if(!item||item.type==="light")continue; hp+=item.hp||0; atk+=item.attack||0; spd+=item.speed||0; def+=item.defense||0; aud+=item.audience||0;}
  const old=player.maxHp; player.maxHp=100+(player.level-1)*14+hp; player.attackDamage=20+(player.level-1)*4+atk; player.speed=player.baseSpeed+spd; player.defense=def; player.audienceBonus=aud; if(player.maxHp>old)player.hp+=player.maxHp-old; player.hp=Math.min(player.hp,player.maxHp);
 }
 function lootBoxCount(){return player.inventory.filter(i=>i.type==="lootbox").length;}
@@ -46,14 +49,15 @@ function updateInventoryUI(){
  const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
  eq.innerHTML=`<div class="equipGrid">${Object.keys(SLOT_LABELS).map(s=>`<div>${SLOT_LABELS[s]}</div><div>${player.equipment[s]?player.equipment[s].name:"Empty"}</div>`).join("")}</div><div class="itemMeta">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · Audience Bonus ${player.audienceBonus}</div>`;
  if(!player.inventory.length){list.innerHTML='<div class="invItem">Inventory empty. The dungeon recommends crime.</div>';return;}
- list.innerHTML=player.inventory.map(item=>`<div class="invItem"><div class="itemName">${item.name}</div><div class="itemMeta">${item.type==="gear"?SLOT_LABELS[item.slot]+" · ":""}${itemDescription(item)}</div><div class="itemActions">${item.type==="gear"?`<button class="itemBtn" onclick="equipItem('${item.id}')">Equip</button>`:`<button class="itemBtn" onclick="openLootBox('${item.id}')">Open</button>`}<button class="itemBtn" onclick="discardItem('${item.id}')">Drop</button></div></div>`).join("");
+ list.innerHTML=player.inventory.map(item=>`<div class="invItem"><div class="itemName">${item.name}</div><div class="itemMeta">${item.type==="gear"||item.type==="light"?SLOT_LABELS[item.slot]+" · ":""}${itemDescription(item)}</div><div class="itemActions">${item.type==="gear"||item.type==="light"?`<button class="itemBtn" onclick="equipItem('${item.id}')">Equip</button>`:`<button class="itemBtn" onclick="openLootBox('${item.id}')">Open</button>`}<button class="itemBtn" onclick="discardItem('${item.id}')">Drop</button></div></div>`).join("");
 }
 function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.style.display==="block"){p.style.display="none";return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display="block";}
 function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p)p.style.display="none";}
 function rewardChestLoot(){
  const roll=Math.random();
  if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}
- else if(roll<.74)addItem(generateLootBox());
+ else if(roll<.68)addItem(generateLootBox());
+ else if(roll<.78)addItem(generateTorchItem());
  else addItem(generateGear());
  if(!achievements.has("firstWearableLoot")&&stats.gearFound>0)achievement("NEW ACHIEVEMENT: Pants Adjacent","You found wearable equipment. Whether this improves your dignity remains under review.","firstWearableLoot");
  updateInventoryUI(); updateHUD();
