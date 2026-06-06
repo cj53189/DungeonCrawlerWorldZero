@@ -163,10 +163,12 @@ function getOpenScrollablePanel() {
   const log = document.getElementById("logPanel");
   const recap = document.getElementById("safeRoomRecap");
   const inv = document.getElementById("inventoryPanel");
+  const loot = document.getElementById("lootPanel");
 
   if (isVisiblePanel(log)) return log;
   if (isVisiblePanel(recap)) return recap;
   if (isVisiblePanel(inv)) return inv;
+  if (isVisiblePanel(loot)) return loot;
   return null;
 }
 
@@ -195,6 +197,7 @@ function setupPanelCloseButtons() {
   const closeLog = document.getElementById("closeLogBtn");
   const closeRecap = document.getElementById("closeRecapBtn");
   const closeInventory = document.getElementById("closeInventoryBtn");
+  const closeLoot = document.getElementById("closeLootBtn");
 
   const bind = (el, fn) => {
     if (!el) return;
@@ -211,6 +214,7 @@ function setupPanelCloseButtons() {
   bind(closeLog, closeLogPanel);
   bind(closeRecap, closeRecapPanel);
   bind(closeInventory, closeInventoryPanel);
+  bind(closeLoot, closeLootPanel);
 }
 
 
@@ -257,7 +261,7 @@ function restoreRunProgress(snapshot) {
   player.aimX = snapshot.player.aimX || 1;
   player.aimY = snapshot.player.aimY || 0;
   player.inventory = snapshot.player.inventory.map(item => ({ ...item }));
-  player.equipment = Object.fromEntries(Object.entries(snapshot.player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null]));
+  player.equipment = { weapon: null, body: null, offhand: null, trinket: null, ...Object.fromEntries(Object.entries(snapshot.player.equipment || {}).map(([slot, item]) => [slot, item ? { ...item } : null])) };
 
   for (const key of Object.keys(stats)) stats[key] = snapshot.stats[key] ?? 0;
   audienceScore = snapshot.audienceScore;

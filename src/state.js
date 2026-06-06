@@ -84,7 +84,7 @@ const player = {
   x: TILE * 2.5, y: TILE * 2.5, r: 11, speed: 2.45,
   hp: 100, maxHp: 100, coins: 0,
   level: 1, xp: 0, xpToNext: 40, attackDamage: 20,
-  baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{},
+  baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{weapon:null,body:null,offhand:null,trinket:null},
   attackCooldown: 0, currentWeaponId: "fists", aimX: 1, aimY: 0,
   safe: true, wasSafe: true, currentRoomId:null, lastTileX:0, lastTileY:0
 };
@@ -97,21 +97,63 @@ const stats = {
 };
 
 function getCurrentWeapon() {
-  return WEAPON_DEFINITIONS[player.currentWeaponId] || WEAPON_DEFINITIONS.fists;
+  const equippedWeapon = player.equipment?.weapon;
+  if (equippedWeapon?.weaponId && WEAPON_DEFINITIONS[equippedWeapon.weaponId]) {
+    const base = WEAPON_DEFINITIONS[equippedWeapon.weaponId];
+    const stats = typeof getItemStats === "function" ? getItemStats(equippedWeapon) : (equippedWeapon.stats || {});
+    return {
+      ...base,
+      name: equippedWeapon.name || base.name,
+      damage: stats.damage || base.damage,
+      range: stats.range || base.range,
+      cooldown: stats.cooldown || base.cooldown
+    };
+  }
+  return WEAPON_DEFINITIONS.fists;
+}
+
+function getHeldWeaponItems() {
+  const weapons = [];
+  if (player.equipment?.weapon) weapons.push(player.equipment.weapon);
+  for (const item of player.inventory || []) if (item.type === "weapon" && item.weaponId) weapons.push(item);
+  return weapons;
 }
 
 function setPlayerWeapon(weaponId, announce = true) {
   if (!WEAPON_DEFINITIONS[weaponId]) return;
-  player.currentWeaponId = weaponId;
+
+  if (weaponId === "fists") {
+    const old = player.equipment?.weapon;
+    if (old) player.inventory.push(old);
+    player.equipment.weapon = null;
+    player.currentWeaponId = "fists";
+  } else if (player.equipment?.weapon?.weaponId !== weaponId) {
+    const idx = player.inventory.findIndex(item => item.type === "weapon" && item.weaponId === weaponId);
+    if (idx < 0) {
+      if (announce && typeof announcer === "function") announcer("Weapon not owned. The dungeon refuses to honor imaginary equipment, despite admiring the confidence.");
+      return;
+    }
+    const [item] = player.inventory.splice(idx, 1);
+    const old = player.equipment.weapon;
+    player.equipment.weapon = item;
+    if (old) player.inventory.push(old);
+    player.currentWeaponId = weaponId;
+  }
+
   player.attackCooldown = Math.min(player.attackCooldown, Math.ceil(getCurrentWeapon().cooldown * 0.35));
+  if (typeof recalcEquipmentStats === "function") recalcEquipmentStats();
   if (announce && typeof announcer === "function") announcer(`Weapon readied: ${getCurrentWeapon().name}.`);
+  if (typeof updateInventoryUI === "function") updateInventoryUI();
   if (typeof updateHUD === "function") updateHUD();
 }
 
 function cyclePlayerWeapon(direction = 1) {
-  const currentIndex = Math.max(0, WEAPON_ORDER.indexOf(player.currentWeaponId));
-  const nextIndex = (currentIndex + direction + WEAPON_ORDER.length) % WEAPON_ORDER.length;
-  setPlayerWeapon(WEAPON_ORDER[nextIndex]);
+  const held = getHeldWeaponItems();
+  const ids = ["fists", ...held.map(item => item.weaponId).filter((id, index, arr) => id && arr.indexOf(id) === index)];
+  const currentId = player.equipment?.weapon?.weaponId || "fists";
+  const currentIndex = Math.max(0, ids.indexOf(currentId));
+  const nextIndex = (currentIndex + direction + ids.length) % ids.length;
+  setPlayerWeapon(ids[nextIndex]);
 }
 
 function updatePlayerAim(dx, dy) {

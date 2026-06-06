@@ -183,7 +183,7 @@
 
     @keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
     @keyframes fadeOut { to { opacity: 0; transform: translateX(20px); } }
-  
+
     #touchControls {
       display: none;
       position: fixed;
@@ -388,7 +388,7 @@
       }
     }
 
-  
+
     .panelClose {
       position: absolute;
       top: 4px;
@@ -405,7 +405,7 @@
       z-index: 100;
     }
 
-  
+
 
     #inventoryPanel {
       -webkit-overflow-scrolling: touch; overscroll-behavior: contain; pointer-events: auto;
@@ -430,7 +430,7 @@
       .itemMeta,#inventoryHelp,.itemBtn { font-size:9px; }
     }
 
-  
+
     #floorSplash {
       position: fixed; inset: 0; z-index: 28; display: none; align-items: center; justify-content: center;
       pointer-events: none; font-size: clamp(42px, 8vw, 96px); font-weight: 900; letter-spacing: 0.08em;
@@ -445,4 +445,262 @@
       100% { opacity: 0; transform: scale(1.04); }
     }
 
-  
+
+/* Crawler inventory + corpse loot interface */
+#inventoryPanel,
+#lootPanel {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+  position: fixed;
+  z-index: 130;
+  background: rgba(7, 8, 11, 0.94);
+  border: 2px solid rgba(214,181,92,0.42);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 0 26px rgba(0,0,0,0.45), inset 0 0 22px rgba(214,181,92,0.05);
+  color: #f5f0df;
+}
+
+#inventoryPanel {
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  width: min(960px, calc(100vw - 28px));
+  max-height: min(74vh, 620px);
+  overflow-y: auto;
+  display: none;
+}
+
+#lootPanel {
+  right: 14px;
+  bottom: 14px;
+  width: min(420px, calc(100vw - 28px));
+  max-height: min(64vh, 500px);
+  overflow-y: auto;
+  display: none;
+}
+
+#inventoryPanel h3,
+#lootPanel h3 {
+  margin: 0 32px 10px 0;
+  color: #ffd86b;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.inventoryLayout {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.8fr) minmax(320px, 1.35fr);
+  gap: 12px;
+}
+
+.inventoryLoadout,
+.inventoryPack {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(255,255,255,0.045);
+}
+
+.panelSubhead {
+  color: #9db1ff;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 7px;
+}
+
+.crawlerStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.crawlerStats div {
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: rgba(0,0,0,0.38);
+  border: 1px solid rgba(255,255,255,0.10);
+  font-size: 12px;
+}
+
+.equipSlots {
+  display: grid;
+  gap: 8px;
+}
+
+.equipSlot,
+.itemDetail,
+.lootCard,
+.invCard {
+  border: 2px solid rgba(255,255,255,0.22);
+  border-radius: 10px;
+  background: rgba(0,0,0,0.34);
+}
+
+.equipSlot {
+  min-height: 58px;
+  padding: 8px;
+}
+
+.equipSlot span {
+  display: block;
+  color: #bbb;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.equipSlot strong {
+  display: block;
+  margin-top: 5px;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+#inventoryList,
+#corpseLootGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 8px;
+}
+
+.invCard {
+  min-height: 112px;
+  padding: 9px;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.invCard.selected {
+  outline: 2px solid #fff;
+  box-shadow: 0 0 18px rgba(255,255,255,0.18);
+}
+
+.lootCard {
+  padding: 9px;
+  min-height: 128px;
+}
+
+.itemName {
+  color: #ffd86b;
+  font-weight: 900;
+  line-height: 1.15;
+}
+
+.itemStats {
+  display: block;
+  color: #e7e0c4;
+  font-size: 11px;
+  line-height: 1.25;
+  margin-top: 6px;
+}
+
+.itemDetail {
+  margin-top: 10px;
+  padding: 10px;
+}
+
+.itemDetail p {
+  margin: 7px 0;
+  color: #ddd;
+  line-height: 1.35;
+}
+
+.itemDetail.empty,
+.invEmpty,
+#lootEmpty {
+  color: #aaa;
+  padding: 12px;
+  border: 1px dashed rgba(255,255,255,0.18);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.035);
+}
+
+.compareBox {
+  margin-top: 9px;
+  border-top: 1px solid rgba(255,255,255,0.14);
+  padding-top: 8px;
+}
+
+.compareTitle {
+  color: #9db1ff;
+  font-size: 11px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.compareRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.statUp strong { color: #7cff91; }
+.statDown strong { color: #ff7777; }
+.statSame strong { color: #bbb; }
+
+.itemActions,
+.lootActions {
+  margin-top: 9px;
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.itemBtn.primary { background: rgba(123,224,123,0.22); border-color: rgba(123,224,123,0.55); color: #dfffe0; }
+.itemBtn.danger { background: rgba(255,80,80,0.16); border-color: rgba(255,110,110,0.42); color: #ffd3d3; }
+
+.rarity-Empty { border-color: rgba(255,255,255,0.16); }
+.rarity-Common { border-color: #9a9a9a; }
+.rarity-Uncommon { border-color: #63d779; }
+.rarity-Rare { border-color: #5aa9ff; }
+.rarity-Epic { border-color: #b064ff; }
+.rarity-Legendary { border-color: #ffb12d; box-shadow: 0 0 16px rgba(255,177,45,0.16); }
+
+@media (hover:none) and (pointer:coarse), (max-width:900px) {
+  #inventoryPanel {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    max-height: 68vh;
+    font-size: 11px;
+  }
+
+  #lootPanel {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+    max-height: 58vh;
+    font-size: 11px;
+  }
+
+  .inventoryLayout {
+    grid-template-columns: 1fr;
+  }
+
+  #inventoryList,
+  #corpseLootGrid {
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  }
+
+  .invCard,
+  .lootCard {
+    min-height: 104px;
+    padding: 8px;
+  }
+}

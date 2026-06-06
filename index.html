@@ -87,10 +87,29 @@
 
   <div id="inventoryPanel">
     <button id="closeInventoryBtn" class="panelClose">×</button>
-    <h3>Inventory</h3>
-    <div id="equipmentStats"></div>
-    <div id="inventoryList"></div>
-    <div id="inventoryHelp">Loot boxes can only be opened in safe rooms.</div>
+    <h3>Crawler Inventory</h3>
+    <div class="inventoryLayout">
+      <section class="inventoryLoadout">
+        <div id="equipmentStats"></div>
+      </section>
+      <section class="inventoryPack">
+        <div class="panelSubhead">Pack Grid</div>
+        <div id="inventoryList"></div>
+        <div id="inventoryDetail"></div>
+      </section>
+    </div>
+    <div id="inventoryHelp">Loot boxes open only in safe rooms. The dungeon calls this suspense, not gambling-adjacent behavior.</div>
+  </div>
+
+  <div id="lootPanel">
+    <button id="closeLootBtn" class="panelClose" onclick="closeLootPanel()">×</button>
+    <h3 id="lootTitle">Corpse Loot</h3>
+    <div id="lootEmpty">This corpse contains only awkward silence.</div>
+    <div id="corpseLootGrid"></div>
+    <div class="lootActions">
+      <button class="itemBtn primary" onclick="takeAllCorpseLoot()">Take All</button>
+      <button class="itemBtn" onclick="closeLootPanel()">Close</button>
+    </div>
   </div>
 
   <div id="floorSplash"></div>

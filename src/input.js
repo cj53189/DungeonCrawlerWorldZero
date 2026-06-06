@@ -104,7 +104,7 @@ function setupTouchControls() {
 
   document.addEventListener("gesturestart", e => e.preventDefault());
   document.addEventListener("touchmove", e => {
-    const allowPanelScroll = e.target.closest && e.target.closest("#logPanel, #safeRoomRecap, #inventoryPanel, #inventoryPanel");
+    const allowPanelScroll = e.target.closest && e.target.closest("#logPanel, #safeRoomRecap, #inventoryPanel, #lootPanel");
     if (isMobileLike() && !allowPanelScroll) e.preventDefault();
   }, { passive: false });
 }
@@ -284,7 +284,7 @@ function setupTouchControls() {
 
   document.addEventListener("gesturestart", e => e.preventDefault());
   document.addEventListener("touchmove", e => {
-    const allowPanelScroll = e.target.closest && e.target.closest("#logPanel, #safeRoomRecap, #inventoryPanel, #inventoryPanel");
+    const allowPanelScroll = e.target.closest && e.target.closest("#logPanel, #safeRoomRecap, #inventoryPanel, #lootPanel");
     if (isMobileLike() && !allowPanelScroll) e.preventDefault();
   }, { passive: false });
 }
