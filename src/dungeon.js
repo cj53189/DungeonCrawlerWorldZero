@@ -320,14 +320,109 @@ function carveRoom(room, tile) {
   });
 }
 
-function connectRooms(a, b) {
-  if (Math.random() < 0.5) { carveHorizontal(a.cx, b.cx, a.cy); carveVertical(a.cy, b.cy, b.cx); }
-  else { carveVertical(a.cy, b.cy, a.cx); carveHorizontal(a.cx, b.cx, b.cy); }
-  maybePlaceDoorNear(a.cx, a.cy, b.cx, b.cy);
+const CARDINAL_DIRECTIONS = [
+  { dx: 1, dy: 0 },
+  { dx: -1, dy: 0 },
+  { dx: 0, dy: 1 },
+  { dx: 0, dy: -1 }
+];
+
+function isInMapBounds(x, y) {
+  return x >= 0 && y >= 0 && x < MAP_COLS && y < MAP_ROWS;
 }
 
-function carveHorizontal(x1, x2, y) { for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) if (map[y][x] === "#") map[y][x] = "."; }
-function carveVertical(y1, y2, x) { for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) if (map[y][x] === "#") map[y][x] = "."; }
+function isRoomBoundaryTile(room, x, y) {
+  if (!roomContainsTile(room, x, y)) return false;
+
+  return CARDINAL_DIRECTIONS.some(dir =>
+    !roomContainsTile(room, x + dir.dx, y + dir.dy)
+  );
+}
+
+function isValidRoomEntranceCandidate(room, candidate) {
+  if (!room || !candidate) return false;
+  if (!isInMapBounds(candidate.x, candidate.y)) return false;
+  if (!roomContainsTile(room, candidate.x, candidate.y)) return false;
+  if (!isRoomBoundaryTile(room, candidate.x, candidate.y)) return false;
+  if (!Number.isFinite(candidate.outX) || !Number.isFinite(candidate.outY)) return false;
+  if (!isInMapBounds(candidate.outX, candidate.outY)) return false;
+  if (roomContainsTile(room, candidate.outX, candidate.outY)) return false;
+  return Math.abs(candidate.outX - candidate.x) + Math.abs(candidate.outY - candidate.y) === 1;
+}
+
+function chooseRoomEntranceToward(room, targetRoom) {
+  const targetX = targetRoom?.cx ?? room.cx;
+  const targetY = targetRoom?.cy ?? room.cy;
+  const vx = Math.sign(targetX - room.cx);
+  const vy = Math.sign(targetY - room.cy);
+  const candidates = [];
+
+  forEachRoomTile(room, (x, y) => {
+    if (!isRoomBoundaryTile(room, x, y)) return;
+
+    for (const dir of CARDINAL_DIRECTIONS) {
+      const outX = x + dir.dx;
+      const outY = y + dir.dy;
+      if (!isInMapBounds(outX, outY)) continue;
+      if (roomContainsTile(room, outX, outY)) continue;
+
+      const facingScore = dir.dx * vx + dir.dy * vy;
+      const targetDist = Math.hypot(x - targetX, y - targetY);
+      const centerDist = Math.hypot(x - room.cx, y - room.cy);
+      candidates.push({
+        x,
+        y,
+        outX,
+        outY,
+        dx: dir.dx,
+        dy: dir.dy,
+        score: facingScore * 1000 - targetDist + centerDist * 0.05
+      });
+    }
+  });
+
+  const facingCandidates = candidates.filter(candidate => candidate.score > -900);
+  const pool = facingCandidates.length > 0 ? facingCandidates : candidates;
+  if (pool.length === 0) return null;
+
+  pool.sort((a, b) => b.score - a.score);
+  const bestScore = pool[0].score;
+  const best = pool.filter(candidate => bestScore - candidate.score <= 3);
+  const pick = best[Math.floor(Math.random() * best.length)];
+
+  return isValidRoomEntranceCandidate(room, pick) ? pick : null;
+}
+
+function carveCorridorTile(x, y) {
+  if (!isInMapBounds(x, y)) return;
+  if (map[y][x] === "#") map[y][x] = ".";
+}
+
+function connectRooms(a, b) {
+  const start = chooseRoomEntranceToward(a, b);
+  const end = chooseRoomEntranceToward(b, a);
+
+  if (!isValidRoomEntranceCandidate(a, start) || !isValidRoomEntranceCandidate(b, end)) {
+    throw new Error("Unable to choose valid room boundary entrances for corridor");
+  }
+
+  carveCorridorTile(start.outX, start.outY);
+  carveCorridorTile(end.outX, end.outY);
+
+  if (Math.random() < 0.5) {
+    carveHorizontal(start.outX, end.outX, start.outY);
+    carveVertical(start.outY, end.outY, end.outX);
+  }
+  else {
+    carveVertical(start.outY, end.outY, start.outX);
+    carveHorizontal(start.outX, end.outX, end.outY);
+  }
+
+  maybePlaceDoorNear(start.x, start.y, end.x, end.y);
+}
+
+function carveHorizontal(x1, x2, y) { for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) carveCorridorTile(x, y); }
+function carveVertical(y1, y2, x) { for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) carveCorridorTile(x, y); }
 
 function isWalkableForDoor(tile) {
   return tile === "." || tile === "S" || tile === "C" || tile === "E";
