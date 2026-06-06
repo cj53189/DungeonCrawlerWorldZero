@@ -5,6 +5,7 @@ function gameLoop() {
     updatePlayer();
     updateBossLocks();
     updateEnemies();
+    updateProjectiles();
     updateFloorTimer();
     updateVisibility();
     updatePrompt();

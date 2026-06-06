@@ -44,7 +44,11 @@ function updatePlayer() {
   dy += gamepadState.moveY + touchState.moveY;
 
   const len = Math.hypot(dx, dy);
-  if (len > 0) { dx = dx / len * player.speed; dy = dy / len * player.speed; }
+  if (len > 0) {
+    updatePlayerAim(dx, dy);
+    dx = dx / len * player.speed;
+    dy = dy / len * player.speed;
+  }
 
   moveEntity(player, dx, dy);
   player.attackCooldown = Math.max(0, player.attackCooldown - 1);
@@ -159,45 +163,141 @@ for (const enemy of enemies) {
   }
 }
 
+function angleDifference(a, b) {
+  let diff = a - b;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return Math.abs(diff);
+}
+
+function getWeaponDamage(weapon) {
+  return weapon.damage + Math.max(0, player.attackDamage - 20);
+}
+
+function damageEnemy(enemy, damage) {
+  if (!enemy || enemy.hp <= 0) return false;
+  if (enemy.boss) triggerBossAggro("attack");
+  enemy.hp -= damage;
+  if (enemy.hp <= 0) {
+    stats.enemiesKilled++;
+    changeAudience(enemy.boss ? 10 : 4);
+    gainXP(enemy.xpReward || 15);
+    createCorpse(enemy);
+    if (enemy.boss) completeBossEncounter(enemy);
+    achievement("NEW ACHIEVEMENT: Pest Control Adjacent", `You killed a level ${enemy.level || 1} dungeon creature. It left behind a corpse. The dungeon calls this an interactive container with smell.`);
+  }
+  return true;
+}
+
+function enemyInCircle(enemy, radius) {
+  return Math.hypot(player.x - enemy.x, player.y - enemy.y) <= radius + enemy.r;
+}
+
+function enemyInArc(enemy, radius, arcAngle) {
+  const dx = enemy.x - player.x;
+  const dy = enemy.y - player.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist > radius + enemy.r) return false;
+  const enemyAngle = Math.atan2(dy, dx);
+  const aimAngle = Math.atan2(player.aimY, player.aimX);
+  return angleDifference(enemyAngle, aimAngle) <= arcAngle / 2;
+}
+
+function enemyInLine(enemy, length, width) {
+  const dx = enemy.x - player.x;
+  const dy = enemy.y - player.y;
+  const forward = dx * player.aimX + dy * player.aimY;
+  if (forward < -enemy.r || forward > length + enemy.r) return false;
+  const side = Math.abs(dx * player.aimY - dy * player.aimX);
+  return side <= width / 2 + enemy.r;
+}
+
+function addAttackTelegraph(weapon) {
+  attackTelegraphs.push({
+    x: player.x,
+    y: player.y,
+    aimX: player.aimX,
+    aimY: player.aimY,
+    shape: { ...weapon.attackShape },
+    color: weapon.telegraphColor,
+    life: 12,
+    maxLife: 12
+  });
+}
+
 function attack() {
   if (player.attackCooldown > 0 || gameWon || gameLost) return;
-  player.attackCooldown = 34;
-  let hit = false;
-  for (const corpse of corpses) {
-    if (corpse.looted) continue;
-    const tx = Math.floor(corpse.x / TILE), ty = Math.floor(corpse.y / TILE);
-    if (!visible[ty]?.[tx]) continue;
+  const weapon = getCurrentWeapon();
+  const shape = weapon.attackShape;
+  const damage = getWeaponDamage(weapon);
+  player.attackCooldown = weapon.cooldown;
+  addAttackTelegraph(weapon);
 
-    ctx.fillStyle = corpse.boss ? "rgba(120,70,160,0.9)" : "rgba(105,88,72,0.9)";
-    ctx.beginPath();
-    ctx.ellipse(corpse.x, corpse.y + 2, corpse.r + 4, Math.max(6, corpse.r * 0.55), 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = corpse.boss ? "rgba(255,216,107,0.85)" : "rgba(210,190,160,0.35)";
-    ctx.lineWidth = corpse.boss ? 2 : 1;
-    ctx.stroke();
-    ctx.lineWidth = 1;
+  if (shape.type === "projectile") {
+    projectiles.push({
+      x: player.x + player.aimX * (player.r + 6),
+      y: player.y + player.aimY * (player.r + 6),
+      vx: player.aimX * shape.speed,
+      vy: player.aimY * shape.speed,
+      remainingRange: weapon.range,
+      radius: shape.radius,
+      damage,
+      color: weapon.telegraphColor,
+      hitEnemies: new Set(),
+      hit: false
+    });
+    return;
   }
 
+  let hit = false;
   for (const enemy of enemies) {
     if (enemy.hp <= 0) continue;
-    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-    if (dist < 58) {
-      if (enemy.boss) triggerBossAggro("attack");
-        enemy.hp -= player.attackDamage;
-      hit = true;
-      if (enemy.hp <= 0) {
-        stats.enemiesKilled++;
-        changeAudience(enemy.boss ? 10 : 4);
-        gainXP(enemy.xpReward || 15);
-        createCorpse(enemy);
-        if (enemy.boss) completeBossEncounter(enemy);
-        achievement("NEW ACHIEVEMENT: Pest Control Adjacent", `You killed a level ${enemy.level || 1} dungeon creature. It left behind a corpse. The dungeon calls this an interactive container with smell.`);
-      }
-    }
+    let inShape = false;
+    if (shape.type === "circle") inShape = enemyInCircle(enemy, shape.radius);
+    if (shape.type === "arc") inShape = enemyInArc(enemy, shape.radius, shape.angle);
+    if (shape.type === "line") inShape = enemyInLine(enemy, shape.length, shape.width);
+    if (inShape) hit = damageEnemy(enemy, damage) || hit;
   }
+
   if (!hit) stats.missedAttacks++;
   if (!hit && !achievements.has("airPunch")) achievement("NEW ACHIEVEMENT: Ghost Violence", "You attacked the air. The air has declined to press charges.", "airPunch");
+}
+
+function updateProjectiles() {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const projectile = projectiles[i];
+    const step = Math.hypot(projectile.vx, projectile.vy);
+    projectile.x += projectile.vx;
+    projectile.y += projectile.vy;
+    projectile.remainingRange -= step;
+
+    if (projectile.remainingRange <= 0 || isBlocked(projectile.x, projectile.y)) {
+      if (!projectile.hit) {
+        stats.missedAttacks++;
+        if (!achievements.has("airPunch")) achievement("NEW ACHIEVEMENT: Ghost Violence", "You attacked the air. The air has declined to press charges.", "airPunch");
+      }
+      projectiles.splice(i, 1);
+      continue;
+    }
+
+    let hit = false;
+    for (const enemy of enemies) {
+      if (enemy.hp <= 0 || projectile.hitEnemies.has(enemy)) continue;
+      if (Math.hypot(projectile.x - enemy.x, projectile.y - enemy.y) <= projectile.radius + enemy.r) {
+        projectile.hitEnemies.add(enemy);
+        damageEnemy(enemy, projectile.damage);
+        projectile.hit = true;
+        hit = true;
+        break;
+      }
+    }
+    if (hit) projectiles.splice(i, 1);
+  }
+
+  for (let i = attackTelegraphs.length - 1; i >= 0; i--) {
+    attackTelegraphs[i].life--;
+    if (attackTelegraphs[i].life <= 0) attackTelegraphs.splice(i, 1);
+  }
 }
 
 function interact() {

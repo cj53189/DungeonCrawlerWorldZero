@@ -223,6 +223,69 @@ function drawEngravedRoomNames(camX, camY) {
   ctx.restore();
 }
 
+function drawAttackTelegraph(telegraph) {
+  const shape = telegraph.shape;
+  const alpha = Math.max(0, telegraph.life / telegraph.maxLife);
+  const aimAngle = Math.atan2(telegraph.aimY, telegraph.aimX);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = telegraph.color;
+  ctx.fillStyle = telegraph.color.replace(/rgba\(([^)]+),[^,]+\)$/u, "rgba($1,0.10)");
+  ctx.lineWidth = 3;
+
+  if (shape.type === "circle") {
+    ctx.beginPath();
+    ctx.arc(telegraph.x, telegraph.y, shape.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  } else if (shape.type === "arc") {
+    const start = aimAngle - shape.angle / 2;
+    const end = aimAngle + shape.angle / 2;
+    ctx.beginPath();
+    ctx.moveTo(telegraph.x, telegraph.y);
+    ctx.arc(telegraph.x, telegraph.y, shape.radius, start, end);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (shape.type === "line") {
+    const half = shape.width / 2;
+    const endX = telegraph.x + telegraph.aimX * shape.length;
+    const endY = telegraph.y + telegraph.aimY * shape.length;
+    const sideX = -telegraph.aimY * half;
+    const sideY = telegraph.aimX * half;
+    ctx.beginPath();
+    ctx.moveTo(telegraph.x + sideX, telegraph.y + sideY);
+    ctx.lineTo(endX + sideX, endY + sideY);
+    ctx.lineTo(endX - sideX, endY - sideY);
+    ctx.lineTo(telegraph.x - sideX, telegraph.y - sideY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (shape.type === "projectile") {
+    ctx.beginPath();
+    ctx.moveTo(telegraph.x, telegraph.y);
+    ctx.lineTo(telegraph.x + telegraph.aimX * 44, telegraph.y + telegraph.aimY * 44);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawCombatVisuals() {
+  for (const telegraph of attackTelegraphs) drawAttackTelegraph(telegraph);
+
+  for (const projectile of projectiles) {
+    const tx = Math.floor(projectile.x / TILE), ty = Math.floor(projectile.y / TILE);
+    if (!visible[ty]?.[tx]) continue;
+    ctx.fillStyle = projectile.color || "rgba(255,240,135,0.8)";
+    ctx.beginPath();
+    ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.65)";
+    ctx.stroke();
+  }
+}
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -309,13 +372,16 @@ for (const enemy of enemies) {
     ctx.fillText(`${enemy.boss ? "BOSS " : ""}Lv ${enemy.level || 1}`, enemy.x, enemy.y - 27);
   }
 
+  drawCombatVisuals();
+
   ctx.fillStyle = player.safe ? "#7be07b" : "#f1f1f1";
   ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
 
-  if (player.attackCooldown > 24) {
-    ctx.strokeStyle = "rgba(255,255,255,0.55)";
-    ctx.beginPath(); ctx.arc(player.x, player.y, 58, 0, Math.PI * 2); ctx.stroke();
-  }
+  ctx.strokeStyle = "rgba(255,216,107,0.75)";
+  ctx.beginPath();
+  ctx.moveTo(player.x, player.y);
+  ctx.lineTo(player.x + player.aimX * (player.r + 9), player.y + player.aimY * (player.r + 9));
+  ctx.stroke();
 
   if (collapseStarted && frameCount % 30 < 15) {
     ctx.fillStyle = "rgba(150, 20, 20, 0.08)";
