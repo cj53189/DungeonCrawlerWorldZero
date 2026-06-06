@@ -46,14 +46,23 @@ function rollScaledEnemyLevel(room, spawnRoom) {
 
 function rollEnemyLoot(enemy) {
   const loot = [];
-  const coins = (enemy.boss ? 18 : 2) + Math.floor(Math.random() * (enemy.boss ? 24 : 7)) + Math.floor((enemy.level || 1) * (enemy.boss ? 3 : 1.2));
-  if (coins > 0) loot.push({ type: "coins", amount: coins, name: `${coins} Coins` });
+  const level = enemy.level || 1;
+  const goldChance = enemy.boss ? 1 : 0.68;
+  if (Math.random() < goldChance) {
+    const coins = (enemy.boss ? 18 : 1) + Math.floor(Math.random() * (enemy.boss ? 24 : 6)) + Math.floor(level * (enemy.boss ? 3 : 0.8));
+    if (coins > 0) loot.push(generateGoldItem(coins));
+  }
 
-  const gearChance = enemy.boss ? 0.85 : 0.09 + Math.min(0.12, (enemy.level || 1) * 0.01);
-  const boxChance = enemy.boss ? 0.95 : 0.07 + Math.min(0.10, currentFloor * 0.015);
+  const forceRare = enemy.boss || level > player.level + 2;
+  const weaponChance = enemy.boss ? 0.55 : 0.05 + Math.min(0.07, level * 0.006);
+  const gearChance = enemy.boss ? 0.72 : 0.07 + Math.min(0.10, level * 0.008);
+  const boxChance = enemy.boss ? 0.45 : 0.035 + Math.min(0.06, currentFloor * 0.01);
+  const junkChance = enemy.boss ? 0.20 : 0.18;
 
-  if (Math.random() < gearChance) loot.push(generateGear(enemy.boss || enemy.level > player.level + 2));
-  if (Math.random() < boxChance) loot.push(generateLootBox(enemy.boss || enemy.level > player.level + 2));
+  if (Math.random() < weaponChance) loot.push(generateWeaponItem(forceRare));
+  if (Math.random() < gearChance) loot.push(generateGear(forceRare));
+  if (Math.random() < boxChance) loot.push(generateLootBox(forceRare));
+  if (Math.random() < junkChance || loot.length === 0) loot.push(generateJunkItem());
   return loot;
 }
 
@@ -74,35 +83,5 @@ function createCorpse(enemy) {
 }
 
 function lootCorpse(corpse) {
-  if (!corpse || corpse.looted) return;
-  corpse.looted = true;
-
-  if (!corpse.loot.length) {
-    announcer(`You searched ${corpse.name}. It contained disappointment and several fluids best left unidentified.`);
-    return;
-  }
-
-  const gained = [];
-  for (const item of corpse.loot) {
-    if (item.type === "coins") {
-      player.coins += item.amount;
-      gained.push(`${item.amount} coins`);
-    } else {
-      player.inventory.push(item);
-      if (item.type === "lootbox") stats.lootBoxesFound++;
-      if (item.type === "gear") stats.gearFound++;
-      gained.push(item.name);
-    }
-  }
-
-  changeAudience(corpse.boss ? 8 : 1);
-  achievement(
-    corpse.boss ? "BOSS CORPSE LOOTED" : "CORPSE LOOTED",
-    `You searched ${corpse.name} and found ${gained.join(", ")}. The dungeon reminds you this is technically recycling.`,
-    `loot_${corpse.id}`
-  );
-  updateInventoryUI();
-  updateHUD();
+  openCorpseLoot(corpse);
 }
-
-
