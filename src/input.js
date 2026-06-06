@@ -330,6 +330,9 @@ window.addEventListener("gamepaddisconnected", () => {
   gamepadState.connected = false;
   gamepadState.name = "";
   gamepadState.previousButtons = [];
+  gamepadState.aimX = 0;
+  gamepadState.aimY = 0;
+  gamepadState.hasAimInput = false;
   updateInputVisibility();
   updateHUD();
 });
@@ -358,6 +361,9 @@ function pollGamepad() {
     }
     gamepadState.moveX = 0;
     gamepadState.moveY = 0;
+    gamepadState.aimX = 0;
+    gamepadState.aimY = 0;
+    gamepadState.hasAimInput = false;
     return;
   }
 
@@ -369,11 +375,23 @@ function pollGamepad() {
 
   const axisX = gp.axes[0] || 0;
   const axisY = gp.axes[1] || 0;
+  const aimAxisX = gp.axes[2] || 0;
+  const aimAxisY = gp.axes[3] || 0;
   const dpadX = (gp.buttons[15]?.pressed ? 1 : 0) - (gp.buttons[14]?.pressed ? 1 : 0);
   const dpadY = (gp.buttons[13]?.pressed ? 1 : 0) - (gp.buttons[12]?.pressed ? 1 : 0);
 
   gamepadState.moveX = Math.abs(axisX) > GAMEPAD_DEADZONE ? axisX : dpadX;
   gamepadState.moveY = Math.abs(axisY) > GAMEPAD_DEADZONE ? axisY : dpadY;
+
+  const aimLength = Math.hypot(aimAxisX, aimAxisY);
+  if (aimLength > GAMEPAD_DEADZONE) {
+    gamepadState.aimX = aimAxisX;
+    gamepadState.aimY = aimAxisY;
+    gamepadState.hasAimInput = true;
+  } else {
+    gamepadState.aimX = 0;
+    gamepadState.aimY = 0;
+  }
 
   const justPressed = (index) => {
     const pressed = gp.buttons[index]?.pressed || false;
