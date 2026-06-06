@@ -1,0 +1,3200 @@
+<!DOCTYPE html>
+<!-- dcw_010 -->
+<!-- dcw_009 -->
+<!-- dcw_008 -->
+<!-- dcw_007 -->
+<!-- dcw_006 -->
+<!-- dcw_005 -->
+<!-- dcw_004 -->
+<!-- dcw_003 -->
+<!-- dcw_002 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Dungeon Crawler World v1.0 - dcw_010</title>
+  <style>
+    html, body { margin: 0; padding: 0; overflow: hidden; background: #111; font-family: Arial, sans-serif; color: white; }
+    canvas { display: block; background: #171717; }
+
+
+    #hud {
+      position: fixed; top: 12px; left: 12px; z-index: 10;
+      background: rgba(0,0,0,0.64); padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,0.22); border-radius: 10px;
+      line-height: 1.2; font-size: 14px; width: 245px; min-width: 0;
+      box-shadow: 0 0 18px rgba(0,0,0,0.25);
+    }
+
+    .hudTop {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 7px;
+      letter-spacing: 0.03em;
+    }
+
+    .hudCoins {
+      color: #ffd86b;
+      font-weight: bold;
+      font-size: 13px;
+    }
+
+    .hudBar {
+      position: relative;
+      height: 18px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.22);
+      margin: 5px 0;
+    }
+
+    .hudBarFill {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 100%;
+      transition: width 0.18s linear;
+    }
+
+    .hpBar .hudBarFill {
+      background: linear-gradient(90deg, #8f1515, #e64242);
+    }
+
+    .xpBar .hudBarFill {
+      background: linear-gradient(90deg, #9f7a13, #ffd86b);
+    }
+
+    .hudBarText {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      text-shadow: 0 1px 2px #000, 0 0 4px #000;
+      letter-spacing: 0.02em;
+      pointer-events: none;
+    }
+
+    .hudMeta {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 7px;
+      font-size: 12px;
+      color: #ddd;
+    }
+
+    .hudMeta span span {
+      color: #fff;
+      font-weight: bold;
+    }
+
+    .hudStair {
+      display: none;
+      margin-top: 6px;
+      font-size: 11px;
+      color: #9db1ff;
+      font-weight: bold;
+      text-shadow: 0 1px 2px #000;
+    }
+
+    .hudStair.visible {
+      display: block;
+    }
+
+    #announcer {
+      position: fixed; right: 16px; top: 16px; width: 340px; z-index: 20;
+      display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+    }
+
+    .popup {
+      background: rgba(15, 15, 15, 0.94); border: 2px solid #d6b55c;
+      border-radius: 10px; padding: 12px; box-shadow: 0 0 22px rgba(214,181,92,0.25);
+      animation: slideIn 0.25s ease-out, fadeOut 0.5s ease-in 7.2s forwards;
+    }
+    .popup .title { color: #ffd86b; font-weight: bold; font-size: 16px; margin-bottom: 4px; text-transform: uppercase; }
+    .popup .body { font-size: 14px; color: #eee; line-height: 1.35; }
+
+    #prompt {
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+      z-index: 12; background: rgba(0,0,0,0.68); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 999px; padding: 8px 14px; font-size: 14px; display: none;
+    }
+
+    #logPanel {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      pointer-events: auto;
+      position: fixed; left: 12px; bottom: 12px; width: 380px; max-height: 240px; overflow-y: auto;
+      z-index: 120; background: rgba(0,0,0,0.82); border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 8px; padding: 10px; font-size: 13px; display: none;
+    }
+    #logPanel h3 { margin: 0 0 8px 0; color: #ffd86b; font-size: 14px; }
+    .logEntry { border-top: 1px solid rgba(255,255,255,0.12); padding: 7px 0; color: #ddd; }
+    .logEntry:first-of-type { border-top: none; }
+    .logTitle { color: #ffd86b; font-weight: bold; }
+
+    #safeRoomRecap {
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      pointer-events: auto;
+      position: fixed; left: 12px; bottom: 12px; width: 245px; z-index: 120;
+      background: rgba(0,0,0,0.82); border: 1px solid rgba(123, 224, 123, 0.35);
+      border-radius: 10px; padding: 8px; display: none;
+      box-shadow: 0 0 16px rgba(123,224,123,0.10); font-size: 11px;
+      max-height: 210px; overflow-y: auto;
+    }
+    #safeRoomRecap h3 { margin: 0 0 5px 0; color: #9cff9c; font-size: 11px; text-transform: uppercase; }
+    .recapLine { display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.10); padding: 3px 0; gap: 10px; }
+    .recapLine:first-of-type { border-top: none; }
+    .recapComment { margin-top: 5px; color: #ddd; font-style: italic; line-height: 1.25; }
+
+    #centerMessage {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      z-index: 30; background: rgba(0,0,0,0.72); text-align: center; padding: 30px;
+    }
+    #centerMessage .box {
+      max-width: 650px; background: #1d1d1d; border: 2px solid #d6b55c;
+      border-radius: 14px; padding: 24px; box-shadow: 0 0 30px rgba(214,181,92,0.25);
+    }
+    #centerMessage h1 { margin-top: 0; color: #ffd86b; }
+    #centerMessage button {
+      margin-top: 16px; font-size: 16px; padding: 10px 18px; border: none;
+      border-radius: 8px; cursor: pointer; background: #d6b55c; color: #111; font-weight: bold;
+    }
+
+    @keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes fadeOut { to { opacity: 0; transform: translateX(20px); } }
+  
+    #touchControls {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 25;
+      pointer-events: none;
+      touch-action: none;
+      user-select: none;
+    }
+
+    body.showTouchControls #touchControls { display: block; }
+
+    #stickBase {
+      position: absolute;
+      left: 24px;
+      bottom: 24px;
+      width: 128px;
+      height: 128px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.10);
+      border: 2px solid rgba(255,255,255,0.20);
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    #stickKnob {
+      position: absolute;
+      left: 39px;
+      top: 39px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.38);
+      border: 1px solid rgba(255,255,255,0.45);
+    }
+
+    .touchButton {
+      position: absolute;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(214,181,92,0.24);
+      border: 2px solid rgba(255,216,107,0.45);
+      color: #fff;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: auto;
+      touch-action: none;
+      text-shadow: 0 1px 2px #000;
+    }
+
+    #btnAttack { right: 34px; bottom: 40px; }
+    #btnInteract { right: 116px; bottom: 100px; width: 64px; height: 64px; }
+    #btnLog { right: 24px; top: 74px; width: 52px; height: 52px; font-size: 12px; }
+    #btnRecap { right: 84px; top: 74px; width: 52px; height: 52px; font-size: 11px; }
+    #btnNew { right: 144px; top: 74px; width: 52px; height: 52px; font-size: 11px; }
+
+    #controllerHint {
+      display: none;
+      position: absolute;
+      left: 50%;
+      top: 8px;
+      transform: translateX(-50%);
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.55);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: #ddd;
+      font-size: 11px;
+      pointer-events: none;
+    }
+
+    @media (hover: none) and (pointer: coarse), (max-width: 900px) {
+      html, body {
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+      }
+
+      #touchControls {
+        display: none;
+      }
+
+      #hud {
+        top: 8px;
+        left: 8px;
+        width: 178px;
+        font-size: 10px;
+        line-height: 1.15;
+        padding: 7px 8px;
+        max-width: 44vw;
+      }
+
+      .hudBar {
+        height: 15px;
+        margin: 4px 0;
+      }
+
+      .hudBarText {
+        font-size: 9px;
+      }
+
+      .hudMeta {
+        font-size: 9px;
+        margin-top: 5px;
+      }
+
+      .hudCoins {
+        font-size: 10px;
+      }
+
+      .hudStair {
+        font-size: 9px;
+      }
+
+      #announcer {
+        top: 8px;
+        right: 8px;
+        width: 260px;
+        max-width: 45vw;
+        gap: 6px;
+      }
+
+      .popup {
+        padding: 8px;
+        border-width: 1px;
+      }
+
+      .popup .title {
+        font-size: 12px;
+      }
+
+      .popup .body {
+        font-size: 11px;
+        line-height: 1.25;
+      }
+
+      #prompt {
+        bottom: 10px;
+        font-size: 11px;
+        padding: 5px 9px;
+        max-width: 42vw;
+        white-space: nowrap;
+      }
+
+      #logPanel {
+        left: 8px;
+        bottom: 160px;
+        width: 310px;
+        max-width: 52vw;
+        max-height: 160px;
+        font-size: 11px;
+      }
+
+      #safeRoomRecap {
+        left: 8px;
+        bottom: 8px;
+        width: 220px;
+        max-width: 36vw;
+        font-size: 10px;
+      }
+
+      #safeRoomRecap h3 {
+        font-size: 10px;
+      }
+
+      .recapLine {
+        padding: 3px 0;
+      }
+
+      #centerMessage .box {
+        max-width: 80vw;
+        padding: 16px;
+      }
+
+      #centerMessage h1 {
+        font-size: 20px;
+      }
+
+      #centerMessage p {
+        font-size: 13px;
+      }
+
+      #centerMessage button {
+        font-size: 14px;
+        padding: 8px 12px;
+      }
+    }
+
+    @media (orientation: portrait) and (hover: none) {
+      #centerMessage {
+        display: flex;
+      }
+
+      #centerTitle::after {
+        content: "";
+      }
+    }
+
+  
+    .panelClose {
+      position: absolute;
+      top: 4px;
+      right: 6px;
+      width: 24px;
+      height: 24px;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 16px;
+      line-height: 20px;
+      cursor: pointer;
+      z-index: 100;
+    }
+
+  
+
+    #inventoryPanel {
+      -webkit-overflow-scrolling: touch; overscroll-behavior: contain; pointer-events: auto;
+      position: fixed; left: 12px; bottom: 12px; width: 330px; max-height: 300px; overflow-y: auto;
+      z-index: 120; background: rgba(0,0,0,0.84); border: 1px solid rgba(214,181,92,0.35);
+      border-radius: 10px; padding: 10px; font-size: 12px; display: none;
+    }
+    #inventoryPanel h3 { margin: 0 0 8px 0; color: #ffd86b; font-size: 13px; text-transform: uppercase; }
+    .equipGrid { display: grid; grid-template-columns: 72px 1fr; gap: 4px 8px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.14); }
+    .invItem { border-top: 1px solid rgba(255,255,255,0.12); padding: 7px 0; color: #ddd; }
+    .invItem:first-child { border-top: none; }
+    .itemName { color: #ffd86b; font-weight: bold; }
+    .itemMeta { color: #bbb; font-size: 11px; line-height: 1.25; margin-top: 2px; }
+    .itemActions { margin-top: 5px; display:flex; gap:5px; flex-wrap:wrap; }
+    .itemBtn { border:1px solid rgba(255,255,255,0.22); border-radius:6px; background:rgba(255,255,255,0.08); color:#fff; padding:4px 7px; font-size:11px; cursor:pointer; }
+    #inventoryHelp { color:#aaa; font-size:11px; margin-top:8px; font-style:italic; }
+    #btnInv { right:204px; top:74px; width:52px; height:52px; font-size:11px; }
+    @media (hover:none) and (pointer:coarse), (max-width:900px) {
+      #inventoryPanel { left:8px; bottom:8px; width:300px; max-width:54vw; max-height:170px; font-size:10px; }
+      #inventoryPanel h3 { font-size:10px; }
+      .itemMeta,#inventoryHelp,.itemBtn { font-size:9px; }
+    }
+
+  
+    #floorSplash {
+      position: fixed; inset: 0; z-index: 28; display: none; align-items: center; justify-content: center;
+      pointer-events: none; font-size: clamp(42px, 8vw, 96px); font-weight: 900; letter-spacing: 0.08em;
+      text-transform: uppercase; color: #ffd86b;
+      text-shadow: 0 0 18px rgba(214,181,92,0.55), 0 4px 10px #000;
+      background: rgba(0,0,0,0.18); animation: floorSplashFade 1.8s ease-out forwards;
+    }
+    @keyframes floorSplashFade {
+      0% { opacity: 0; transform: scale(0.96); }
+      18% { opacity: 1; transform: scale(1); }
+      70% { opacity: 1; }
+      100% { opacity: 0; transform: scale(1.04); }
+    }
+
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div class="hudTop"><strong>FLOOR <span id="floorNumber">0</span></strong><span class="hudCoins">¢ <span id="coins">0</span></span></div>
+
+    <div class="hudBar hpBar">
+      <div id="hpFill" class="hudBarFill"></div>
+      <div id="hpText" class="hudBarText">100 / 100</div>
+    </div>
+
+    <div class="hudBar xpBar">
+      <div id="xpFill" class="hudBarFill"></div>
+      <div id="xpText" class="hudBarText">LV 1 · 0 / 40</div>
+    </div>
+
+    <div class="hudMeta">
+      <span>Audience <span id="audience">10</span></span>
+      <span>Collapse <span id="timer">10:00</span></span>
+    </div>
+
+    <div id="stairHud" class="hudStair">Stairwell marked</div>
+
+    <!-- Hidden compatibility spans. Existing game code still updates these safely. -->
+    <span id="health" style="display:none">100</span>
+    <span id="maxHealth" style="display:none">100</span>
+    <span id="playerLevel" style="display:none">1</span>
+    <span id="playerXP" style="display:none">0</span>
+    <span id="xpNext" style="display:none">40</span>
+    <span id="roomsSeen" style="display:none">0</span>
+    <span id="roomTotal" style="display:none">0</span>
+    <span id="inventoryCount" style="display:none">0</span>
+    <span id="lootBoxCount" style="display:none">0</span>
+    <span id="currentRoomName" style="display:none">Safe Room</span>
+    <span id="stairStatus" style="display:none">Unknown</span>
+  </div>
+
+  <div id="announcer"></div>
+  <div id="prompt"></div>
+
+  <div id="touchControls" aria-hidden="true">
+    <div id="stickBase"><div id="stickKnob"></div></div>
+    <div id="btnAttack" class="touchButton">ATK</div>
+    <div id="btnInteract" class="touchButton">E</div>
+    <div id="btnLog" class="touchButton">LOG</div>
+    <div id="btnRecap" class="touchButton">RECAP</div>
+    <div id="btnNew" class="touchButton">NEW</div>
+    <div id="btnInv" class="touchButton">INV</div>
+    <div id="controllerHint">Controller: left stick/D-pad move · A interact · X/RB/RT attack</div>
+  </div>
+
+
+  <div id="safeRoomRecap">
+    <button id="closeRecapBtn" class="panelClose">×</button>
+    <h3>Safe Room Performance Review</h3>
+    <div id="recapStats"></div>
+    <div id="recapComment" class="recapComment"></div>
+  </div>
+
+  <div id="logPanel">
+    <button id="closeLogBtn" class="panelClose">×</button>
+    <h3>Recent Dungeon Commentary</h3>
+    <div id="logEntries"></div>
+  </div>
+
+  <div id="inventoryPanel">
+    <button id="closeInventoryBtn" class="panelClose">×</button>
+    <h3>Inventory</h3>
+    <div id="equipmentStats"></div>
+    <div id="inventoryList"></div>
+    <div id="inventoryHelp">Loot boxes can only be opened in safe rooms.</div>
+  </div>
+
+  <div id="floorSplash"></div>
+
+  <div id="centerMessage">
+    <div class="box">
+      <h1 id="centerTitle"></h1>
+      <p id="centerText"></p>
+      <button id="centerButton" onclick="restartGame()">Generate New Floor</button>
+    </div>
+  </div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const TILE = 32;
+const MAP_ROWS = 80;
+const MAP_COLS = 110;
+const VIEW_RADIUS = 9;
+const MEMORY_RADIUS = 12;
+
+let map, seen, visible, rooms, enemies, corpses, openedChests, achievements, achievementHistory, activePopups;
+let bossRoom=null,bossEnemy=null,currentRoomName="Safe Room";
+let currentFloor = 0, stairwellFound = false, stairwellX = null, stairwellY = null, finalDescentAnnounced = false;
+let bossLockTiles = [];
+let bossAggroed = false;
+let bossDoorsLocked = false;
+let pendingBossLocks = [];
+let pendingFloorAdvance = false;
+let minimapCanvas=document.createElement("canvas"),minimapCtx=minimapCanvas.getContext("2d"),minimapDirty=true,minimapLastScale=null;
+let lastVisibilityTileX=null,lastVisibilityTileY=null,visibilityDirty=true;
+let roomRevealState = { roomId: null, startFrame: 0, originX: 0, originY: 0, maxDist: 0, complete: false };
+let gameWon, gameLost, frameCount, floorTimeLeft, collapseStarted;
+let warnedAt360, warnedAt240, warnedAt120, warnedAt60, warnedAt30;
+let lastObservationFrame, audienceScore, currentReputation, roomsSeen;
+
+const MAX_ACTIVE_POPUPS = 2;
+const POPUP_LIFETIME_MS = 7800;
+const OBSERVATION_INTERVAL_FRAMES = 60 * 25;
+
+const player = {
+  x: TILE * 2.5, y: TILE * 2.5, r: 11, speed: 2.45,
+  hp: 100, maxHp: 100, coins: 0,
+  level: 1, xp: 0, xpToNext: 40, attackDamage: 20,
+  baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{},
+  attackCooldown: 0, safe: true, wasSafe: true, currentRoomId:null, lastTileX:0, lastTileY:0
+};
+
+const stats = {
+  doorsOpened: 0, chestsOpened: 0, enemiesKilled: 0, damageTaken: 0,
+  missedAttacks: 0, wallBumps: 0, interactionsWithNothing: 0,
+  timeInSafeRoomFrames: 0, timeOutsideSafeRoomFrames: 0, potshotsFromAI: 0,
+  riskyMoments: 0, safeRoomEntries: 0, exitFinds: 0, floorRooms: 0, lootBoxesFound:0, lootBoxesOpened:0, gearFound:0, bossesDefeated:0
+};
+
+const keys = {};
+const gamepadState = { connected: false, name: "", moveX: 0, moveY: 0, previousButtons: [] };
+const touchState = { moveX: 0, moveY: 0, activeTouchId: null, baseX: 0, baseY: 0 };
+const GAMEPAD_DEADZONE = 0.22;
+
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; if (typeof updateInputVisibility === 'function') updateInputVisibility(); }
+window.addEventListener("resize", resize);
+resize();
+
+
+function isMobileLike() {
+  return window.matchMedia("(hover: none) and (pointer: coarse)").matches || window.innerWidth <= 900;
+}
+
+function setupTouchControls() {
+  const base = document.getElementById("stickBase");
+  const knob = document.getElementById("stickKnob");
+  const btnAttack = document.getElementById("btnAttack");
+  const btnInteract = document.getElementById("btnInteract");
+  const btnLog = document.getElementById("btnLog");
+  const btnRecap = document.getElementById("btnRecap");
+  const btnNew = document.getElementById("btnNew");
+  const btnInv = document.getElementById("btnInv");
+
+  const prevent = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  function resetStick() {
+    touchState.moveX = 0;
+    touchState.moveY = 0;
+    touchState.activeTouchId = null;
+    knob.style.left = "39px";
+    knob.style.top = "39px";
+  }
+
+  function updateStick(clientX, clientY) {
+    const rect = base.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    const max = rect.width / 2 - 25;
+    const dist = Math.hypot(dx, dy);
+    const clamped = Math.min(max, dist);
+    const angle = Math.atan2(dy, dx);
+
+    const knobX = Math.cos(angle) * clamped;
+    const knobY = Math.sin(angle) * clamped;
+
+    knob.style.left = `${39 + knobX}px`;
+    knob.style.top = `${39 + knobY}px`;
+
+    touchState.moveX = Math.abs(dx / max) > 0.12 ? Math.max(-1, Math.min(1, dx / max)) : 0;
+    touchState.moveY = Math.abs(dy / max) > 0.12 ? Math.max(-1, Math.min(1, dy / max)) : 0;
+  }
+
+  base.addEventListener("touchstart", e => {
+    prevent(e);
+    const t = e.changedTouches[0];
+    touchState.activeTouchId = t.identifier;
+    updateStick(t.clientX, t.clientY);
+  }, { passive: false });
+
+  base.addEventListener("touchmove", e => {
+    prevent(e);
+    for (const t of e.changedTouches) {
+      if (t.identifier === touchState.activeTouchId) {
+        updateStick(t.clientX, t.clientY);
+        break;
+      }
+    }
+  }, { passive: false });
+
+  base.addEventListener("touchend", e => {
+    prevent(e);
+    for (const t of e.changedTouches) {
+      if (t.identifier === touchState.activeTouchId) {
+        resetStick();
+        break;
+      }
+    }
+  }, { passive: false });
+
+  base.addEventListener("touchcancel", e => {
+    prevent(e);
+    resetStick();
+  }, { passive: false });
+
+  btnAttack.addEventListener("touchstart", e => { prevent(e); attack(); }, { passive: false });
+  btnInteract.addEventListener("touchstart", e => { prevent(e); interact(); }, { passive: false });
+  btnLog.addEventListener("touchstart", e => { prevent(e); toggleLog(); }, { passive: false });
+  btnRecap.addEventListener("touchstart", e => { prevent(e); toggleSafeRoomRecap(); }, { passive: false });
+  btnNew.addEventListener("touchstart", e => { prevent(e); restartGame(); }, { passive: false });
+
+  btnAttack.addEventListener("click", e => { prevent(e); attack(); });
+  btnInteract.addEventListener("click", e => { prevent(e); interact(); });
+  btnLog.addEventListener("click", e => { prevent(e); toggleLog(); });
+  btnRecap.addEventListener("click", e => { prevent(e); toggleSafeRoomRecap(); });
+  btnNew.addEventListener("click", e => { prevent(e); restartGame(); });
+
+  document.addEventListener("gesturestart", e => e.preventDefault());
+  document.addEventListener("touchmove", e => {
+    const allowPanelScroll = e.target.closest && e.target.closest("#logPanel, #safeRoomRecap, #inventoryPanel, #inventoryPanel");
+    if (isMobileLike() && !allowPanelScroll) e.preventDefault();
+  }, { passive: false });
+}
+
+
+function setupDirectPanelButtonFallbacks() {
+  const logBtn = document.getElementById("btnLog");
+  const recapBtn = document.getElementById("btnRecap");
+
+  const bindDirect = (el, fn) => {
+    if (!el) return;
+
+    let last = 0;
+    const fire = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const now = performance.now();
+      if (now - last < 180) return;
+      last = now;
+      fn();
+    };
+
+    el.addEventListener("pointerdown", fire, { passive: false, capture: true });
+    el.addEventListener("touchstart", fire, { passive: false, capture: true });
+    el.addEventListener("click", fire, { capture: true });
+  };
+
+  bindDirect(logBtn, toggleLogPanelMobile);
+  bindDirect(recapBtn, toggleRecapPanelMobile);
+}
+
+
+
+function setupInventoryButtonFallback() {
+  const invBtn = document.getElementById("btnInv");
+  if (!invBtn || invBtn.dataset.invFallbackBound === "true") return;
+  invBtn.dataset.invFallbackBound = "true";
+
+  let last = 0;
+  const fire = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+    const now = performance.now();
+    if (now - last < 180) return;
+    last = now;
+
+    toggleInventoryPanel();
+  };
+
+  invBtn.addEventListener("pointerdown", fire, { passive: false, capture: true });
+  invBtn.addEventListener("touchstart", fire, { passive: false, capture: true });
+  invBtn.addEventListener("click", fire, { capture: true });
+}
+
+
+setupTouchControls();
+setupInventoryButtonFallback();
+
+
+function isMobileLike() {
+  return window.matchMedia("(hover: none) and (pointer: coarse)").matches || window.innerWidth <= 900;
+}
+
+function updateInputVisibility() {
+  const shouldShowTouch = isMobileLike() && !gamepadState.connected;
+  document.body.classList.toggle("showTouchControls", shouldShowTouch);
+}
+
+function setupTouchControls() {
+  const base = document.getElementById("stickBase");
+  const knob = document.getElementById("stickKnob");
+  const btnAttack = document.getElementById("btnAttack");
+  const btnInteract = document.getElementById("btnInteract");
+  const btnLog = document.getElementById("btnLog");
+  const btnRecap = document.getElementById("btnRecap");
+  const btnNew = document.getElementById("btnNew");
+  const btnInv = document.getElementById("btnInv");
+
+  if (!base || !knob) return;
+
+  const prevent = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  function resetStick() {
+    touchState.moveX = 0;
+    touchState.moveY = 0;
+    touchState.activeTouchId = null;
+    knob.style.left = "36px";
+    knob.style.top = "36px";
+  }
+
+  function updateStick(clientX, clientY) {
+    const rect = base.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    const max = rect.width / 2 - 23;
+    const dist = Math.hypot(dx, dy);
+    const clamped = Math.min(max, dist);
+    const angle = Math.atan2(dy, dx);
+
+    const knobX = Math.cos(angle) * clamped;
+    const knobY = Math.sin(angle) * clamped;
+
+    knob.style.left = `${36 + knobX}px`;
+    knob.style.top = `${36 + knobY}px`;
+
+    touchState.moveX = Math.abs(dx / max) > 0.12 ? Math.max(-1, Math.min(1, dx / max)) : 0;
+    touchState.moveY = Math.abs(dy / max) > 0.12 ? Math.max(-1, Math.min(1, dy / max)) : 0;
+  }
+
+  base.addEventListener("touchstart", e => {
+    prevent(e);
+    const t = e.changedTouches[0];
+    touchState.activeTouchId = t.identifier;
+    updateStick(t.clientX, t.clientY);
+  }, { passive: false });
+
+  base.addEventListener("touchmove", e => {
+    prevent(e);
+    for (const t of e.changedTouches) {
+      if (t.identifier === touchState.activeTouchId) {
+        updateStick(t.clientX, t.clientY);
+        break;
+      }
+    }
+  }, { passive: false });
+
+  base.addEventListener("touchend", e => {
+    prevent(e);
+    for (const t of e.changedTouches) {
+      if (t.identifier === touchState.activeTouchId) {
+        resetStick();
+        break;
+      }
+    }
+  }, { passive: false });
+
+  base.addEventListener("touchcancel", e => {
+    prevent(e);
+    resetStick();
+  }, { passive: false });
+
+  const bindButton = (el, fn) => {
+    if (!el) return;
+
+    let lastFire = 0;
+    const fire = (e) => {
+      prevent(e);
+      const now = performance.now();
+      if (now - lastFire < 180) return;
+      lastFire = now;
+      fn();
+    };
+
+    el.addEventListener("pointerdown", fire, { passive: false });
+    el.addEventListener("touchstart", fire, { passive: false });
+    el.addEventListener("click", fire);
+  };
+
+  bindButton(btnAttack, attack);
+  bindButton(btnInteract, interact);
+  bindButton(btnLog, toggleLogPanelMobile);
+  bindButton(btnRecap, toggleRecapPanelMobile);
+  bindButton(btnNew, restartGame);
+  bindButton(btnInv, toggleInventoryPanel);
+
+  document.addEventListener("gesturestart", e => e.preventDefault());
+  document.addEventListener("touchmove", e => {
+    const allowPanelScroll = e.target.closest && e.target.closest("#logPanel, #safeRoomRecap, #inventoryPanel, #inventoryPanel");
+    if (isMobileLike() && !allowPanelScroll) e.preventDefault();
+  }, { passive: false });
+}
+
+
+function setupDirectPanelButtonFallbacks() {
+  const logBtn = document.getElementById("btnLog");
+  const recapBtn = document.getElementById("btnRecap");
+
+  const bindDirect = (el, fn) => {
+    if (!el) return;
+
+    let last = 0;
+    const fire = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      const now = performance.now();
+      if (now - last < 180) return;
+      last = now;
+      fn();
+    };
+
+    el.addEventListener("pointerdown", fire, { passive: false, capture: true });
+    el.addEventListener("touchstart", fire, { passive: false, capture: true });
+    el.addEventListener("click", fire, { capture: true });
+  };
+
+  bindDirect(logBtn, toggleLogPanelMobile);
+  bindDirect(recapBtn, toggleRecapPanelMobile);
+}
+
+
+setupTouchControls();
+setupPanelCloseButtons();
+setupDirectPanelButtonFallbacks();
+updateInputVisibility();
+
+window.addEventListener("gamepadconnected", e => {
+  gamepadState.connected = true;
+  gamepadState.name = e.gamepad.id || "Controller";
+  updateInputVisibility();
+  achievement("CONTROLLER CONNECTED", "A mysterious handheld device has joined the crawl. Try not to blame it for your decisions.", "controllerConnected");
+  updateHUD();
+});
+
+window.addEventListener("gamepaddisconnected", () => {
+  gamepadState.connected = false;
+  gamepadState.name = "";
+  gamepadState.previousButtons = [];
+  updateInputVisibility();
+  updateHUD();
+});
+
+window.addEventListener("keydown", e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key.toLowerCase() === "e") interact();
+  if (e.key.toLowerCase() === "l") toggleLog();
+  if (e.key.toLowerCase() === "r") toggleSafeRoomRecap();
+  if (e.key.toLowerCase() === "n") restartGame();
+  if (e.key.toLowerCase() === "i") toggleInventoryPanel();
+  if (e.code === "Space") { e.preventDefault(); attack(); }
+});
+window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+function pollGamepad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const gp = Array.from(pads).find(pad => pad && pad.connected !== false);
+  if (!gp) {
+    if (gamepadState.connected) {
+      gamepadState.connected = false;
+      updateInputVisibility();
+    }
+    gamepadState.moveX = 0;
+    gamepadState.moveY = 0;
+    return;
+  }
+
+  if (!gamepadState.connected) {
+    gamepadState.connected = true;
+    updateInputVisibility();
+  }
+  gamepadState.name = gp.id || "Controller";
+
+  const axisX = gp.axes[0] || 0;
+  const axisY = gp.axes[1] || 0;
+  const dpadX = (gp.buttons[15]?.pressed ? 1 : 0) - (gp.buttons[14]?.pressed ? 1 : 0);
+  const dpadY = (gp.buttons[13]?.pressed ? 1 : 0) - (gp.buttons[12]?.pressed ? 1 : 0);
+
+  gamepadState.moveX = Math.abs(axisX) > GAMEPAD_DEADZONE ? axisX : dpadX;
+  gamepadState.moveY = Math.abs(axisY) > GAMEPAD_DEADZONE ? axisY : dpadY;
+
+  const justPressed = (index) => {
+    const pressed = gp.buttons[index]?.pressed || false;
+    const wasPressed = gamepadState.previousButtons[index] || false;
+    return pressed && !wasPressed;
+  };
+
+  if (justPressed(0)) interact();                    // A / Cross
+  if (justPressed(2) || justPressed(5) || justPressed(7)) attack(); // X/Square, RB, RT
+  if (justPressed(8)) toggleLog();                   // View/Select
+  if (justPressed(3)) toggleSafeRoomRecap();         // Y/Triangle
+  if (justPressed(1)) toggleInventoryPanel();        // B/Circle
+  if (justPressed(9)) restartGame();                 // Menu/Start
+
+  gamepadState.previousButtons = gp.buttons.map(button => button.pressed);
+}
+
+
+function getFloorTimeLimit() {
+  // Prototype timing. Later floors get shorter, matching the book's pressure curve.
+  return Math.max(300, 600 - currentFloor * 60);
+}
+
+function getFloorLabel() {
+  return `Floor ${currentFloor}`;
+}
+
+function isFinalDescentWindow() {
+  return floorTimeLeft <= 60;
+}
+
+function resetFloorTimerForCurrentFloor() {
+  floorTimeLeft = getFloorTimeLimit();
+  collapseStarted = false;
+  warnedAt360 = false;
+  warnedAt240 = false;
+  warnedAt120 = false;
+  warnedAt60 = false;
+  warnedAt30 = false;
+  finalDescentAnnounced = false;
+}
+
+
+function resetRunProgress() {
+  player.level = 1;
+  player.xp = 0;
+  player.xpToNext = 40;
+  player.maxHp = 100;
+  player.hp = player.maxHp;
+  player.attackDamage = 20;
+  player.baseSpeed = 2.45;
+  player.speed = player.baseSpeed;
+  player.defense = 0;
+  player.audienceBonus = 0;
+  player.inventory = [];
+  player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null};
+  player.coins = 0;
+  player.attackCooldown = 0;
+  currentFloor = 0;
+  pendingFloorAdvance = false;
+}
+
+
+function resetState(options = {}) {
+  const preserveRun = !!options.preserveRun;
+  const snapshot = options.snapshot || null;
+
+  if (!preserveRun) {
+    resetRunProgress();
+  }
+  enemies = [];
+  corpses = [];
+  openedChests = new Set();
+  if (!preserveRun) {
+    achievements = new Set();
+    achievementHistory = [];
+  }
+  activePopups = [];
+
+  gameWon = false; gameLost = false; frameCount = 0;
+  resetFloorTimerForCurrentFloor();
+  lastObservationFrame = 0;
+  audienceScore = 10; currentReputation = "Undeclared Menace"; roomsSeen = 0;
+
+  if (!preserveRun) {
+    player.level = 1;
+    player.xp = 0;
+    player.xpToNext = 40;
+    player.maxHp = 100;
+    player.hp = player.maxHp;
+    player.attackDamage = 20;
+    player.baseSpeed = 2.45;
+    player.speed = player.baseSpeed;
+    player.defense = 0;
+    player.audienceBonus = 0;
+    player.inventory = [];
+    player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null};
+    }
+  player.currentRoomId = null;
+  player.lastTileX = 0;
+  player.lastTileY = 0;
+  bossRoom=null; bossEnemy=null; currentRoomName="Safe Room";
+  stairwellFound=false; stairwellX=null; stairwellY=null;
+  minimapDirty=true;
+  visibilityDirty=true;
+  lastVisibilityTileX=null;
+  lastVisibilityTileY=null;
+  roomRevealState = { roomId: null, startFrame: 0, originX: 0, originY: 0, maxDist: 0, complete: false };
+  player.attackCooldown = 0;
+  player.safe = true;
+  player.wasSafe = true;
+
+  if (!preserveRun) for (const key of Object.keys(stats)) stats[key] = 0;
+
+  document.getElementById("announcer").innerHTML = "";
+  document.getElementById("centerMessage").style.display = "none";
+  document.getElementById("logPanel").style.display = "none";
+  const invPanel=document.getElementById("inventoryPanel"); if(invPanel) invPanel.style.display="none";
+  hideSafeRoomRecap();
+
+  generateDungeon();
+
+  if (preserveRun && snapshot) restoreRunProgress(snapshot);
+
+  updateVisibility(true);
+  updateHUD();
+  renderLog();
+
+  achievement(`NEW FLOOR: ${getFloorLabel()}`, `This floor contains ${rooms.length} rooms. The dungeon has provided a generous supply of places to make mistakes.`, `startFloor${currentFloor}`);
+}
+
+
+function roomDistance(a, b) {
+  if (!a || !b) return 0;
+  return Math.hypot(a.cx - b.cx, a.cy - b.cy);
+}
+
+function chooseCrawlerSpawnRoom(startRoom) {
+  if (currentFloor === 0) return startRoom;
+
+  const candidates = rooms.filter(room => {
+    if (!room || room === startRoom) return false;
+    if (room.type === "boss") return false;
+    if (bossRoom && room === bossRoom) return false;
+    if (bossRoom && roomDistance(room, bossRoom) < 18) return false;
+    if (map[room.cy]?.[room.cx] !== ".") return false;
+    return true;
+  });
+
+  const preferred = candidates.filter(room => room.sizeClass === "small" || room.sizeClass === "medium");
+  const pool = preferred.length ? preferred : candidates;
+  return pool.length ? pool[Math.floor(Math.random() * pool.length)] : startRoom;
+}
+
+function placeCrawlerInRoom(room) {
+  player.x = room.cx * TILE + TILE / 2;
+  player.y = room.cy * TILE + TILE / 2;
+  player.currentRoomId = null;
+}
+
+function getFloorEnemyPressure() {
+  return Math.floor(currentFloor * 0.75);
+}
+
+function rollScaledEnemyLevel(room, spawnRoom) {
+  const base = player.level + getFloorEnemyPressure();
+  const distance = spawnRoom ? Math.hypot(room.cx - spawnRoom.cx, room.cy - spawnRoom.cy) : 0;
+  const regionBonus = Math.floor(distance / 34);
+  const r = Math.random();
+  let variance = 0;
+  if (r < 0.18) variance = -2;
+  else if (r < 0.42) variance = -1;
+  else if (r < 0.76) variance = 0;
+  else if (r < 0.94) variance = 1;
+  else variance = 2;
+  return Math.max(1, base + regionBonus + variance);
+}
+
+function rollEnemyLoot(enemy) {
+  const loot = [];
+  const coins = (enemy.boss ? 18 : 2) + Math.floor(Math.random() * (enemy.boss ? 24 : 7)) + Math.floor((enemy.level || 1) * (enemy.boss ? 3 : 1.2));
+  if (coins > 0) loot.push({ type: "coins", amount: coins, name: `${coins} Coins` });
+
+  const gearChance = enemy.boss ? 0.85 : 0.09 + Math.min(0.12, (enemy.level || 1) * 0.01);
+  const boxChance = enemy.boss ? 0.95 : 0.07 + Math.min(0.10, currentFloor * 0.015);
+
+  if (Math.random() < gearChance) loot.push(generateGear(enemy.boss || enemy.level > player.level + 2));
+  if (Math.random() < boxChance) loot.push(generateLootBox(enemy.boss || enemy.level > player.level + 2));
+  return loot;
+}
+
+function createCorpse(enemy) {
+  const corpse = {
+    id: makeId("corpse"),
+    x: enemy.x,
+    y: enemy.y,
+    r: enemy.boss ? 18 : 11,
+    boss: !!enemy.boss,
+    name: enemy.boss ? `${enemy.name || "Boss"} Corpse` : `Level ${enemy.level || 1} Corpse`,
+    level: enemy.level || 1,
+    loot: rollEnemyLoot(enemy),
+    looted: false
+  };
+  corpses.push(corpse);
+  return corpse;
+}
+
+function lootCorpse(corpse) {
+  if (!corpse || corpse.looted) return;
+  corpse.looted = true;
+
+  if (!corpse.loot.length) {
+    announcer(`You searched ${corpse.name}. It contained disappointment and several fluids best left unidentified.`);
+    return;
+  }
+
+  const gained = [];
+  for (const item of corpse.loot) {
+    if (item.type === "coins") {
+      player.coins += item.amount;
+      gained.push(`${item.amount} coins`);
+    } else {
+      player.inventory.push(item);
+      if (item.type === "lootbox") stats.lootBoxesFound++;
+      if (item.type === "gear") stats.gearFound++;
+      gained.push(item.name);
+    }
+  }
+
+  changeAudience(corpse.boss ? 8 : 1);
+  achievement(
+    corpse.boss ? "BOSS CORPSE LOOTED" : "CORPSE LOOTED",
+    `You searched ${corpse.name} and found ${gained.join(", ")}. The dungeon reminds you this is technically recycling.`,
+    `loot_${corpse.id}`
+  );
+  updateInventoryUI();
+  updateHUD();
+}
+
+
+function generateDungeon() {
+  map = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill("#"));
+  seen = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(false));
+  visible = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(false));
+  rooms = [];
+
+  const targetRooms = 34 + Math.floor(Math.random() * 18);
+  let attempts = 0;
+
+  while (rooms.length < targetRooms && attempts < 2200) {
+    attempts++;
+    const roomRoll = Math.random();
+    let w, h, sizeClass, forcedBossCandidate = false;
+
+    // First room becomes the safe room, so keep it small.
+    if (rooms.length === 0) {
+      w = 7 + Math.floor(Math.random() * 5);
+      h = 6 + Math.floor(Math.random() * 4);
+      sizeClass = "small";
+    }
+
+    // Second accepted room is intentionally boss-sized.
+    // The boss chamber is a required ingredient now, not a lucky accident.
+    else if (rooms.length === 1) {
+      w = 22 + Math.floor(Math.random() * 9);
+      h = 15 + Math.floor(Math.random() * 7);
+      sizeClass = "large";
+      forcedBossCandidate = true;
+    }
+
+    else if (roomRoll < 0.55) {
+      w = 7 + Math.floor(Math.random() * 7);
+      h = 6 + Math.floor(Math.random() * 6);
+      sizeClass = "small";
+    } else if (roomRoll < 0.88) {
+      w = 12 + Math.floor(Math.random() * 8);
+      h = 9 + Math.floor(Math.random() * 7);
+      sizeClass = "medium";
+    } else {
+      w = 19 + Math.floor(Math.random() * 11);
+      h = 13 + Math.floor(Math.random() * 9);
+      sizeClass = "large";
+    }
+    const x = 2 + Math.floor(Math.random() * (MAP_COLS - w - 4));
+    const y = 2 + Math.floor(Math.random() * (MAP_ROWS - h - 4));
+    const room = { id: rooms.length, x, y, w, h, cx: Math.floor(x + w / 2), cy: Math.floor(y + h / 2), seen: false, sizeClass, name:null, type:"normal", locked:false, cleared:false, forcedBossCandidate };
+    if (rooms.some(r => rectsOverlap(expandRect(room, 2), r))) continue;
+    carveRoom(room, ".");
+    if (rooms.length > 0) connectRooms(rooms[rooms.length - 1], room);
+    rooms.push(room);
+  }
+
+  if (rooms.length < 8 || !rooms.some(r => r.forcedBossCandidate)) {
+    generateDungeon();
+    return;
+  }
+
+  assignRoomNamesAndBoss();
+
+  const startRoom = rooms[0];
+  startRoom.type="safe"; startRoom.name="Safe Room";
+  carveRoom(startRoom, "S");
+
+  cleanupBadDoors();
+
+  const exitRoom = getFarthestRoom(startRoom);
+  map[exitRoom.cy][exitRoom.cx] = "E";
+  stairwellX = exitRoom.cx;
+  stairwellY = exitRoom.cy;
+
+  const spawnRoom = chooseCrawlerSpawnRoom(startRoom);
+  placeCrawlerInRoom(spawnRoom);
+
+  placeObjects("C", Math.min(10, Math.max(4, Math.floor(rooms.length / 5))), [startRoom, exitRoom, bossRoom, spawnRoom]);
+  placeEnemies(Math.min(16, Math.max(6, Math.floor(rooms.length / 3))), [startRoom, bossRoom, spawnRoom], spawnRoom);
+  placeBossEnemy();
+  stats.floorRooms = rooms.length;
+}
+
+function expandRect(r, a) { return { x: r.x - a, y: r.y - a, w: r.w + a * 2, h: r.h + a * 2 }; }
+function rectsOverlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+function carveRoom(room, tile) { for (let y = room.y; y < room.y + room.h; y++) for (let x = room.x; x < room.x + room.w; x++) map[y][x] = tile; }
+
+function connectRooms(a, b) {
+  if (Math.random() < 0.5) { carveHorizontal(a.cx, b.cx, a.cy); carveVertical(a.cy, b.cy, b.cx); }
+  else { carveVertical(a.cy, b.cy, a.cx); carveHorizontal(a.cx, b.cx, b.cy); }
+  maybePlaceDoorNear(a.cx, a.cy, b.cx, b.cy);
+}
+
+function carveHorizontal(x1, x2, y) { for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) if (map[y][x] === "#") map[y][x] = "."; }
+function carveVertical(y1, y2, x) { for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) if (map[y][x] === "#") map[y][x] = "."; }
+
+function isWalkableForDoor(tile) {
+  return tile === "." || tile === "S" || tile === "C" || tile === "E";
+}
+
+function isValidDoorSpot(x, y) {
+  if (x <= 1 || y <= 1 || x >= MAP_COLS - 2 || y >= MAP_ROWS - 2) return false;
+  if (map[y][x] !== ".") return false;
+
+  const up = map[y - 1][x];
+  const down = map[y + 1][x];
+  const left = map[y][x - 1];
+  const right = map[y][x + 1];
+
+  // Horizontal passage door:
+  // wall above + wall below, walkable left + walkable right
+  const horizontalDoor =
+    up === "#" &&
+    down === "#" &&
+    isWalkableForDoor(left) &&
+    isWalkableForDoor(right);
+
+  // Vertical passage door:
+  // wall left + wall right, walkable up + walkable down
+  const verticalDoor =
+    left === "#" &&
+    right === "#" &&
+    isWalkableForDoor(up) &&
+    isWalkableForDoor(down);
+
+  if (!horizontalDoor && !verticalDoor) return false;
+
+  // Extra anti-goofiness rule:
+  // Reject doors that have obvious walk-around space diagonally adjacent on both sides.
+  // This helps prevent decorative doors in wide open rooms.
+  const diagonalWalkables =
+    [
+      map[y - 1][x - 1], map[y - 1][x + 1],
+      map[y + 1][x - 1], map[y + 1][x + 1]
+    ].filter(isWalkableForDoor).length;
+
+  return diagonalWalkables <= 2;
+}
+
+function cleanupBadDoors() {
+  for (let y = 1; y < MAP_ROWS - 1; y++) {
+    for (let x = 1; x < MAP_COLS - 1; x++) {
+      if (map[y][x] === "D") {
+        map[y][x] = ".";
+        if (!isValidDoorSpot(x, y)) {
+          map[y][x] = ".";
+        } else {
+          map[y][x] = "D";
+        }
+      }
+    }
+  }
+}
+
+function maybePlaceDoorNear(ax, ay, bx, by) {
+  if (Math.random() > 0.45) return;
+
+  const mx = Math.floor((ax + bx) / 2);
+  const my = Math.floor((ay + by) / 2);
+
+  // Prefer true chokepoints near the hallway midpoint.
+  for (let radius = 1; radius <= 8; radius++) {
+    const candidates = [];
+
+    for (let y = my - radius; y <= my + radius; y++) {
+      for (let x = mx - radius; x <= mx + radius; x++) {
+        if (Math.abs(x - mx) !== radius && Math.abs(y - my) !== radius) continue;
+        if (x <= 1 || y <= 1 || x >= MAP_COLS - 2 || y >= MAP_ROWS - 2) continue;
+        if (isValidDoorSpot(x, y)) candidates.push({ x, y });
+      }
+    }
+
+    if (candidates.length > 0) {
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      map[pick.y][pick.x] = "D";
+      return;
+    }
+  }
+}
+
+
+
+function assignRoomNamesAndBoss(){
+ for(const room of rooms){
+   room.sizeClass=room.sizeClass||((room.w*room.h>220)?"large":(room.w*room.h>120)?"medium":"small");
+   room.name=choose(ROOM_NAMES[room.sizeClass]||ROOM_NAMES.medium);
+ }
+
+ const candidates=rooms
+   .filter((r,i)=>i!==0 && r.type!=="safe")
+   .sort((a,b)=>(b.w*b.h)-(a.w*a.h));
+
+ // Prefer the intentionally generated boss room, then fall back to the largest large room.
+ bossRoom =
+   candidates.find(r=>r.forcedBossCandidate) ||
+   candidates.find(r=>r.sizeClass==="large") ||
+   candidates[0] ||
+   null;
+
+ if(bossRoom){
+   bossRoom.type="boss";
+   bossRoom.name=choose(ROOM_NAMES.boss);
+   bossRoom.locked=false;
+   bossRoom.cleared=false;
+ }
+}
+
+function isAdjacentEdgeFloorForRoom(x, y, room) {
+  if (!room) return false;
+  if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) return false;
+
+  const tile = map[y]?.[x];
+  if (!(tile === "." || tile === "D" || tile === "L" || tile === "C")) return false;
+
+  const touchesLeft = x === room.x - 1 && y >= room.y && y < room.y + room.h;
+  const touchesRight = x === room.x + room.w && y >= room.y && y < room.y + room.h;
+  const touchesTop = y === room.y - 1 && x >= room.x && x < room.x + room.w;
+  const touchesBottom = y === room.y + room.h && x >= room.x && x < room.x + room.w;
+
+  return touchesLeft || touchesRight || touchesTop || touchesBottom;
+}
+
+
+function roomForTile(tx, ty) {
+  // First: true room interior wins.
+  for (const room of rooms) {
+    if (tx >= room.x && tx < room.x + room.w && ty >= room.y && ty < room.y + room.h) {
+      return room;
+    }
+  }
+
+  // Second: if an open hallway/floor tile hugs a room edge, treat it as part of that room.
+  // This keeps fog, room names, and player perception aligned.
+  for (const room of rooms) {
+    if (isAdjacentEdgeFloorForRoom(tx, ty, room)) {
+      return room;
+    }
+  }
+
+  return null;
+}
+
+
+function updateCurrentRoom(){
+ const tx=Math.floor(player.x/TILE),ty=Math.floor(player.y/TILE),room=roomForTile(tx,ty); if(!room)return;
+ if(player.currentRoomId!==room.id){player.currentRoomId=room.id; currentRoomName=room.name||"Unknown Chamber";
+   if(room.type!=="safe"){stats.namedRoomsEntered++; announcer(`Room discovered: ${currentRoomName}. Try not to make it historically significant.`);}
+   if(room.type==="boss"&&!room.cleared&&!room.locked)startBossEncounter(room);
+   updateHUD();
+ }
+}
+function startBossEncounter(room){
+  // dcw_010: entering a boss room only announces it.
+  // Actual lockdown happens only through triggerBossAggro().
+  if (!room || room.encounterAnnounced) return;
+  room.encounterAnnounced = true;
+  achievement("BOSS ENCOUNTER",`${room.name}. Something large and legally distinct from your comfort zone is nearby.`,"bossEncounter");
+  announcer("Entering unusually large rooms remains a leading cause of crawler-shaped stains.");
+}
+
+function isBossBorderCell(room,x,y){
+  return (x>=room.x&&x<room.x+room.w&&(y===room.y-1||y===room.y+room.h)) ||
+         (y>=room.y&&y<room.y+room.h&&(x===room.x-1||x===room.x+room.w));
+}
+
+function isInsideRoom(room,x,y){
+  return x>=room.x && x<room.x+room.w && y>=room.y && y<room.y+room.h;
+}
+
+function isFloorLikeForBossDoor(tile){
+  return tile === "." || tile === "D" || tile === "L";
+}
+
+function isPlayerStandingOnTile(x,y){
+  const px = Math.floor(player.x / TILE);
+  const py = Math.floor(player.y / TILE);
+  return px === x && py === y;
+}
+
+function bossPerimeterTiles(room){
+  const tiles = [];
+
+  // Top and bottom rings just outside room.
+  for(let x=room.x; x<room.x+room.w; x++){
+    tiles.push({x, y:room.y-1});
+    tiles.push({x, y:room.y+room.h});
+  }
+
+  // Left and right rings just outside room.
+  for(let y=room.y; y<room.y+room.h; y++){
+    tiles.push({x:room.x-1, y});
+    tiles.push({x:room.x+room.w, y});
+  }
+
+  return tiles.filter(t => t.x>0 && t.y>0 && t.x<MAP_COLS-1 && t.y<MAP_ROWS-1);
+}
+
+function isConnectedToBossInterior(room,x,y){
+  return isInsideRoom(room,x-1,y) ||
+         isInsideRoom(room,x+1,y) ||
+         isInsideRoom(room,x,y-1) ||
+         isInsideRoom(room,x,y+1);
+}
+
+function isConnectedToExteriorFloor(room,x,y){
+  const neighbors = [
+    {x:x-1,y},
+    {x:x+1,y},
+    {x,y:y-1},
+    {x,y:y+1}
+  ];
+
+  return neighbors.some(n =>
+    !isInsideRoom(room,n.x,n.y) &&
+    n.x>0 && n.y>0 && n.x<MAP_COLS-1 && n.y<MAP_ROWS-1 &&
+    isFloorLikeForBossDoor(map[n.y][n.x])
+  );
+}
+
+function isBossDoorCandidate(room,x,y){
+  if(x<=0||y<=0||x>=MAP_COLS-1||y>=MAP_ROWS-1) return false;
+  if(!isBossBorderCell(room,x,y)) return false;
+  if(!isFloorLikeForBossDoor(map[y][x])) return false;
+  // Player-occupied seal tiles are still valid candidates; placeBossLockSafely() will queue them.
+
+  // Less picky than before:
+  // any floor-like perimeter tile that touches boss interior and also touches outside floor is a lock candidate.
+  return isConnectedToBossInterior(room,x,y) && isConnectedToExteriorFloor(room,x,y);
+}
+
+
+
+function registerBossLock(x, y) {
+  if (!bossLockTiles) bossLockTiles = [];
+  if (!bossLockTiles.some(t => t.x === x && t.y === y)) {
+    bossLockTiles.push({x, y});
+  }
+
+  // A spawned lock should be visible to the crawler. Doors block vision beyond them,
+  // but the door itself should not be hidden in fog.
+  visible[y] = visible[y] || [];
+  seen[y] = seen[y] || [];
+  visible[y][x] = true;
+  seen[y][x] = true;
+  minimapDirty = true;
+  visibilityDirty = true;
+}
+
+function clearBossLocks() {
+  if (!bossLockTiles) bossLockTiles = [];
+
+  for (const t of bossLockTiles) {
+    if (t.x < 0 || t.y < 0 || t.x >= MAP_COLS || t.y >= MAP_ROWS) continue;
+    if (map[t.y]?.[t.x] === "L") {
+      map[t.y][t.x] = ".";
+    }
+    if (visible[t.y]) visible[t.y][t.x] = true;
+    if (seen[t.y]) seen[t.y][t.x] = true;
+  }
+
+  bossLockTiles = [];
+  minimapDirty = true;
+  visibilityDirty = true;
+}
+
+
+function isNearCrawlerTile(x, y, radius = 1) {
+  const px = Math.floor(player.x / TILE);
+  const py = Math.floor(player.y / TILE);
+  return Math.abs(x - px) <= radius && Math.abs(y - py) <= radius;
+}
+
+function isTileInsideRoom(x, y, room) {
+  return room && x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+}
+
+function nudgeCrawlerIntoBossRoom() {
+  // dcw_007: no teleporting. Player movement should only come from player input.
+  return;
+}
+
+
+function placeBossLockSafely(x, y) {
+  if (!bossRoom) return false;
+  if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) return false;
+
+  // No teleporting. If crawler is literally standing in the seal tile,
+  // queue this exact lock and place it the moment they clear it.
+  if (isCrawlerBlockingTile(x, y, 0)) {
+    queueBossLock(x, y);
+    return false;
+  }
+
+  const tile = map[y]?.[x];
+
+  if (tile === "." || tile === "D" || tile === "C" || tile === "L") {
+    map[y][x] = "L";
+    registerBossLock(x, y);
+    return true;
+  }
+
+  // If the ideal tile is invalid, try one tile outward/inward, but never around the crawler.
+  const cx = bossRoom.cx;
+  const cy = bossRoom.cy;
+  const dx = Math.sign(x - cx);
+  const dy = Math.sign(y - cy);
+
+  const candidates = [
+    {x: x + dx, y: y + dy},
+    {x: x - dx, y: y - dy}
+  ];
+
+  for (const t of candidates) {
+    if (t.x < 0 || t.y < 0 || t.x >= MAP_COLS || t.y >= MAP_ROWS) continue;
+    if (isCrawlerBlockingTile(t.x, t.y, 0)) {
+      queueBossLock(t.x, t.y);
+      continue;
+    }
+
+    const alt = map[t.y]?.[t.x];
+    if (alt === "." || alt === "D" || alt === "C" || alt === "L") {
+      map[t.y][t.x] = "L";
+      registerBossLock(t.x, t.y);
+      return true;
+    }
+  }
+
+  // Last resort: queue original. No entrance should be forgotten.
+  queueBossLock(x, y);
+  return false;
+}
+
+
+function isCrawlerBlockingTile(x, y, radius = 0) {
+  const px = Math.floor(player.x / TILE);
+  const py = Math.floor(player.y / TILE);
+  return Math.abs(x - px) <= radius && Math.abs(y - py) <= radius;
+}
+
+function queueBossLock(x, y) {
+  if (!pendingBossLocks) pendingBossLocks = [];
+  if (!pendingBossLocks.some(t => t.x === x && t.y === y)) {
+    pendingBossLocks.push({x, y});
+  }
+}
+
+function processPendingBossLocks() {
+  if (!bossAggroed && !bossDoorsLocked) return;
+  if (!pendingBossLocks || !pendingBossLocks.length) return;
+
+  const remaining = [];
+
+  for (const lock of pendingBossLocks) {
+    if (isCrawlerBlockingTile(lock.x, lock.y, 0)) {
+      remaining.push(lock);
+      continue;
+    }
+
+    const tile = map[lock.y]?.[lock.x];
+    if (tile === "." || tile === "D" || tile === "C" || tile === "L") {
+      map[lock.y][lock.x] = "L";
+      registerBossLock(lock.x, lock.y);
+    } else {
+      remaining.push(lock);
+    }
+  }
+
+  pendingBossLocks = remaining;
+}
+
+// dcw_009: boss aggro requires LOS or attack. No proximity-only lockdown.
+function triggerBossAggro(reason = "seen") {
+  if (!bossEnemy || bossEnemy.hp <= 0 || bossAggroed) return;
+
+  bossAggroed = true;
+  lockBossDoors(bossRoom);
+
+  achievement(
+    "BOSS AGGRO",
+    reason === "attack"
+      ? "You attacked the boss. The exits seal. This is what scholars call commitment."
+      : "The boss has noticed you. The exits seal. Running is now a historical concept.",
+    `bossAggro_${currentFloor}`
+  );
+}
+
+
+function lockBossDoors(room = bossRoom){
+  if (!room) return;
+  if (bossDoorsLocked) return;
+  bossDoorsLocked = true;
+  room.lockedDoors = [];
+
+  for(const t of bossPerimeterTiles(room)){
+    if(isBossDoorCandidate(room,t.x,t.y)){
+      placeBossLockSafely(t.x, t.y);
+      minimapDirty=true;
+      room.lockedDoors.push({x:t.x,y:t.y});
+    }
+  }
+
+  // Also scan one tile just inside the perimeter for weird wide-mouth entrances.
+  // This catches cases where the "doorway" is technically inside the room edge.
+  for(let y=room.y; y<room.y+room.h; y++){
+    for(let x=room.x; x<room.x+room.w; x++){
+      const nearEdge = x===room.x || x===room.x+room.w-1 || y===room.y || y===room.y+room.h-1;
+      if(!nearEdge) continue;
+      if(!isFloorLikeForBossDoor(map[y][x])) continue;
+      // Player-occupied seal tiles are still valid; placeBossLockSafely() will queue them.
+
+      const outsideNeighbor =
+        (x===room.x && isFloorLikeForBossDoor(map[y][x-1])) ||
+        (x===room.x+room.w-1 && isFloorLikeForBossDoor(map[y][x+1])) ||
+        (y===room.y && isFloorLikeForBossDoor(map[y-1][x])) ||
+        (y===room.y+room.h-1 && isFloorLikeForBossDoor(map[y+1][x]));
+
+      if(outsideNeighbor){
+        placeBossLockSafely(x, y);
+        minimapDirty=true;
+        room.lockedDoors.push({x,y});
+      }
+    }
+  }
+
+  if(room.lockedDoors.length===0){
+    announcer("Boss door lock failed gracefully. The dungeon blames contractors.");
+  }
+}
+
+function unlockBossDoors(room){
+  clearBossLocks();
+  if(room.lockedDoors){
+    for(const door of room.lockedDoors){
+      if(map[door.y]&&map[door.y][door.x]==="L"){map[door.y][door.x]=".";minimapDirty=true;}
+    }
+    room.lockedDoors=[];
+    return;
+  }
+
+  for(const t of bossPerimeterTiles(room)){
+    if(map[t.y][t.x]==="L"){map[t.y][t.x]=".";minimapDirty=true;}
+  }
+}
+
+function placeBossEnemy(){
+  if(!bossRoom)return;
+  const lvl=Math.max(3, player.level + 2 + Math.floor(currentFloor * 1.25));
+  const hp=120+lvl*32;
+  bossEnemy={
+    x:bossRoom.cx*TILE+TILE/2,
+    y:bossRoom.cy*TILE+TILE/2,
+    r:20,
+    level:lvl,
+    boss:true,
+    name:choose(["Rat King","Goblin Champion","Bone Collector","Cavern Brute","Kobold Shaman"]),
+    hp,
+    maxHp:hp,
+    damage:10+lvl*4,
+    xpReward:75+lvl*24,
+    speed:.62+lvl*.025,
+    damageCooldown:0,
+    wanderAngle:Math.random()*Math.PI*2
+  };
+  enemies.push(bossEnemy);
+}
+function completeBossEncounter(enemy){
+  bossAggroed = false;
+  bossDoorsLocked = false;
+  pendingBossLocks = [];
+  clearBossLocks();if(!bossRoom||bossRoom.cleared)return; bossRoom.cleared=true; bossRoom.locked=false; stats.bossesDefeated++; unlockBossDoors(bossRoom); const cx=Math.max(bossRoom.x+1,Math.min(bossRoom.x+bossRoom.w-2,bossRoom.cx+1)),cy=Math.max(bossRoom.y+1,Math.min(bossRoom.y+bossRoom.h-2,bossRoom.cy)); if(map[cy][cx]===".")map[cy][cx]="C"; changeAudience(15); achievement("BOSS DEFEATED",`You defeated ${enemy.name||"the boss"}. The doors unlock. The corpse remains lootable, because dignity is not included in the tutorial.`,"bossDefeated");}
+
+function getFarthestRoom(fromRoom) {
+  let best = rooms[0], bestDist = -1;
+  for (const r of rooms) {
+    const d = Math.hypot(r.cx - fromRoom.cx, r.cy - fromRoom.cy);
+    if (d > bestDist) { bestDist = d; best = r; }
+  }
+  return best;
+}
+
+function placeObjects(tile, count, excludedRooms = []) {
+  const excluded = new Set(excludedRooms.map(r => rooms.indexOf(r)));
+  let placed = 0, guard = 0;
+  while (placed < count && guard < 400) {
+    guard++;
+    const i = Math.floor(Math.random() * rooms.length);
+    if (excluded.has(i)) continue;
+    const room = rooms[i];
+    const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+    const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+    if (map[y][x] === ".") { map[y][x] = tile; placed++; }
+  }
+}
+
+function placeEnemies(count, excludedRooms = [], spawnRoom = null) {
+  const excluded = new Set(excludedRooms.map(r => rooms.indexOf(r)));
+  let placed = 0, guard = 0;
+  while (placed < count && guard < 600) {
+    guard++;
+    const i = Math.floor(Math.random() * rooms.length);
+    if (excluded.has(i)) continue;
+    const room = rooms[i];
+    const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
+    const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
+    if (map[y][x] === ".") {
+      const enemyLevel = rollScaledEnemyLevel(room, spawnRoom);
+      const maxHp = 24 + enemyLevel * 10;
+      enemies.push({
+        x: x * TILE + TILE / 2,
+        y: y * TILE + TILE / 2,
+        r: 11,
+        level: enemyLevel,
+        hp: maxHp,
+        maxHp: maxHp,
+        damage: 5 + enemyLevel * 3,
+        xpReward: 12 + enemyLevel * 8,
+        speed: 0.74 + enemyLevel * 0.045,
+        damageCooldown: 0,
+        wanderAngle: Math.random() * Math.PI * 2
+      });
+      placed++;
+    }
+  }
+}
+
+function tileAt(px, py) {
+  const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
+  if (tx < 0 || tx >= MAP_COLS || ty < 0 || ty >= MAP_ROWS) return "#";
+  return map[ty][tx];
+}
+
+function isBlocked(px, py) { const t = tileAt(px, py); return t === "#" || t === "D" || t === "L"; }
+function canMoveTo(x, y, r) {
+  return !isBlocked(x - r, y - r) && !isBlocked(x + r, y - r) && !isBlocked(x - r, y + r) && !isBlocked(x + r, y + r);
+}
+
+function moveEntity(entity, dx, dy) {
+  if (dx === 0 && dy === 0) return;
+  let nx = entity.x + dx, ny = entity.y;
+  if (canMoveTo(nx, ny, entity.r)) entity.x = nx;
+  else if (entity === player) {
+    stats.wallBumps++;
+    if (stats.wallBumps === 10) achievement("NEW ACHIEVEMENT: Wall Scholar", "You have studied the wall with your face ten times. The wall remains undefeated.", "wallScholar");
+  }
+
+  nx = entity.x; ny = entity.y + dy;
+  if (canMoveTo(nx, ny, entity.r)) entity.y = ny;
+  else if (entity === player) stats.wallBumps++;
+}
+
+
+function updateBossLocks(){
+  // dcw_010: no timed boss-room lockdown.
+  // Pending locks are handled by processPendingBossLocks() after aggro.
+  processPendingBossLocks();
+}
+
+function updatePlayer() {
+  const previousTileX = Math.floor(player.x / TILE);
+  const previousTileY = Math.floor(player.y / TILE);
+  player.lastTileX = previousTileX;
+  player.lastTileY = previousTileY;
+  let dx = 0, dy = 0;
+  if (keys["w"] || keys["arrowup"]) dy--;
+  if (keys["s"] || keys["arrowdown"]) dy++;
+  if (keys["a"] || keys["arrowleft"]) dx--;
+  if (keys["d"] || keys["arrowright"]) dx++;
+  dx += gamepadState.moveX + touchState.moveX;
+  dy += gamepadState.moveY + touchState.moveY;
+
+  const len = Math.hypot(dx, dy);
+  if (len > 0) { dx = dx / len * player.speed; dy = dy / len * player.speed; }
+
+  moveEntity(player, dx, dy);
+  player.attackCooldown = Math.max(0, player.attackCooldown - 1);
+
+  const currentTile = tileAt(player.x, player.y);
+  player.safe = currentTile === "S";
+  updateCurrentRoom();
+
+  if (player.safe) stats.timeInSafeRoomFrames++;
+  else stats.timeOutsideSafeRoomFrames++;
+
+  if (player.safe && !player.wasSafe) {
+    stats.safeRoomEntries++;
+    if (stats.safeRoomEntries > 1) announcer("Safe room re-entry detected. Press R or Y if you require the dungeon to summarize your questionable choices.");
+    else announcer("Safe room entered. Press R or Y for your performance review, assuming your ego is insured.");
+  }
+
+  if (!player.safe && player.wasSafe) hideSafeRoomRecap();
+  player.wasSafe = player.safe;
+
+  if (currentTile !== "S" && !achievements.has("leftSafeRoom")) achievement("NEW ACHIEVEMENT: Bad Decision Geography", "You left the safe room. Statistically speaking, this is where problems begin.", "leftSafeRoom");
+
+  if (currentTile === "E" && !gameWon) {
+    descendStairwell();
+  }
+}
+
+
+function hasLineOfSight(x1, y1, x2, y2) {
+  const tx1 = Math.floor(x1 / TILE);
+  const ty1 = Math.floor(y1 / TILE);
+  const tx2 = Math.floor(x2 / TILE);
+  const ty2 = Math.floor(y2 / TILE);
+
+  let x = tx1;
+  let y = ty1;
+  const dx = Math.abs(tx2 - tx1);
+  const dy = Math.abs(ty2 - ty1);
+  const sx = tx1 < tx2 ? 1 : -1;
+  const sy = ty1 < ty2 ? 1 : -1;
+  let err = dx - dy;
+
+  while (!(x === tx2 && y === ty2)) {
+    if (!(x === tx1 && y === ty1)) {
+      if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) return false;
+      const t = map[y]?.[x];
+      if (t === "#" || t === "D" || t === "L") return false;
+    }
+
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += sx; }
+    if (e2 < dx) { err += dx; y += sy; }
+  }
+
+  return true;
+}
+
+
+function updateEnemies() {
+  processPendingBossLocks();
+  for (const corpse of corpses) {
+    if (corpse.looted) continue;
+    const tx = Math.floor(corpse.x / TILE), ty = Math.floor(corpse.y / TILE);
+    if (!visible[ty]?.[tx]) continue;
+
+    ctx.fillStyle = corpse.boss ? "rgba(120,70,160,0.9)" : "rgba(105,88,72,0.9)";
+    ctx.beginPath();
+    ctx.ellipse(corpse.x, corpse.y + 2, corpse.r + 4, Math.max(6, corpse.r * 0.55), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = corpse.boss ? "rgba(255,216,107,0.85)" : "rgba(210,190,160,0.35)";
+    ctx.lineWidth = corpse.boss ? 2 : 1;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+for (const enemy of enemies) {
+    if (enemy.hp <= 0) continue;
+    enemy.damageCooldown = Math.max(0, enemy.damageCooldown - 1);
+    if (player.safe) continue;
+
+    const exTile = Math.floor(enemy.x / TILE), eyTile = Math.floor(enemy.y / TILE);
+    if (!seen[eyTile]?.[exTile] && !collapseStarted) continue;
+
+    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+    const canSeePlayer = dist < 210 && hasLineOfSight(enemy.x, enemy.y, player.x, player.y);
+    if (enemy.boss && !bossAggroed && canSeePlayer) {
+      triggerBossAggro("seen");
+    }
+    const bossCanAlwaysTrack = enemy.boss && bossAggroed;
+    let dx = 0, dy = 0;
+    if (canSeePlayer || bossCanAlwaysTrack) { dx = (player.x - enemy.x) / Math.max(1, dist) * enemy.speed; dy = (player.y - enemy.y) / Math.max(1, dist) * enemy.speed; }
+    else {
+      dx = Math.cos(enemy.wanderAngle) * 0.35;
+      dy = Math.sin(enemy.wanderAngle) * 0.35;
+      if (Math.random() < 0.015) enemy.wanderAngle = Math.random() * Math.PI * 2;
+    }
+    moveEntity(enemy, dx, dy);
+
+    const newDist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+    if (newDist < player.r + enemy.r + 4 && enemy.damageCooldown <= 0) {
+      const rawDmg = enemy.damage || 8;
+      const dmg = Math.max(1, rawDmg - player.defense);
+      player.hp -= dmg;
+      stats.damageTaken += dmg;
+      stats.riskyMoments++;
+      changeAudience(1);
+      enemy.damageCooldown = 70;
+      updateHUD();
+      if (!achievements.has("firstHit")) achievement("NEW ACHIEVEMENT: Physical Contact", "A dungeon creature touched you without consent. Human resources has been eaten.", "firstHit");
+      if (player.hp <= 0) loseGame();
+    }
+  }
+}
+
+function attack() {
+  if (player.attackCooldown > 0 || gameWon || gameLost) return;
+  player.attackCooldown = 34;
+  let hit = false;
+  for (const corpse of corpses) {
+    if (corpse.looted) continue;
+    const tx = Math.floor(corpse.x / TILE), ty = Math.floor(corpse.y / TILE);
+    if (!visible[ty]?.[tx]) continue;
+
+    ctx.fillStyle = corpse.boss ? "rgba(120,70,160,0.9)" : "rgba(105,88,72,0.9)";
+    ctx.beginPath();
+    ctx.ellipse(corpse.x, corpse.y + 2, corpse.r + 4, Math.max(6, corpse.r * 0.55), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = corpse.boss ? "rgba(255,216,107,0.85)" : "rgba(210,190,160,0.35)";
+    ctx.lineWidth = corpse.boss ? 2 : 1;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  for (const enemy of enemies) {
+    if (enemy.hp <= 0) continue;
+    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+    if (dist < 58) {
+      if (enemy.boss) triggerBossAggro("attack");
+        enemy.hp -= player.attackDamage;
+      hit = true;
+      if (enemy.hp <= 0) {
+        stats.enemiesKilled++;
+        changeAudience(enemy.boss ? 10 : 4);
+        gainXP(enemy.xpReward || 15);
+        createCorpse(enemy);
+        if (enemy.boss) completeBossEncounter(enemy);
+        achievement("NEW ACHIEVEMENT: Pest Control Adjacent", `You killed a level ${enemy.level || 1} dungeon creature. It left behind a corpse. The dungeon calls this an interactive container with smell.`);
+      }
+    }
+  }
+  if (!hit) stats.missedAttacks++;
+  if (!hit && !achievements.has("airPunch")) achievement("NEW ACHIEVEMENT: Ghost Violence", "You attacked the air. The air has declined to press charges.", "airPunch");
+}
+
+function interact() {
+  if (gameWon || gameLost) return;
+
+  for (const corpse of corpses) {
+    if (corpse.looted) continue;
+    const dist = Math.hypot(player.x - corpse.x, player.y - corpse.y);
+    if (dist < player.r + corpse.r + 24) {
+      lootCorpse(corpse);
+      return;
+    }
+  }
+
+  for (const spot of getNearbyTiles()) {
+    const t = map[spot.y][spot.x];
+    if (t === "L") {
+      announcer("That door is boss-locked. It will not open until the large angry problem in the room stops being alive.");
+      return;
+    }
+    if (t === "D") {
+      map[spot.y][spot.x] = ".";
+      stats.doorsOpened++;
+      changeAudience(1);
+      if (stats.doorsOpened === 1) achievement("NEW ACHIEVEMENT: Suspiciously Door-Shaped Object", "You found a door and immediately made it everybody else's problem.", "firstDoor");
+      else announcer("Door opened. Bold. Original. Historians are already fighting over who gets to write your biography.");
+      return;
+    }
+    if (t === "C") {
+      const key = `${spot.x},${spot.y}`;
+      if (!openedChests.has(key)) {
+        openedChests.add(key);
+        stats.chestsOpened++;
+        map[spot.y][spot.x] = ".";
+        changeAudience(2);
+        rewardChestLoot();
+        if (!achievements.has("firstChest")) achievement("NEW ACHIEVEMENT: Box Goblin", "You opened a chest. The dungeon has begun the traditional process of bribing you into worse decisions.", "firstChest");
+        return;
+      }
+    }
+  }
+  stats.interactionsWithNothing++;
+  announcer("You interacted with absolutely nothing. Stunning. The nothing is considering a restraining order.");
+}
+
+function getNearbyTiles() {
+  const px = Math.floor(player.x / TILE), py = Math.floor(player.y / TILE), spots = [];
+  for (let y = py - 1; y <= py + 1; y++) for (let x = px - 1; x <= px + 1; x++) {
+    if (x >= 0 && x < MAP_COLS && y >= 0 && y < MAP_ROWS) spots.push({x, y});
+  }
+  return spots;
+}
+
+
+function beginRoomReveal(room, px, py) {
+  if (!room) return;
+
+  let maxDist = 1;
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      maxDist = Math.max(maxDist, Math.hypot(x - px, y - py));
+    }
+  }
+
+  roomRevealState = {
+    roomId: room.id,
+    startFrame: frameCount,
+    originX: px,
+    originY: py,
+    maxDist,
+    complete: false
+  };
+}
+
+function updateRoomReveal(room, px, py) {
+  if (!room) return false;
+
+  if (roomRevealState.roomId !== room.id) {
+    beginRoomReveal(room, px, py);
+  }
+
+  const framesElapsed = Math.max(0, frameCount - roomRevealState.startFrame);
+  const revealFrames = 28; // about half a second at 60fps
+  const progress = roomRevealState.complete ? 1 : Math.min(1, framesElapsed / revealFrames);
+  const radius = 1.5 + roomRevealState.maxDist * progress;
+
+  let changed = false;
+
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) continue;
+
+      const dist = Math.hypot(x - roomRevealState.originX, y - roomRevealState.originY);
+      const revealedByWave = dist <= radius;
+
+      if (revealedByWave || progress >= 1) {
+        visible[y][x] = true;
+        if (!seen[y][x]) {
+          seen[y][x] = true;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  if (progress >= 1) {
+    roomRevealState.complete = true;
+  }
+
+  if (changed) minimapDirty = true;
+  return changed;
+}
+
+
+function isVisionBlockingTile(t) {
+  return t === "#" || t === "D" || t === "L";
+}
+
+function revealTileForVision(x, y) {
+  if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) return false;
+
+  const t = map[y][x];
+
+  // Walls block vision and stay hidden.
+  if (t === "#") return false;
+
+  // Doors and boss locks are visible as endpoints, but still block anything behind them.
+  visible[y][x] = true;
+  if (!seen[y][x]) {
+    seen[y][x] = true;
+    minimapDirty = true;
+    return true;
+  }
+  return false;
+}
+
+
+function revealAdjacentRoomEdgeFloors(room) {
+  if (!room) return;
+
+  const candidates = [];
+
+  for (let x = room.x; x < room.x + room.w; x++) {
+    candidates.push({x, y: room.y - 1});
+    candidates.push({x, y: room.y + room.h});
+  }
+
+  for (let y = room.y; y < room.y + room.h; y++) {
+    candidates.push({x: room.x - 1, y});
+    candidates.push({x: room.x + room.w, y});
+  }
+
+  for (const t of candidates) {
+    if (t.x < 0 || t.y < 0 || t.x >= MAP_COLS || t.y >= MAP_ROWS) continue;
+
+    const tile = map[t.y]?.[t.x];
+
+    // Only one tile deep. Reveal open hallway/floor, doors/locks as endpoints,
+    // but never walls or stairs/safe-room/exit markers.
+    if (tile === "." || tile === "D" || tile === "L" || tile === "C") {
+      visible[t.y][t.x] = true;
+      if (!seen[t.y][t.x]) {
+        seen[t.y][t.x] = true;
+        minimapDirty = true;
+      }
+    }
+  }
+}
+
+
+function revealRoomDoorEdges(room) {
+  if (!room) return;
+
+  const edgeCandidates = [];
+
+  for (let x = room.x; x < room.x + room.w; x++) {
+    edgeCandidates.push({x, y: room.y - 1});
+    edgeCandidates.push({x, y: room.y + room.h});
+  }
+
+  for (let y = room.y; y < room.y + room.h; y++) {
+    edgeCandidates.push({x: room.x - 1, y});
+    edgeCandidates.push({x: room.x + room.w, y});
+  }
+
+  for (const t of edgeCandidates) {
+    if (t.x < 0 || t.y < 0 || t.x >= MAP_COLS || t.y >= MAP_ROWS) continue;
+    if (map[t.y][t.x] !== "#") revealTileForVision(t.x, t.y);
+  }
+}
+
+function revealTightHallwayVision(px, py) {
+  revealTileForVision(px, py);
+
+  const dirs = [
+    {dx: 1, dy: 0}, {dx: -1, dy: 0}, {dx: 0, dy: 1}, {dx: 0, dy: -1},
+    {dx: 1, dy: 1}, {dx: 1, dy: -1}, {dx: -1, dy: 1}, {dx: -1, dy: -1}
+  ];
+
+  for (const d of dirs) {
+    const nx = px + d.dx;
+    const ny = py + d.dy;
+
+    if (d.dx === 0 || d.dy === 0) {
+      revealTileForVision(nx, ny);
+      continue;
+    }
+
+    const sideA = map[py]?.[px + d.dx];
+    const sideB = map[py + d.dy]?.[px];
+    if (!isVisionBlockingTile(sideA) && !isVisionBlockingTile(sideB)) {
+      revealTileForVision(nx, ny);
+    }
+  }
+}
+
+
+function updateVisibility(force=false) {
+  const px = Math.floor(player.x / TILE);
+  const py = Math.floor(player.y / TILE);
+  const currentRoomForReveal = roomForTile(px, py);
+
+  const roomRevealNeedsUpdate =
+    currentRoomForReveal &&
+    (roomRevealState.roomId !== currentRoomForReveal.id || !roomRevealState.complete);
+
+  if (!force && !visibilityDirty && px === lastVisibilityTileX && py === lastVisibilityTileY && !roomRevealNeedsUpdate) {
+    return;
+  }
+
+  lastVisibilityTileX = px;
+  lastVisibilityTileY = py;
+  visibilityDirty = false;
+
+  visible = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(false));
+
+  if (currentRoomForReveal) {
+    updateRoomReveal(currentRoomForReveal, px, py);
+    revealRoomDoorEdges(currentRoomForReveal);
+    revealAdjacentRoomEdgeFloors(currentRoomForReveal);
+  } else {
+    revealTightHallwayVision(px, py);
+  }
+
+  let count = 0;
+  for (const room of rooms) {
+    if (!room.seen) {
+      for (let y = room.y; y < room.y + room.h; y++) {
+        for (let x = room.x; x < room.x + room.w; x++) {
+          if (seen[y][x]) {
+            room.seen = true;
+            count++;
+            break;
+          }
+        }
+        if (room.seen) break;
+      }
+    }
+  }
+
+  discoverStairwellIfVisible();
+
+  if (count > 0) {
+    roomsSeen += count;
+    if (roomsSeen === 5) achievement("NEW ACHIEVEMENT: Lightly Trespassing", "You have discovered five rooms. The dungeon would like to remind you that curiosity killed the cat, then monetized the footage.", "rooms5");
+    if (roomsSeen === 15) achievement("NEW ACHIEVEMENT: Real Estate Goblin", "You have discovered fifteen rooms. At this point you are less crawler and more aggressive home inspector.", "rooms15");
+    updateHUD();
+  }
+}
+
+
+function discoverStairwellIfVisible() {
+  if (stairwellFound || stairwellX === null || stairwellY === null) return;
+
+  if (seen[stairwellY]?.[stairwellX]) {
+    stairwellFound = true;
+    minimapDirty = true;
+    achievement("NEW DISCOVERY: STAIRWELL LOCATED", "The stairwell has been permanently marked on your map. You may descend at any time. This is not the same thing as a good idea.", "stairwellFound");
+    announcer("Stairwell located. The dungeon reminds you that leaving early is survival, not glory.");
+    updateHUD();
+  }
+}
+
+function updateFloorTimer() {
+  if (gameWon || gameLost) return;
+  frameCount++;
+  if (frameCount % 60 === 0 && !collapseStarted) {
+    floorTimeLeft = Math.max(0, floorTimeLeft - 1);
+    if (frameCount % (60 * 20) === 0 && !player.safe) audienceScore = Math.max(0, audienceScore - 1);
+    if (floorTimeLeft <= 360 && !warnedAt360) { warnedAt360 = true; announcer("Floor collapse in six minutes. This is not a threat. It is a scheduling policy."); }
+    if (floorTimeLeft <= 240 && !warnedAt240) { warnedAt240 = true; announcer("Floor collapse in four minutes. Plenty of time to panic inefficiently."); }
+    if (floorTimeLeft <= 120 && !warnedAt120) { warnedAt120 = true; achievement("NEW ACHIEVEMENT: Scheduling Conflict", "The floor is preparing to stop existing. Please wrap up any hobbies, grudges, or poor decisions.", "twoMinuteWarning"); }
+    if (floorTimeLeft <= 60 && !warnedAt60) { warnedAt60 = true; finalDescentAnnounced = true; achievement("FINAL DESCENT WINDOW", "One minute until collapse. Descending now grants immediate access to the next floor. Remaining here grants the dungeon plausible deniability.", "finalDescentWindow"); }
+    if (floorTimeLeft <= 30 && !warnedAt30) { warnedAt30 = true; achievement("NEW ACHIEVEMENT: Time Management Goblin", "You have thirty seconds left and somehow this is still not the worst plan I've seen today.", "thirtySecondWarning"); }
+    if (floorTimeLeft <= 0) floorCollapseDeath();
+    updateHUD();
+  }
+  if (!collapseStarted && frameCount - lastObservationFrame >= OBSERVATION_INTERVAL_FRAMES) {
+    lastObservationFrame = frameCount;
+    makeDungeonObservation();
+  }
+}
+
+
+function floorCollapseDeath() {
+  if (gameWon || gameLost) return;
+  pendingFloorAdvance = false;
+  gameLost = true;
+  achievement("FLOOR COLLAPSE", "You failed to descend before the floor collapsed. The dungeon thanks you for becoming load-bearing paste.", "collapseDeath");
+  showCenter("Floor Collapse", "You failed to descend before the floor collapsed. Any crawler remaining on the floor dies. The dungeon has filed your remains under: avoidable.", "Start New Run", restartGame);
+}
+
+function startCollapse() {
+  collapseStarted = true;
+  changeAudience(5);
+  achievement("FLOOR COLLAPSE STARTED", "The dungeon has begun aggressively uninstalling this floor. Enemies are faster. The exit is now less of a suggestion.", "collapseStarted");
+  for (const enemy of enemies) if (enemy.hp > 0) enemy.speed *= 1.65;
+  updateHUD();
+}
+
+function makeDungeonObservation() {
+  stats.potshotsFromAI++;
+  const rep = updateReputation();
+  const safeSeconds = Math.floor(stats.timeInSafeRoomFrames / 60);
+  const outsideSeconds = Math.floor(stats.timeOutsideSafeRoomFrames / 60);
+  const obs = [];
+
+  if (roomsSeen >= 10 && stats.doorsOpened <= 1) obs.push(`You have seen ${roomsSeen} rooms and opened ${stats.doorsOpened} doors. Either this floor is generous or you are wandering with heroic uncertainty.`);
+  if (roomsSeen >= 12 && stats.chestsOpened === 0) obs.push("You have discovered multiple rooms and somehow avoided treasure. Bold anti-loot behavior. The goblins are confused and frankly offended.");
+  if (stats.doorsOpened >= 3 && stats.enemiesKilled === 0) obs.push("You have opened multiple doors and killed nothing. Fascinating. A pacifist locksmith.");
+  if (stats.chestsOpened >= 2 && stats.enemiesKilled === 0) obs.push("You appear to believe this is a treasure tour with occasional screaming. The dungeon respects the hustle, barely.");
+  if (stats.missedAttacks >= 4) obs.push("Your combat strategy currently involves threatening oxygen. Oxygen remains undefeated.");
+  if (stats.wallBumps >= 12) obs.push("Repeated wall impacts detected. The architecture has filed a formal complaint.");
+  if (stats.damageTaken >= 24 && stats.enemiesKilled === 0) obs.push("You have taken significant damage without killing anything. This is less combat and more customer service.");
+  if (safeSeconds > 35 && outsideSeconds < 20) obs.push("You are spending a lot of time in the safe room. Bold survival strategy. Cowardly, but bold.");
+  if (stats.enemiesKilled >= 2 && stats.chestsOpened === 0) obs.push("You keep killing things and ignoring treasure. Somewhere, a goblin accountant just woke up screaming.");
+  if (lootBoxCount() >= 3) obs.push(`You are carrying ${lootBoxCount()} unopened loot boxes. This is either discipline or a small cardboard addiction.`);
+  if (stats.gearFound >= 2 && Object.values(player.equipment).filter(Boolean).length === 0) obs.push("You keep finding clothing and refusing to wear it. The dungeon has questions. So do I.");
+  if (stats.interactionsWithNothing >= 3) obs.push("You keep interacting with empty space. The empty space has asked me not to give you its number.");
+  if (audienceScore <= 8 && outsideSeconds > 20) obs.push("Your audience score is low. Even the dungeon's background fungus is testing better with viewers.");
+  if (player.level >= 2 && stats.enemiesKilled >= 2) obs.push(`You are now level ${player.level}. The dungeon is forced to acknowledge your growth, legally and against its wishes.`);
+  if (audienceScore >= 30) obs.push(`Current reputation: ${rep}. ${getReputationComment(rep)}`);
+  if (stats.doorsOpened >= 4 && stats.chestsOpened >= 2 && stats.enemiesKilled >= 1) obs.push("Look at you, developing a gameplay loop. Door, loot, violence. Civilization began with less.");
+  if (obs.length === 0) obs.push([
+    `You have seen ${roomsSeen} of ${rooms.length} rooms. This is called exploration. Or trespassing, depending on the lawyer.`,
+    "The dungeon is watching you. Not impressed yet. Still watching.",
+    "You are doing fine. Unfortunately, fine is not a genre.",
+    "No major pattern detected. Try becoming more entertaining before the floor becomes rubble.",
+    "Your survival continues to be technically legal."
+  ][Math.floor(Math.random() * 5)]);
+  announcer(obs[Math.floor(Math.random() * obs.length)]);
+}
+
+
+
+const SLOT_LABELS={head:"Head",chest:"Chest",legs:"Legs",feet:"Feet",accessory:"Accessory"};
+const ITEM_BASES={head:["Helmet","Cap","Crown","Hood"],chest:["Vest","Tunic","Breastplate","Jacket"],legs:["Pants","Greaves","Shorts","Trousers"],feet:["Boots","Sandals","Crocs","Footwraps"],accessory:["Ring","Charm","Badge","Pendant"]};
+const ITEM_PREFIXES=["Goblin","Rat-hide","Bone","Rusty","Lucky","Crawler","Moldy","Questionable","Royal","Screaming"];
+const ROOM_NAMES={small:["Crypt Nook","Goblin Pantry","Collapsed Alcove","Rat Nest","Old Guard Room"],medium:["Bone Gallery","Broken Armory","Forgotten Shrine","Goblin Barracks","Hall of Echoes","Mushroom Chapel"],large:["Feast Hall","The Drowned Hall","Cavern of Teeth","Hall of Rusted Banners"],boss:["The Rat King's Court","The Bone Collector's Pit","Champion's Den","The Blood-Marked Chamber","The Old Arena"]};
+function makeId(p="item"){return `${p}_${Date.now()}_${Math.floor(Math.random()*999999)}`;}
+function choose(a){return a[Math.floor(Math.random()*a.length)];}
+function rollRarity(force=false){if(force)return"Rare";let r=Math.random();return r<.62?"Common":r<.88?"Uncommon":r<.98?"Rare":"Epic";}
+function rarityPower(r){return {Common:1,Uncommon:2,Rare:3,Epic:4}[r]||1;}
+function generateGear(forceRare=false){
+ const slot=choose(Object.keys(ITEM_BASES)),rarity=rollRarity(forceRare),p=rarityPower(rarity);
+ const item={id:makeId("gear"),type:"gear",slot,rarity,name:`${rarity} ${choose(ITEM_PREFIXES)} ${choose(ITEM_BASES[slot])}`,hp:0,attack:0,speed:0,defense:0,audience:0};
+ if(slot==="head")item.audience=p*2; if(slot==="chest")item.hp=p*9; if(slot==="legs")item.defense=p; if(slot==="feet")item.speed=p*.08;
+ if(slot==="accessory"){if(Math.random()<.5)item.attack=p*2; else item.audience=p*3;}
+ if(Math.random()<.28)item.hp+=p*4; if(Math.random()<.22)item.attack+=p; if(Math.random()<.18)item.defense+=1;
+ return item;
+}
+function generateLootBox(forceRare=false){const rarity=rollRarity(forceRare);return{id:makeId("box"),type:"lootbox",rarity,name:`${rarity} Prize Box`,opened:false};}
+function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room."; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
+function addItem(item){
+ player.inventory.push(item);
+ if(item.type==="lootbox"){stats.lootBoxesFound++; achievement("NEW LOOT BOX",`You found a ${item.name}. It can only be opened in a safe room.`,`box_${item.id}`);}
+ else{stats.gearFound++; achievement("NEW GEAR",`You found ${item.name}. ${itemDescription(item)}`,`gear_${item.id}`);}
+ updateInventoryUI(); updateHUD();
+}
+function equipItem(id){
+ const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const item=player.inventory[idx]; if(item.type!=="gear")return;
+ const old=player.equipment[item.slot]; player.equipment[item.slot]=item; player.inventory.splice(idx,1); if(old)player.inventory.push(old);
+ recalcEquipmentStats(); achievement("EQUIPPED",`You equipped ${item.name}. ${itemDescription(item)}`,`equip_${item.id}`); updateInventoryUI(); updateHUD();
+}
+function openLootBox(id){
+ const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const box=player.inventory[idx]; if(box.type!=="lootbox")return;
+ if(!player.safe){announcer("Loot boxes may only be opened in safe rooms. The dungeon believes in responsible dopamine distribution.");return;}
+ player.inventory.splice(idx,1); stats.lootBoxesOpened++; const coins=8+Math.floor(Math.random()*16)+rarityPower(box.rarity)*6; player.coins+=coins;
+ const gear=generateGear(box.rarity==="Rare"||box.rarity==="Epic"); player.inventory.push(gear); stats.gearFound++;
+ achievement("LOOT BOX OPENED",`You opened ${box.name} and received ${coins} coins and ${gear.name}. Pants-based civilization remains possible.`,`open_${box.id}`);
+ if(!achievements.has("firstLootBoxOpen"))achievement("NEW ACHIEVEMENT: Delayed Gratification","You waited until a safe room to open a box. Somewhere, an impulse-control researcher just shed a single tear.","firstLootBoxOpen");
+ updateInventoryUI(); updateHUD();
+}
+function discardItem(id){const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const [item]=player.inventory.splice(idx,1); announcer(`You discarded ${item.name}. The dungeon has sold it to someone with lower standards.`); updateInventoryUI(); updateHUD();}
+function recalcEquipmentStats(){
+ let hp=0,atk=0,spd=0,def=0,aud=0; for(const item of Object.values(player.equipment)){if(!item)continue; hp+=item.hp||0; atk+=item.attack||0; spd+=item.speed||0; def+=item.defense||0; aud+=item.audience||0;}
+ const old=player.maxHp; player.maxHp=100+(player.level-1)*14+hp; player.attackDamage=20+(player.level-1)*4+atk; player.speed=player.baseSpeed+spd; player.defense=def; player.audienceBonus=aud; if(player.maxHp>old)player.hp+=player.maxHp-old; player.hp=Math.min(player.hp,player.maxHp);
+}
+function lootBoxCount(){return player.inventory.filter(i=>i.type==="lootbox").length;}
+function updateInventoryUI(){
+ const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
+ eq.innerHTML=`<div class="equipGrid">${Object.keys(SLOT_LABELS).map(s=>`<div>${SLOT_LABELS[s]}</div><div>${player.equipment[s]?player.equipment[s].name:"Empty"}</div>`).join("")}</div><div class="itemMeta">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · Audience Bonus ${player.audienceBonus}</div>`;
+ if(!player.inventory.length){list.innerHTML='<div class="invItem">Inventory empty. The dungeon recommends crime.</div>';return;}
+ list.innerHTML=player.inventory.map(item=>`<div class="invItem"><div class="itemName">${item.name}</div><div class="itemMeta">${item.type==="gear"?SLOT_LABELS[item.slot]+" · ":""}${itemDescription(item)}</div><div class="itemActions">${item.type==="gear"?`<button class="itemBtn" onclick="equipItem('${item.id}')">Equip</button>`:`<button class="itemBtn" onclick="openLootBox('${item.id}')">Open</button>`}<button class="itemBtn" onclick="discardItem('${item.id}')">Drop</button></div></div>`).join("");
+}
+function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.style.display==="block"){p.style.display="none";return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display="block";}
+function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p)p.style.display="none";}
+function rewardChestLoot(){
+ const roll=Math.random();
+ if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}
+ else if(roll<.74)addItem(generateLootBox());
+ else addItem(generateGear());
+ if(!achievements.has("firstWearableLoot")&&stats.gearFound>0)achievement("NEW ACHIEVEMENT: Pants Adjacent","You found wearable equipment. Whether this improves your dignity remains under review.","firstWearableLoot");
+ updateInventoryUI(); updateHUD();
+}
+
+function gainXP(amount) {
+  player.xp += amount;
+
+  if (!achievements.has("firstXP")) {
+    achievement("NEW ACHIEVEMENT: Number Goes Up", "You gained experience. This is how games trick mammals into enjoying chores.", "firstXP");
+  }
+
+  while (player.xp >= player.xpToNext) {
+    player.xp -= player.xpToNext;
+    levelUpPlayer();
+  }
+
+  updateHUD();
+}
+
+function levelUpPlayer() {
+  player.level++;
+  player.xpToNext = Math.floor(40 + player.level * 28);
+  recalcEquipmentStats();
+  player.hp = player.maxHp;
+
+  changeAudience(6);
+  achievement("LEVEL UP", `You reached level ${player.level}. Your numbers improved, which is technically character development.`, `level${player.level}`);
+}
+
+
+function changeAudience(amount) {
+  audienceScore = Math.max(0, Math.min(100, audienceScore + amount));
+  updateHUD();
+  if (audienceScore >= 25 && !achievements.has("audience25")) achievement("NEW ACHIEVEMENT: Mildly Watchable", "Your audience score reached 25. Somewhere, a bored alien looked up from its sandwich.", "audience25");
+  if (audienceScore >= 50 && !achievements.has("audience50")) achievement("NEW ACHIEVEMENT: Content Creature", "Your audience score reached 50. You are no longer background noise. Terrifying progress.", "audience50");
+}
+
+function updateReputation() {
+  const safeSeconds = Math.floor(stats.timeInSafeRoomFrames / 60);
+  const outsideSeconds = Math.floor(stats.timeOutsideSafeRoomFrames / 60);
+  const c = [];
+  if (roomsSeen >= 15 && stats.chestsOpened <= 1) c.push("Dungeon Tourist");
+  if (stats.chestsOpened >= 2 && stats.chestsOpened >= stats.enemiesKilled + 1) c.push("Loot Goblin");
+  if (stats.doorsOpened >= 4 && stats.enemiesKilled <= 1) c.push("Door Enthusiast");
+  if (stats.enemiesKilled >= 2 && stats.enemiesKilled >= stats.chestsOpened) c.push("Murder Hobo Intern");
+  if (safeSeconds > outsideSeconds && outsideSeconds > 10) c.push("Strategic Coward");
+  if (stats.missedAttacks >= 5) c.push("Air Boxer");
+  if (stats.wallBumps >= 12) c.push("Wall Conversationalist");
+  if (stats.damageTaken >= 24 && stats.enemiesKilled >= 1) c.push("Damage Sponge");
+  if (audienceScore >= 35 && stats.riskyMoments >= 3) c.push("Ratings Goblin");
+  currentReputation = c[0] || "Undeclared Menace";
+  return currentReputation;
+}
+
+function getReputationComment(rep) {
+  return {
+    "Dungeon Tourist": "You are sightseeing under conditions most travel agents would describe as legally indefensible.",
+    "Loot Goblin": "You prioritize treasure over safety, dignity, and basic pattern recognition.",
+    "Door Enthusiast": "You have formed a suspicious emotional attachment to doors.",
+    "Murder Hobo Intern": "You are not yet a full murder hobo, but your resume has promise.",
+    "Strategic Coward": "Cowardice is such an ugly word. We prefer 'resource-conserving mammal.'",
+    "Air Boxer": "Your rivalry with empty space continues to define your brand.",
+    "Wall Conversationalist": "The walls know your face better than your allies do.",
+    "Damage Sponge": "You absorb punishment with the confidence of someone who has misunderstood the assignment.",
+    "Ratings Goblin": "You are becoming entertaining in the worst possible way.",
+    "Undeclared Menace": "Your brand remains unclear. Try committing to a bit before you die."
+  }[rep] || "Your brand remains unclear. Try committing to a bit before you die.";
+}
+
+function showSafeRoomRecap() {
+  const panel = document.getElementById("safeRoomRecap");
+  const statsBox = document.getElementById("recapStats");
+  const commentBox = document.getElementById("recapComment");
+  const rep = updateReputation();
+  const safeSeconds = Math.floor(stats.timeInSafeRoomFrames / 60);
+  const outsideSeconds = Math.floor(stats.timeOutsideSafeRoomFrames / 60);
+  statsBox.innerHTML = `
+    <div class="recapLine"><span>Reputation</span><span>${rep}</span></div>
+    <div class="recapLine"><span>Level</span><span>${player.level}</span></div>
+    <div class="recapLine"><span>XP</span><span>${player.xp}/${player.xpToNext}</span></div>
+    <div class="recapLine"><span>Audience</span><span>${audienceScore}</span></div>
+    <div class="recapLine"><span>Rooms</span><span>${roomsSeen}/${rooms.length}</span></div>
+    <div class="recapLine"><span>Kills</span><span>${stats.enemiesKilled}</span></div>
+    <div class="recapLine"><span>Bosses</span><span>${stats.bossesDefeated}</span></div>
+    <div class="recapLine"><span>Boxes</span><span>${lootBoxCount()}</span></div>
+    <div class="recapLine"><span>Damage</span><span>${stats.damageTaken}</span></div>`;
+  commentBox.textContent = getReputationComment(rep);
+  panel.style.display = "block";
+}
+function hideSafeRoomRecap() { document.getElementById("safeRoomRecap").style.display = "none"; }
+
+function toggleSafeRoomRecap() {
+  if (!player.safe) { announcer("Performance reviews are only available in safe rooms. The dungeon believes in work-life balance, briefly."); return; }
+  const panel = document.getElementById("safeRoomRecap");
+  if (panel.style.display === "block") hideSafeRoomRecap(); else showSafeRoomRecap();
+}
+
+function updatePrompt() {
+  const prompt = document.getElementById("prompt");
+  let text = "";
+
+  for (const corpse of corpses) {
+    if (corpse.looted) continue;
+    const dist = Math.hypot(player.x - corpse.x, player.y - corpse.y);
+    if (dist < player.r + corpse.r + 24) {
+      text = corpse.boss ? "Loot boss corpse" : "Loot corpse";
+      break;
+    }
+  }
+
+  if (!text) for (const spot of getNearbyTiles()) {
+    const t = map[spot.y][spot.x];
+    if (t === "L") { text = "Boss door locked"; break; }
+    if (t === "D") { text = "Open door"; break; }
+    if (t === "C") { text = "Open chest"; break; }
+  }
+  if (!text && player.safe) text = "Safe Room";
+  prompt.textContent = text;
+  prompt.style.display = text ? "block" : "none";
+}
+
+function achievement(title, body, id = null) {
+  const key = id || title + body;
+  if (achievements.has(key)) return;
+  achievements.add(key);
+  addToLog(title, body);
+  showPopup(title, body);
+}
+function announcer(text) { achievement("DUNGEON AI COMMENTARY", text); }
+
+function showPopup(title, body) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "popup";
+  wrapper.innerHTML = `<div class="title">${title}</div><div class="body">${body}</div>`;
+  document.getElementById("announcer").prepend(wrapper);
+  activePopups.unshift(wrapper);
+  while (activePopups.length > MAX_ACTIVE_POPUPS) {
+    const oldPopup = activePopups.pop();
+    if (oldPopup?.parentNode) oldPopup.remove();
+  }
+  setTimeout(() => {
+    activePopups = activePopups.filter(p => p !== wrapper);
+    if (wrapper.parentNode) wrapper.remove();
+  }, POPUP_LIFETIME_MS);
+}
+
+function addToLog(title, body) {
+  achievementHistory.unshift({ title, body });
+  achievementHistory = achievementHistory.slice(0, 16);
+  renderLog();
+}
+function renderLog() {
+  document.getElementById("logEntries").innerHTML = achievementHistory.map(entry => `
+    <div class="logEntry"><div class="logTitle">${entry.title}</div><div>${entry.body}</div></div>
+  `).join("");
+}
+function toggleLog() {
+  const panel = document.getElementById("logPanel");
+  panel.style.display = panel.style.display === "none" || panel.style.display === "" ? "block" : "none";
+}
+
+
+function openLogPanel() {
+  const panel = document.getElementById("logPanel");
+  const recap = document.getElementById("safeRoomRecap");
+  if (recap) recap.style.display = "none";
+  if (panel) panel.style.display = "block";
+}
+
+function closeLogPanel() {
+  const panel = document.getElementById("logPanel");
+  if (panel) panel.style.display = "none";
+}
+
+function openRecapPanel() {
+  const recap = document.getElementById("safeRoomRecap");
+  const log = document.getElementById("logPanel");
+  if (log) log.style.display = "none";
+
+  if (!player.safe) {
+    announcer("Performance reviews are only available in safe rooms. The dungeon believes in work-life balance, briefly.");
+    return;
+  }
+
+  showSafeRoomRecap();
+  if (recap) recap.style.display = "block";
+}
+
+function closeRecapPanel() {
+  const recap = document.getElementById("safeRoomRecap");
+  if (recap) recap.style.display = "none";
+}
+
+
+function isVisiblePanel(el) {
+  return el && el.style.display === "block";
+}
+
+function toggleLogPanelMobile() {
+  const log = document.getElementById("logPanel");
+  const recap = document.getElementById("safeRoomRecap");
+
+  if (isVisiblePanel(log)) {
+    log.style.display = "none";
+    return;
+  }
+
+  if (recap) recap.style.display = "none";
+  if (log) log.style.display = "block";
+}
+
+function toggleRecapPanelMobile() {
+  const recap = document.getElementById("safeRoomRecap");
+  const log = document.getElementById("logPanel");
+
+  if (isVisiblePanel(recap)) {
+    recap.style.display = "none";
+    return;
+  }
+
+  if (!player.safe) {
+    announcer("Performance reviews are only available in safe rooms. The dungeon believes in work-life balance, briefly.");
+    return;
+  }
+
+  if (log) log.style.display = "none";
+  showSafeRoomRecap();
+  if (recap) recap.style.display = "block";
+}
+
+function getOpenScrollablePanel() {
+  const log = document.getElementById("logPanel");
+  const recap = document.getElementById("safeRoomRecap");
+  const inv = document.getElementById("inventoryPanel");
+
+  if (isVisiblePanel(log)) return log;
+  if (isVisiblePanel(recap)) return recap;
+  if (isVisiblePanel(inv)) return inv;
+  return null;
+}
+
+function updatePanelScrollFromController() {
+  if (!gamepadState.connected) return;
+
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  const gp = Array.from(pads).find(pad => pad && pad.connected !== false);
+  if (!gp) return;
+
+  const panel = getOpenScrollablePanel();
+  if (!panel) return;
+
+  const rightY = gp.axes[3] || 0;
+  const dpadDown = gp.buttons[13]?.pressed ? 1 : 0;
+  const dpadUp = gp.buttons[12]?.pressed ? -1 : 0;
+  const scrollInput = Math.abs(rightY) > 0.18 ? rightY : (dpadDown + dpadUp);
+
+  if (Math.abs(scrollInput) > 0.05) {
+    panel.scrollTop += scrollInput * 12;
+  }
+}
+
+
+function setupPanelCloseButtons() {
+  const closeLog = document.getElementById("closeLogBtn");
+  const closeRecap = document.getElementById("closeRecapBtn");
+  const closeInventory = document.getElementById("closeInventoryBtn");
+
+  const bind = (el, fn) => {
+    if (!el) return;
+    const fire = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      fn();
+    };
+    el.addEventListener("pointerdown", fire, { passive: false });
+    el.addEventListener("touchstart", fire, { passive: false });
+    el.addEventListener("click", fire);
+  };
+
+  bind(closeLog, closeLogPanel);
+  bind(closeRecap, closeRecapPanel);
+  bind(closeInventory, closeInventoryPanel);
+}
+
+
+
+function formatTimer(seconds) {
+  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+  const s = Math.floor(seconds % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+
+function captureRunProgress() {
+  return {
+    player: {
+      level: player.level, xp: player.xp, xpToNext: player.xpToNext,
+      maxHp: player.maxHp, hp: player.hp, attackDamage: player.attackDamage,
+      baseSpeed: player.baseSpeed, speed: player.speed, defense: player.defense,
+      audienceBonus: player.audienceBonus, coins: player.coins,
+      inventory: player.inventory.map(item => ({ ...item })),
+      equipment: Object.fromEntries(Object.entries(player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null]))
+    },
+    stats: { ...stats },
+    audienceScore,
+    achievementHistory: achievementHistory.map(entry => ({ ...entry })),
+    achievements: new Set(achievements)
+  };
+}
+
+function restoreRunProgress(snapshot) {
+  if (!snapshot) return;
+  player.level = snapshot.player.level;
+  player.xp = snapshot.player.xp;
+  player.xpToNext = snapshot.player.xpToNext;
+  player.maxHp = snapshot.player.maxHp;
+  player.hp = Math.min(snapshot.player.hp, snapshot.player.maxHp);
+  player.attackDamage = snapshot.player.attackDamage;
+  player.baseSpeed = snapshot.player.baseSpeed;
+  player.speed = snapshot.player.speed;
+  player.defense = snapshot.player.defense;
+  player.audienceBonus = snapshot.player.audienceBonus;
+  player.coins = snapshot.player.coins;
+  player.inventory = snapshot.player.inventory.map(item => ({ ...item }));
+  player.equipment = Object.fromEntries(Object.entries(snapshot.player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null]));
+
+  for (const key of Object.keys(stats)) stats[key] = snapshot.stats[key] ?? 0;
+  audienceScore = snapshot.audienceScore;
+  achievementHistory = snapshot.achievementHistory.map(entry => ({ ...entry }));
+  achievements = new Set(snapshot.achievements);
+
+  recalcEquipmentStats();
+  updateInventoryUI();
+  renderLog();
+}
+
+function showFloorSplash() {
+  const splash = document.getElementById("floorSplash");
+  if (!splash) return;
+  splash.textContent = `Floor ${currentFloor}`;
+  splash.style.display = "flex";
+  splash.style.animation = "none";
+  splash.offsetHeight;
+  splash.style.animation = "";
+  setTimeout(() => { splash.style.display = "none"; }, 1850);
+}
+
+function advanceToNextFloor() {
+  if (!pendingFloorAdvance) return;
+  const snapshot = captureRunProgress();
+  currentFloor++;
+  pendingFloorAdvance = false;
+  resetState({ preserveRun: true, snapshot });
+  showFloorSplash();
+}
+
+
+function updateHUD() {
+  const hpNow = Math.max(0, Math.floor(player.hp));
+  const hpMax = Math.max(1, player.maxHp);
+  const xpNow = Math.max(0, player.xp);
+  const xpMax = Math.max(1, player.xpToNext);
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+
+  setText("health", hpNow);
+  setText("maxHealth", hpMax);
+  setText("coins", player.coins);
+  setText("playerLevel", player.level);
+  setText("playerXP", xpNow);
+  setText("xpNext", xpMax);
+  setText("audience", audienceScore);
+  setText("timer", isFinalDescentWindow() ? `FINAL ${formatTimer(floorTimeLeft)}` : formatTimer(floorTimeLeft));
+  setText("roomsSeen", roomsSeen);
+  setText("roomTotal", rooms.length);
+
+  const hpFill = document.getElementById("hpFill");
+  const hpText = document.getElementById("hpText");
+  const xpFill = document.getElementById("xpFill");
+  const xpText = document.getElementById("xpText");
+
+  if (hpFill) hpFill.style.width = `${Math.max(0, Math.min(100, (hpNow / hpMax) * 100))}%`;
+  if (hpText) hpText.textContent = `${hpNow} / ${hpMax}`;
+  if (xpFill) xpFill.style.width = `${Math.max(0, Math.min(100, (xpNow / xpMax) * 100))}%`;
+  if (xpText) xpText.textContent = `LV ${player.level} · ${xpNow} / ${xpMax}`;
+
+  const invCount=document.getElementById("inventoryCount"),boxCount=document.getElementById("lootBoxCount"),roomEl=document.getElementById("currentRoomName");
+  const floorEl=document.getElementById("floorNumber"),stairEl=document.getElementById("stairStatus");
+
+  if(invCount)invCount.textContent=player.inventory.length;
+  if(boxCount)boxCount.textContent=lootBoxCount();
+  if(roomEl)roomEl.textContent=currentRoomName;
+  if(floorEl)floorEl.textContent=currentFloor;
+  if(stairEl)stairEl.textContent=stairwellFound ? "Marked" : "Unknown";
+
+  const stairHud=document.getElementById("stairHud");
+  if(stairHud) stairHud.classList.toggle("visible", !!stairwellFound);
+
+  const gpStatus = document.getElementById("gamepadStatus");
+  if (gpStatus) gpStatus.textContent = gamepadState.connected ? "Connected" : "Press any button";
+
+  updateReputation();
+}
+
+function showCenter(title, text, buttonText = "Generate New Floor", buttonHandler = restartGame) {
+  document.getElementById("centerTitle").textContent = title;
+  document.getElementById("centerText").textContent = text;
+  const button = document.getElementById("centerButton");
+  if (button) {
+    button.textContent = buttonText;
+    button.onclick = buttonHandler;
+  }
+  document.getElementById("centerMessage").style.display = "flex";
+}
+
+function descendStairwell() {
+  if (gameWon || gameLost) return;
+
+  stats.exitFinds++;
+  changeAudience(10);
+
+  const early = floorTimeLeft > 60;
+  const timeText = formatTimer(floorTimeLeft);
+
+  if (early) {
+    gameWon = true;
+    pendingFloorAdvance = true;
+    achievement("STAIRWELL USED: EARLY DESCENT", "You chose survival over glory. In multiplayer, you would now wait in stasis until collapse.", `earlyDescent${currentFloor}`);
+    showCenter(
+      "Entered Stasis",
+      `You descended with ${timeText} remaining. In multiplayer, you would wait here until floor collapse. For prototype testing, press the button when you are ready to advance.`,
+      "Skip Countdown",
+      advanceToNextFloor
+    );
+  } else {
+    achievement("STAIRWELL USED: FINAL WINDOW", "You waited until the floor was actively trying to murder you. In multiplayer, this would give you a head start on the next floor.", `finalDescent${currentFloor}`);
+    pendingFloorAdvance = true;
+    advanceToNextFloor();
+  }
+}
+function winGame() {
+  gameWon = true;
+  achievement("NEW ACHIEVEMENT: Escalator Enthusiast", "You found the exit. This means you get to leave one bad situation and enter a worse one.", "win");
+  showCenter("Dungeon Crawler World v1.0 Cleared", "Congratulations, crawler. You survived this procedural floor. The dungeon is already pretending it let you win.");
+}
+function loseGame() {
+  gameLost = true;
+  pendingFloorAdvance = false;
+  showCenter("You Died", "The dungeon would like to thank you for your brief but educational contribution to slapstick violence.", "Start New Run", restartGame);
+}
+function restartGame() { pendingFloorAdvance = false; resetState(); }
+
+
+
+
+function wrapRoomLabel(label, maxCharsPerLine = 12) {
+  const words = label.toUpperCase().split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = "";
+
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (test.length > maxCharsPerLine && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  }
+
+  if (line) lines.push(line);
+  return lines.length ? lines.slice(0, 3) : [label.toUpperCase()];
+}
+
+function fitEngravedFont(lines, startingFontSize, maxWidth) {
+  let fontSize = startingFontSize;
+
+  while (fontSize > 12) {
+    ctx.font = `900 ${fontSize}px Arial`;
+    const widest = Math.max(...lines.map(line => ctx.measureText(line).width));
+    if (widest <= maxWidth) break;
+    fontSize -= 2;
+  }
+
+  return fontSize;
+}
+
+
+function drawEngravedRoomNames(camX, camY) {
+  if (!rooms || !visible) return;
+
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const room of rooms) {
+    if (!room.seen || !room.name) continue;
+
+    const cx = room.cx * TILE + TILE / 2;
+    const cy = room.cy * TILE + TILE / 2;
+
+    if (cx < camX - 260 || cx > camX + canvas.width + 260 || cy < camY - 200 || cy > camY + canvas.height + 200) continue;
+
+    const isRevealingThisRoom = roomRevealState?.roomId === room.id && !roomRevealState.complete;
+    const revealFrames = 28;
+    const revealProgress = roomRevealState?.roomId === room.id
+      ? Math.max(0.18, Math.min(1, (frameCount - roomRevealState.startFrame) / revealFrames))
+      : 1;
+
+    let centerVisible = false;
+
+    // During the reveal wave, allow the name to show while the crawler is inside the room,
+    // even before the exact center tiles have become visible.
+    if (isRevealingThisRoom) {
+      centerVisible = true;
+    } else {
+      for (let y = room.cy - 1; y <= room.cy + 1; y++) {
+        for (let x = room.cx - 1; x <= room.cx + 1; x++) {
+          if (visible[y]?.[x]) centerVisible = true;
+        }
+      }
+    }
+
+    if (!centerVisible) continue;
+
+    const roomPixelW = room.w * TILE;
+    const roomPixelH = room.h * TILE;
+    const usableWidth = Math.max(40, roomPixelW * 0.72);
+    const usableHeight = Math.max(28, roomPixelH * 0.50);
+
+    const maxChars = room.w <= 5 ? 7 : room.w <= 8 ? 10 : 14;
+    const lines = wrapRoomLabel(room.name, maxChars);
+
+    let fontSize = Math.floor(Math.min(roomPixelH * 0.22, roomPixelW * 0.105));
+    fontSize = Math.max(14, Math.min(fontSize, room.type === "boss" ? 46 : 34));
+
+    if (room.type === "boss") fontSize = Math.max(fontSize, 30);
+    if (room.type === "safe") fontSize = Math.max(fontSize, 20);
+
+    fontSize = fitEngravedFont(lines, fontSize, usableWidth);
+
+    let lineHeight = fontSize * 0.92;
+    const maxTotalHeight = usableHeight;
+    if (lines.length * lineHeight > maxTotalHeight) {
+      lineHeight = maxTotalHeight / lines.length;
+      fontSize = Math.min(fontSize, Math.floor(lineHeight / 0.92));
+      ctx.font = `900 ${fontSize}px Arial`;
+    }
+
+    const totalHeight = (lines.length - 1) * lineHeight;
+    ctx.font = `900 ${fontSize}px Arial`;
+    ctx.lineWidth = Math.max(1, Math.floor(fontSize / 18));
+
+    const alpha = revealProgress;
+
+    for (let i = 0; i < lines.length; i++) {
+      const label = lines[i];
+      const y = cy - totalHeight / 2 + i * lineHeight;
+
+      ctx.fillStyle = room.type === "safe" ? `rgba(35,75,35,${0.24 * alpha})` :
+                      room.type === "boss" ? `rgba(85,45,20,${0.28 * alpha})` :
+                      `rgba(0,0,0,${0.22 * alpha})`;
+      ctx.fillText(label, cx + 1.2, y + 1.2);
+
+      ctx.fillStyle = room.type === "safe" ? `rgba(185,255,185,${0.095 * alpha})` :
+                      room.type === "boss" ? `rgba(255,216,107,${0.105 * alpha})` :
+                      `rgba(255,255,255,${0.08 * alpha})`;
+      ctx.fillText(label, cx - 1, y - 1);
+
+      ctx.fillStyle = room.type === "safe" ? `rgba(150,225,150,${0.055 * alpha})` :
+                      room.type === "boss" ? `rgba(255,216,107,${0.065 * alpha})` :
+                      `rgba(255,255,255,${0.046 * alpha})`;
+      ctx.fillText(label, cx, y);
+    }
+  }
+
+  ctx.restore();
+}
+
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const camX = player.x - canvas.width / 2;
+  const camY = player.y - canvas.height / 2;
+
+  ctx.save();
+  ctx.translate(-camX, -camY);
+
+  const startX = Math.max(0, Math.floor(camX / TILE) - 2);
+  const endX = Math.min(MAP_COLS - 1, Math.floor((camX + canvas.width) / TILE) + 2);
+  const startY = Math.max(0, Math.floor(camY / TILE) - 2);
+  const endY = Math.min(MAP_ROWS - 1, Math.floor((camY + canvas.height) / TILE) + 2);
+
+  for (let y = startY; y <= endY; y++) {
+    for (let x = startX; x <= endX; x++) {
+      const px = x * TILE, py = y * TILE;
+      if (!seen[y][x]) { ctx.fillStyle = "#080808"; ctx.fillRect(px, py, TILE, TILE); continue; }
+      const t = map[y][x], isVisible = visible[y][x];
+
+      if (t === "#") {
+        ctx.fillStyle = isVisible ? "#333" : "#1e1e1e";
+        ctx.fillRect(px, py, TILE, TILE);
+        ctx.strokeStyle = isVisible ? "#444" : "#262626";
+        ctx.strokeRect(px, py, TILE, TILE);
+      } else if (t === "S") {
+        ctx.fillStyle = isVisible ? "#203522" : "#172418";
+        ctx.fillRect(px, py, TILE, TILE);
+      } else {
+        ctx.fillStyle = collapseStarted ? (isVisible ? "#2b1c1c" : "#1d1515") : (isVisible ? "#202020" : "#161616");
+        ctx.fillRect(px, py, TILE, TILE);
+      }
+
+      if (t === "D") { ctx.fillStyle = isVisible ? "#7b4a22" : "#3f2a18"; ctx.fillRect(px + 5, py + 5, TILE - 10, TILE - 10); }
+      if (t === "L") {
+        ctx.fillStyle = isVisible ? "#4b1111" : "#241010";
+        ctx.fillRect(px + 4, py + 4, TILE - 8, TILE - 8);
+        if (isVisible) {
+          ctx.strokeStyle = "#ff6b6b";
+          ctx.strokeRect(px + 7, py + 7, TILE - 14, TILE - 14);
+        }
+      }
+      if (t === "C" && isVisible) {
+        ctx.fillStyle = "#a36a21"; ctx.fillRect(px + 7, py + 10, TILE - 14, TILE - 15);
+        ctx.fillStyle = "#e0b14a"; ctx.fillRect(px + 13, py + 15, 7, 7);
+      }
+      if (t === "E" && (isVisible || stairwellFound)) {
+        ctx.fillStyle = "#3f63ff";
+        ctx.beginPath(); ctx.arc(px + TILE / 2, py + TILE / 2, 13, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = "#9db1ff"; ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1;
+      }
+      if (!isVisible) { ctx.fillStyle = "rgba(0,0,0,0.38)"; ctx.fillRect(px, py, TILE, TILE); }
+    }
+  }
+
+  drawEngravedRoomNames(camX, camY);
+
+  for (const corpse of corpses) {
+    if (corpse.looted) continue;
+    const tx = Math.floor(corpse.x / TILE), ty = Math.floor(corpse.y / TILE);
+    if (!visible[ty]?.[tx]) continue;
+
+    ctx.fillStyle = corpse.boss ? "rgba(120,70,160,0.9)" : "rgba(105,88,72,0.9)";
+    ctx.beginPath();
+    ctx.ellipse(corpse.x, corpse.y + 2, corpse.r + 4, Math.max(6, corpse.r * 0.55), 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = corpse.boss ? "rgba(255,216,107,0.85)" : "rgba(210,190,160,0.35)";
+    ctx.lineWidth = corpse.boss ? 2 : 1;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+for (const enemy of enemies) {
+    if (enemy.hp <= 0) continue;
+    const tx = Math.floor(enemy.x / TILE), ty = Math.floor(enemy.y / TILE);
+    if (!visible[ty]?.[tx]) continue;
+    ctx.fillStyle = enemy.boss ? "#8f38ff" : (collapseStarted ? "#d13b3b" : "#9b3131");
+    ctx.beginPath(); ctx.arc(enemy.x, enemy.y, enemy.r, 0, Math.PI * 2); ctx.fill();
+    if(enemy.boss){ctx.strokeStyle="#ffd86b";ctx.lineWidth=3;ctx.stroke();ctx.lineWidth=1;}
+    ctx.fillStyle = "#ffbaba"; ctx.fillRect(enemy.x - 13, enemy.y - 22, 26 * (enemy.hp / enemy.maxHp), 4);
+    ctx.fillStyle = "rgba(255,255,255,0.78)";
+    ctx.font = "10px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(`${enemy.boss ? "BOSS " : ""}Lv ${enemy.level || 1}`, enemy.x, enemy.y - 27);
+  }
+
+  ctx.fillStyle = player.safe ? "#7be07b" : "#f1f1f1";
+  ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
+
+  if (player.attackCooldown > 24) {
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.beginPath(); ctx.arc(player.x, player.y, 58, 0, Math.PI * 2); ctx.stroke();
+  }
+
+  if (collapseStarted && frameCount % 30 < 15) {
+    ctx.fillStyle = "rgba(150, 20, 20, 0.08)";
+    ctx.fillRect(camX, camY, canvas.width, canvas.height);
+  }
+
+  ctx.restore();
+  drawMinimap();
+}
+
+function getMinimapScale(){
+  return isMobileLike() ? 1.45 : 2.2;
+}
+
+function rebuildMinimapCache(scale){
+  const w=Math.ceil(MAP_COLS*scale), h=Math.ceil(MAP_ROWS*scale);
+  if(minimapCanvas.width!==w || minimapCanvas.height!==h){
+    minimapCanvas.width=w;
+    minimapCanvas.height=h;
+  }
+
+  minimapCtx.clearRect(0,0,w,h);
+
+  for(let y=0;y<MAP_ROWS;y++){
+    for(let x=0;x<MAP_COLS;x++){
+      const t=map[y][x];
+      if(!seen[y][x] && !(stairwellFound && x===stairwellX && y===stairwellY)) continue;
+      if(t==="#") minimapCtx.fillStyle="rgba(95,95,95,0.45)";
+      else if(t==="S") minimapCtx.fillStyle="rgba(123,224,123,0.8)";
+      else if(t==="E") minimapCtx.fillStyle=stairwellFound ? "rgba(80,160,255,1)" : "rgba(80,120,255,0.95)";
+      else if(t==="L") minimapCtx.fillStyle="rgba(255,90,90,0.95)";
+      else minimapCtx.fillStyle="rgba(170,170,170,0.55)";
+
+      minimapCtx.fillRect(Math.floor(x*scale),Math.floor(y*scale),Math.ceil(scale),Math.ceil(scale));
+    }
+  }
+
+  minimapDirty=false;
+  minimapLastScale=scale;
+}
+
+function drawMinimap(){
+  const scale=getMinimapScale();
+
+  if(minimapDirty || minimapLastScale!==scale){
+    rebuildMinimapCache(scale);
+  }
+
+  const w=minimapCanvas.width, h=minimapCanvas.height;
+  const x0=canvas.width-w-14, y0=canvas.height-h-14;
+
+  ctx.fillStyle="rgba(0,0,0,0.58)";
+  ctx.fillRect(x0-6,y0-6,w+12,h+12);
+  ctx.strokeStyle="rgba(255,255,255,0.22)";
+  ctx.strokeRect(x0-6,y0-6,w+12,h+12);
+
+  ctx.drawImage(minimapCanvas,x0,y0);
+
+  ctx.fillStyle="#ffffff";
+  ctx.beginPath();
+  ctx.arc(x0+(player.x/TILE)*scale,y0+(player.y/TILE)*scale,3.2,0,Math.PI*2);
+  ctx.fill();
+
+  for (const corpse of corpses) {
+    if (corpse.looted) continue;
+    const cx = Math.floor(corpse.x / TILE);
+    const cy = Math.floor(corpse.y / TILE);
+    if (!seen[cy]?.[cx]) continue;
+    ctx.fillStyle = corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)";
+    ctx.beginPath();
+    ctx.arc(x0 + (corpse.x / TILE) * scale, y0 + (corpse.y / TILE) * scale, corpse.boss ? 2.8 : 2.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if(stairwellFound && stairwellX !== null && stairwellY !== null){
+    const sx = x0 + (stairwellX + 0.5) * scale;
+    const sy = y0 + (stairwellY + 0.5) * scale;
+    const pulse = 4.8 + Math.sin(frameCount * 0.08) * 1.2;
+    ctx.fillStyle = "rgba(80,160,255,0.95)";
+    ctx.beginPath();
+    ctx.arc(sx, sy, pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(190,215,255,1)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+  }
+
+  if(bossEnemy && bossEnemy.hp>0){
+    const bx=Math.floor(bossEnemy.x/TILE), by=Math.floor(bossEnemy.y/TILE);
+    if(seen[by]?.[bx]){
+      ctx.fillStyle="#ffd86b";
+      ctx.beginPath();
+      ctx.arc(x0+(bossEnemy.x/TILE)*scale,y0+(bossEnemy.y/TILE)*scale,2.8,0,Math.PI*2);
+      ctx.fill();
+    }
+  }
+}
+
+function gameLoop() {
+  pollGamepad();
+  updatePanelScrollFromController();
+  if (!gameWon && !gameLost) {
+    updatePlayer();
+    updateBossLocks();
+    updateEnemies();
+    updateFloorTimer();
+    updateVisibility();
+    updatePrompt();
+  }
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+resetState();
+gameLoop();
+
+// Jeremiah gold reset fix: full death/new-run reset is handled by resetRunProgress().
+</script>
+</body>
+</html>
