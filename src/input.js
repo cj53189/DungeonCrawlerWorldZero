@@ -17,6 +17,7 @@ function setupTouchControls() {
   const base = document.getElementById("stickBase");
   const knob = document.getElementById("stickKnob");
   const btnAttack = document.getElementById("btnAttack");
+  const attackBase = document.getElementById("attackStickBase");
   const btnInteract = document.getElementById("btnInteract");
   const btnLog = document.getElementById("btnLog");
   const btnRecap = document.getElementById("btnRecap");
@@ -93,6 +94,63 @@ function setupTouchControls() {
     resetStick();
   }, { passive: false });
 
+
+  const bindAttackStick = () => {
+    if (!attackBase || !btnAttack) return;
+
+    const resetAttackStick = () => {
+      touchState.attackTouchId = null;
+      touchState.attackActive = false;
+      btnAttack.style.transform = "translate(0px, 0px)";
+      btnAttack.classList.remove("peeling");
+    };
+
+    const updateAttackStick = (clientX, clientY) => {
+      const rect = attackBase.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = clientX - cx;
+      const dy = clientY - cy;
+      const max = rect.width / 2 - 26;
+      const dist = Math.hypot(dx, dy);
+      const clamped = Math.min(max, dist);
+      const angle = Math.atan2(dy, dx);
+      const knobX = Math.cos(angle) * clamped;
+      const knobY = Math.sin(angle) * clamped;
+
+      btnAttack.style.transform = `translate(${knobX}px, ${knobY}px)`;
+      btnAttack.classList.toggle("peeling", dist > 8);
+
+      if (dist > 14) updatePlayerAim(dx / max, dy / max);
+    };
+
+    attackBase.addEventListener("pointerdown", e => {
+      prevent(e);
+      touchState.attackTouchId = e.pointerId;
+      touchState.attackActive = true;
+      attackBase.setPointerCapture?.(e.pointerId);
+      updateAttackStick(e.clientX, e.clientY);
+      attack();
+    }, { passive: false });
+
+    attackBase.addEventListener("pointermove", e => {
+      if (touchState.attackTouchId !== e.pointerId) return;
+      prevent(e);
+      updateAttackStick(e.clientX, e.clientY);
+    }, { passive: false });
+
+    const endPointerAttack = e => {
+      if (touchState.attackTouchId !== e.pointerId) return;
+      prevent(e);
+      attackBase.releasePointerCapture?.(e.pointerId);
+      resetAttackStick();
+    };
+
+    attackBase.addEventListener("pointerup", endPointerAttack, { passive: false });
+    attackBase.addEventListener("pointercancel", endPointerAttack, { passive: false });
+    attackBase.addEventListener("lostpointercapture", resetAttackStick);
+  };
+
   const bindButton = (el, fn) => {
     if (!el) return;
 
@@ -110,7 +168,7 @@ function setupTouchControls() {
     el.addEventListener("click", fire);
   };
 
-  bindButton(btnAttack, attack);
+  bindAttackStick();
   bindButton(btnInteract, interact);
   bindButton(btnLog, toggleLogPanelMobile);
   bindButton(btnRecap, toggleRecapPanelMobile);
