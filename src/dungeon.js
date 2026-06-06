@@ -912,6 +912,12 @@ function getFarthestRoom(fromRoom) {
 const VISUAL_FLOOR_TYPES = ["crack", "scratch", "rubble", "stain", "worn"];
 const VISUAL_DECAL_TYPES = ["debris", "brokenStone", "dust", "scorch", "coins", "marking"];
 const VISUAL_DECORATION_TILES = new Set([".", "S"]);
+const ENVIRONMENTAL_LIGHT_TYPES = ["torch", "lantern", "crystal"];
+const ENVIRONMENTAL_LIGHT_COLORS = {
+  torch: { inner: "rgba(255,182,76,", outer: "rgba(255,112,36," },
+  lantern: { inner: "rgba(255,220,136,", outer: "rgba(255,175,70," },
+  crystal: { inner: "rgba(134,214,255,", outer: "rgba(82,126,255," }
+};
 
 function tileHash(x, y, salt = 0) {
   let n = (x * 374761393 + y * 668265263 + currentFloor * 982451653 + salt * 1442695041) >>> 0;
@@ -969,6 +975,64 @@ function canPlaceVisualDecal(x, y) {
   return x !== Math.floor(player.x / TILE) || y !== Math.floor(player.y / TILE);
 }
 
+
+function createEnvironmentalLight(type, x, y, radius, intensity) {
+  return {
+    type,
+    x: x * TILE + TILE / 2,
+    y: y * TILE + TILE / 2,
+    tileX: x,
+    tileY: y,
+    radius,
+    intensity
+  };
+}
+
+function chooseEnvironmentalLightType(room) {
+  const name = (room?.name || "").toLowerCase();
+  if (room?.type === "safe") return "lantern";
+  if (room?.type === "boss" || name.includes("shrine") || name.includes("chapel")) return tileHash(room.cx, room.cy, 71) < 0.55 ? "crystal" : "torch";
+  const roll = tileHash(room.cx, room.cy, 72);
+  if (roll < 0.50) return "torch";
+  if (roll < 0.78) return "lantern";
+  return "crystal";
+}
+
+function canPlaceEnvironmentalLight(x, y) {
+  if (!VISUAL_DECORATION_TILES.has(map[y]?.[x])) return false;
+  if (map[y]?.[x] === "C" || map[y]?.[x] === "E") return false;
+  if (x === Math.floor(player.x / TILE) && y === Math.floor(player.y / TILE)) return false;
+  return true;
+}
+
+function buildEnvironmentalLights() {
+  environmentalLights = [];
+
+  for (const room of rooms) {
+    const tiles = roomTileList(room, 2).filter(t => canPlaceEnvironmentalLight(t.x, t.y));
+    if (tiles.length === 0) continue;
+
+    const maxLights = room.type === "boss" ? 4 : room.type === "safe" ? 2 : room.sizeClass === "large" ? 3 : 1;
+    const target = room.type === "safe" ? 1 : Math.min(maxLights, Math.max(1, Math.floor(tiles.length / 95)));
+    let placed = 0;
+    let guard = 0;
+
+    while (placed < target && guard < target * 20 + 20 && tiles.length > 0) {
+      guard++;
+      const index = Math.floor(tileHash(room.id + guard, placed + currentFloor, 73) * tiles.length) % tiles.length;
+      const tile = tiles.splice(index, 1)[0];
+      if (!canPlaceEnvironmentalLight(tile.x, tile.y)) continue;
+      if (environmentalLights.some(light => Math.hypot(light.tileX - tile.x, light.tileY - tile.y) < 5)) continue;
+
+      const type = chooseEnvironmentalLightType(room);
+      const radius = type === "crystal" ? 128 : type === "lantern" ? 118 : 104;
+      const intensity = type === "crystal" ? 0.34 : type === "lantern" ? 0.30 : 0.36;
+      environmentalLights.push(createEnvironmentalLight(type, tile.x, tile.y, radius, intensity));
+      placed++;
+    }
+  }
+}
+
 function buildDungeonVisuals() {
   dungeonVisuals = {
     floor: Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(null)),
@@ -981,6 +1045,8 @@ function buildDungeonVisuals() {
       dungeonVisuals.floor[y][x] = createFloorDetail(x, y, roomForTile(x, y));
     }
   }
+
+  buildEnvironmentalLights();
 
   for (const room of rooms) {
     const theme = visualThemeForRoom(room);
@@ -1014,12 +1080,18 @@ function buildDungeonVisuals() {
 function validateDungeonVisualsAreVisualOnly() {
   if (!dungeonVisuals) return false;
   const floorOk = dungeonVisuals.floor.length === MAP_ROWS && dungeonVisuals.floor.every(row => row.length === MAP_COLS);
+  const lightsOk = environmentalLights.every(light =>
+    ENVIRONMENTAL_LIGHT_TYPES.includes(light.type) &&
+    typeof light.x === "number" && typeof light.y === "number" &&
+    light.radius > 0 && light.intensity > 0 &&
+    isVisualDecalBaseTile(light.tileX, light.tileY)
+  );
   const decalsOk = dungeonVisuals.decals.every(decal =>
     VISUAL_DECAL_TYPES.includes(decal.type) &&
     isVisualDecalBaseTile(decal.x, decal.y) &&
     !["C", "E", "D", "L", "#"].includes(map[decal.y]?.[decal.x])
   );
-  return floorOk && decalsOk;
+  return floorOk && decalsOk && lightsOk;
 }
 
 function placeObjects(tile, count, excludedRooms = []) {
