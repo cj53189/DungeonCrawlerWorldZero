@@ -272,6 +272,34 @@ function drawAttackTelegraph(telegraph) {
   ctx.restore();
 }
 
+
+function drawAimIndicator() {
+  const startX = player.x + player.aimX * (player.r + 2);
+  const startY = player.y + player.aimY * (player.r + 2);
+  const endX = player.x + player.aimX * (player.r + 18);
+  const endY = player.y + player.aimY * (player.r + 18);
+  const sideX = -player.aimY;
+  const sideY = player.aimX;
+
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,216,107,0.82)";
+  ctx.fillStyle = "rgba(255,216,107,0.92)";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  ctx.lineTo(endX, endY);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(endX, endY);
+  ctx.lineTo(endX - player.aimX * 6 + sideX * 4, endY - player.aimY * 6 + sideY * 4);
+  ctx.lineTo(endX - player.aimX * 6 - sideX * 4, endY - player.aimY * 6 - sideY * 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawCombatVisuals() {
   for (const telegraph of attackTelegraphs) drawAttackTelegraph(telegraph);
 
@@ -377,11 +405,7 @@ for (const enemy of enemies) {
   ctx.fillStyle = player.safe ? "#7be07b" : "#f1f1f1";
   ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
 
-  ctx.strokeStyle = "rgba(255,216,107,0.75)";
-  ctx.beginPath();
-  ctx.moveTo(player.x, player.y);
-  ctx.lineTo(player.x + player.aimX * (player.r + 9), player.y + player.aimY * (player.r + 9));
-  ctx.stroke();
+  drawAimIndicator();
 
   if (collapseStarted && frameCount % 30 < 15) {
     ctx.fillStyle = "rgba(150, 20, 20, 0.08)";

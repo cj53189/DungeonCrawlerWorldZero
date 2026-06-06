@@ -35,17 +35,30 @@ function updatePlayer() {
   const previousTileY = Math.floor(player.y / TILE);
   player.lastTileX = previousTileX;
   player.lastTileY = previousTileY;
-  let dx = 0, dy = 0;
-  if (keys["w"] || keys["arrowup"]) dy--;
-  if (keys["s"] || keys["arrowdown"]) dy++;
-  if (keys["a"] || keys["arrowleft"]) dx--;
-  if (keys["d"] || keys["arrowright"]) dx++;
-  dx += gamepadState.moveX + touchState.moveX;
-  dy += gamepadState.moveY + touchState.moveY;
+  let keyboardX = 0, keyboardY = 0;
+  if (keys["w"] || keys["arrowup"]) keyboardY--;
+  if (keys["s"] || keys["arrowdown"]) keyboardY++;
+  if (keys["a"] || keys["arrowleft"]) keyboardX--;
+  if (keys["d"] || keys["arrowright"]) keyboardX++;
 
+  const movementX = keyboardX + gamepadState.moveX + touchState.moveX;
+  const movementY = keyboardY + gamepadState.moveY + touchState.moveY;
+  const aimLength = Math.hypot(gamepadState.aimX, gamepadState.aimY);
+  const fallbackAimX = keyboardX + touchState.moveX;
+  const fallbackAimY = keyboardY + touchState.moveY;
+
+  if (aimLength > 0) {
+    updatePlayerAim(gamepadState.aimX, gamepadState.aimY);
+  } else if (Math.hypot(fallbackAimX, fallbackAimY) > 0) {
+    updatePlayerAim(fallbackAimX, fallbackAimY);
+  } else if (gamepadState.connected && !gamepadState.hasAimInput && Math.hypot(gamepadState.moveX, gamepadState.moveY) > 0) {
+    updatePlayerAim(gamepadState.moveX, gamepadState.moveY);
+  }
+
+  let dx = movementX;
+  let dy = movementY;
   const len = Math.hypot(dx, dy);
   if (len > 0) {
-    updatePlayerAim(dx, dy);
     dx = dx / len * player.speed;
     dy = dy / len * player.speed;
   }
