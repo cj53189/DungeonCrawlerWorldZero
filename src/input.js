@@ -98,9 +98,13 @@ function setupTouchControls() {
   const bindAttackStick = () => {
     if (!attackBase || !btnAttack) return;
 
+    const ATTACK_STICK_DEADZONE = 14;
+
     const resetAttackStick = () => {
       touchState.attackTouchId = null;
       touchState.attackActive = false;
+      touchState.attackX = 0;
+      touchState.attackY = 0;
       btnAttack.style.transform = "translate(0px, 0px)";
       btnAttack.classList.remove("peeling");
     };
@@ -121,7 +125,17 @@ function setupTouchControls() {
       btnAttack.style.transform = `translate(${knobX}px, ${knobY}px)`;
       btnAttack.classList.toggle("peeling", dist > 8);
 
-      if (dist > 14) updatePlayerAim(dx / max, dy / max);
+      const attackX = Math.max(-1, Math.min(1, dx / max));
+      const attackY = Math.max(-1, Math.min(1, dy / max));
+      const isAimingAttack = dist > ATTACK_STICK_DEADZONE;
+      touchState.attackActive = isAimingAttack;
+      touchState.attackX = isAimingAttack ? attackX : 0;
+      touchState.attackY = isAimingAttack ? attackY : 0;
+
+      if (isAimingAttack) {
+        updatePlayerAim(attackX, attackY);
+        attack();
+      }
     };
 
     attackBase.addEventListener("pointerdown", e => {
@@ -130,7 +144,6 @@ function setupTouchControls() {
       touchState.attackActive = true;
       attackBase.setPointerCapture?.(e.pointerId);
       updateAttackStick(e.clientX, e.clientY);
-      attack();
     }, { passive: false });
 
     attackBase.addEventListener("pointermove", e => {

@@ -123,5 +123,15 @@ function updatePlayerAim(dx, dy) {
 
 const keys = {};
 const gamepadState = { connected: false, name: "", moveX: 0, moveY: 0, aimX: 0, aimY: 0, hasAimInput: false, previousButtons: [] };
-const touchState = { moveX: 0, moveY: 0, activeTouchId: null, attackTouchId: null, attackActive: false, baseX: 0, baseY: 0 };
+const touchState = {
+  moveX: 0,
+  moveY: 0,
+  activeTouchId: null,
+  attackTouchId: null,
+  attackActive: false,
+  attackX: 0,
+  attackY: 0,
+  baseX: 0,
+  baseY: 0
+};
 const GAMEPAD_DEADZONE = 0.22;
