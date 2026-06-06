@@ -56,6 +56,7 @@ function resetState(options = {}) {
   }
   enemies = [];
   corpses = [];
+  dungeonVisuals = { floor: [], decals: [] };
   projectiles = [];
   attackTelegraphs = [];
   openedChests = new Set();
