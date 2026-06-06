@@ -43,7 +43,7 @@ function generateDungeon() {
     }
     const x = 2 + Math.floor(Math.random() * (MAP_COLS - w - 4));
     const y = 2 + Math.floor(Math.random() * (MAP_ROWS - h - 4));
-    const room = { id: rooms.length, x, y, w, h, cx: Math.floor(x + w / 2), cy: Math.floor(y + h / 2), seen: false, sizeClass, name:null, type:"normal", locked:false, cleared:false, forcedBossCandidate };
+    const room = createRoom({ id: rooms.length, x, y, w, h, sizeClass, forcedBossCandidate });
     if (rooms.some(r => rectsOverlap(expandRect(room, 2), r))) continue;
     carveRoom(room, ".");
     if (rooms.length > 0) connectRooms(rooms[rooms.length - 1], room);
@@ -79,7 +79,246 @@ function generateDungeon() {
 
 function expandRect(r, a) { return { x: r.x - a, y: r.y - a, w: r.w + a * 2, h: r.h + a * 2 }; }
 function rectsOverlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
-function carveRoom(room, tile) { for (let y = room.y; y < room.y + room.h; y++) for (let x = room.x; x < room.x + room.w; x++) map[y][x] = tile; }
+
+function createRoom({ id, x, y, w, h, sizeClass, forcedBossCandidate = false }) {
+  const parts = createRoomParts(x, y, w, h, sizeClass, forcedBossCandidate, id === 0);
+  const center = chooseRoomCenter({ x, y, w, h, parts });
+
+  return {
+    id,
+    x,
+    y,
+    w,
+    h,
+    cx: center.x,
+    cy: center.y,
+    parts,
+    shape: describeRoomShape(parts, forcedBossCandidate, id === 0),
+    seen: false,
+    sizeClass,
+    name: null,
+    type: "normal",
+    locked: false,
+    cleared: false,
+    forcedBossCandidate
+  };
+}
+
+function createRoomParts(x, y, w, h, sizeClass, forcedBossCandidate, isSafeRoom) {
+  const base = { x, y, w, h };
+
+  // Safe rooms and boss candidates stay intentionally clean/conservative for gameplay clarity.
+  if (isSafeRoom || forcedBossCandidate || sizeClass === "large") return [base];
+  if (w < 9 || h < 8) return [base];
+
+  const roll = Math.random();
+  if (roll < 0.46) return [base];
+  if (roll < 0.68) return createLRoomParts(x, y, w, h);
+  if (roll < 0.82) return createAlcoveRoomParts(x, y, w, h);
+  if (roll < 0.93) return createTRoomParts(x, y, w, h);
+  return createCrossRoomParts(x, y, w, h);
+}
+
+function createLRoomParts(x, y, w, h) {
+  const armW = Math.max(4, Math.floor(w * (0.48 + Math.random() * 0.18)));
+  const armH = Math.max(4, Math.floor(h * (0.48 + Math.random() * 0.18)));
+  const horizontalH = Math.max(4, h - Math.floor(h * (0.28 + Math.random() * 0.18)));
+  const verticalW = Math.max(4, w - Math.floor(w * (0.28 + Math.random() * 0.18)));
+  const right = Math.random() < 0.5;
+  const bottom = Math.random() < 0.5;
+
+  const horizontal = {
+    x: right ? x + w - armW : x,
+    y: bottom ? y + h - horizontalH : y,
+    w: armW,
+    h: horizontalH
+  };
+  const vertical = {
+    x: right ? x + w - verticalW : x,
+    y: bottom ? y + h - armH : y,
+    w: verticalW,
+    h: armH
+  };
+
+  return [horizontal, vertical];
+}
+
+function createAlcoveRoomParts(x, y, w, h) {
+  const mainW = Math.max(6, Math.floor(w * (0.62 + Math.random() * 0.12)));
+  const mainH = Math.max(5, Math.floor(h * (0.62 + Math.random() * 0.12)));
+  const mainX = x + Math.floor((w - mainW) / 2);
+  const mainY = y + Math.floor((h - mainH) / 2);
+  const parts = [{ x: mainX, y: mainY, w: mainW, h: mainH }];
+  const alcoves = 1 + Math.floor(Math.random() * 2);
+
+  for (let i = 0; i < alcoves; i++) {
+    const horizontal = Math.random() < 0.5;
+    if (horizontal) {
+      const aw = Math.max(3, Math.floor(w * (0.26 + Math.random() * 0.14)));
+      const ah = Math.max(3, Math.min(mainH - 2, Math.floor(h * (0.34 + Math.random() * 0.18))));
+      const onRight = Math.random() < 0.5;
+      parts.push({
+        x: onRight ? mainX + mainW - 1 : mainX - aw + 1,
+        y: mainY + 1 + Math.floor(Math.random() * Math.max(1, mainH - ah - 1)),
+        w: aw,
+        h: ah
+      });
+    } else {
+      const aw = Math.max(3, Math.min(mainW - 2, Math.floor(w * (0.34 + Math.random() * 0.18))));
+      const ah = Math.max(3, Math.floor(h * (0.26 + Math.random() * 0.14)));
+      const onBottom = Math.random() < 0.5;
+      parts.push({
+        x: mainX + 1 + Math.floor(Math.random() * Math.max(1, mainW - aw - 1)),
+        y: onBottom ? mainY + mainH - 1 : mainY - ah + 1,
+        w: aw,
+        h: ah
+      });
+    }
+  }
+
+  return clampRoomParts(parts, x, y, w, h);
+}
+
+function createTRoomParts(x, y, w, h) {
+  const horizontal = Math.random() < 0.5;
+  if (horizontal) {
+    const barH = Math.max(4, Math.floor(h * 0.45));
+    const stemW = Math.max(4, Math.floor(w * (0.34 + Math.random() * 0.16)));
+    const top = Math.random() < 0.5;
+    return [
+      { x, y: top ? y : y + h - barH, w, h: barH },
+      { x: x + Math.floor((w - stemW) / 2), y: top ? y + barH - 1 : y, w: stemW, h: h - barH + 1 }
+    ];
+  }
+
+  const barW = Math.max(4, Math.floor(w * 0.45));
+  const stemH = Math.max(4, Math.floor(h * (0.34 + Math.random() * 0.16)));
+  const left = Math.random() < 0.5;
+  return [
+    { x: left ? x : x + w - barW, y, w: barW, h },
+    { x: left ? x + barW - 1 : x, y: y + Math.floor((h - stemH) / 2), w: w - barW + 1, h: stemH }
+  ];
+}
+
+function createCrossRoomParts(x, y, w, h) {
+  const centerW = Math.max(4, Math.floor(w * (0.42 + Math.random() * 0.12)));
+  const centerH = Math.max(4, Math.floor(h * (0.42 + Math.random() * 0.12)));
+  return [
+    { x: x + Math.floor((w - centerW) / 2), y, w: centerW, h },
+    { x, y: y + Math.floor((h - centerH) / 2), w, h: centerH }
+  ];
+}
+
+function clampRoomParts(parts, boundsX, boundsY, boundsW, boundsH) {
+  return parts.map(part => {
+    const px = Math.max(boundsX, Math.min(boundsX + boundsW - 1, part.x));
+    const py = Math.max(boundsY, Math.min(boundsY + boundsH - 1, part.y));
+    return {
+      x: px,
+      y: py,
+      w: Math.max(1, Math.min(part.w, boundsX + boundsW - px)),
+      h: Math.max(1, Math.min(part.h, boundsY + boundsH - py))
+    };
+  });
+}
+
+function describeRoomShape(parts, forcedBossCandidate, isSafeRoom) {
+  if (isSafeRoom) return "safe";
+  if (forcedBossCandidate) return "bossArena";
+  if (!parts || parts.length <= 1) return "rectangle";
+  if (parts.length >= 3) return "alcove";
+  const [a, b] = parts;
+  if (a.w === b.w || a.h === b.h) return "compound";
+  return "composite";
+}
+
+function roomParts(room) {
+  return room?.parts?.length ? room.parts : [{ x: room.x, y: room.y, w: room.w, h: room.h }];
+}
+
+function roomContainsTile(room, x, y) {
+  return roomParts(room).some(part => x >= part.x && x < part.x + part.w && y >= part.y && y < part.y + part.h);
+}
+
+function forEachRoomTile(room, visit) {
+  const visited = new Set();
+  for (const part of roomParts(room)) {
+    for (let y = part.y; y < part.y + part.h; y++) {
+      for (let x = part.x; x < part.x + part.w; x++) {
+        const key = `${x},${y}`;
+        if (visited.has(key)) continue;
+        visited.add(key);
+        visit(x, y);
+      }
+    }
+  }
+}
+
+function roomTileList(room, inset = 0) {
+  const tiles = [];
+  forEachRoomTile(room, (x, y) => {
+    if (inset > 0) {
+      let hasOutsideNeighbor = false;
+      for (const n of [{ x: x - 1, y }, { x: x + 1, y }, { x, y: y - 1 }, { x, y: y + 1 }]) {
+        if (!roomContainsTile(room, n.x, n.y)) {
+          hasOutsideNeighbor = true;
+          break;
+        }
+      }
+      if (hasOutsideNeighbor) return;
+    }
+    tiles.push({ x, y });
+  });
+  return tiles;
+}
+
+function roomAdjacentTiles(room) {
+  const tiles = [];
+  const visited = new Set();
+
+  forEachRoomTile(room, (x, y) => {
+    for (const n of [{ x: x - 1, y }, { x: x + 1, y }, { x, y: y - 1 }, { x, y: y + 1 }]) {
+      if (roomContainsTile(room, n.x, n.y)) continue;
+      const key = `${n.x},${n.y}`;
+      if (visited.has(key)) continue;
+      visited.add(key);
+      tiles.push(n);
+    }
+  });
+
+  return tiles;
+}
+
+function chooseRoomCenter(room) {
+  const idealX = Math.floor(room.x + room.w / 2);
+  const idealY = Math.floor(room.y + room.h / 2);
+  const tiles = roomTileList(room);
+  let best = tiles[0] || { x: idealX, y: idealY };
+  let bestDist = Infinity;
+
+  for (const t of tiles) {
+    const d = Math.hypot(t.x - idealX, t.y - idealY);
+    if (d < bestDist) {
+      best = t;
+      bestDist = d;
+    }
+  }
+
+  return best;
+}
+
+function chooseRandomRoomTile(room, preferredInset = 1) {
+  const insetTiles = roomTileList(room, preferredInset).filter(t => map[t.y]?.[t.x] === ".");
+  const tiles = insetTiles.length > 0 ? insetTiles : roomTileList(room).filter(t => map[t.y]?.[t.x] === ".");
+  if (tiles.length === 0) return null;
+  return tiles[Math.floor(Math.random() * tiles.length)];
+}
+
+function carveRoom(room, tile) {
+  forEachRoomTile(room, (x, y) => {
+    map[y][x] = tile;
+  });
+}
 
 function connectRooms(a, b) {
   if (Math.random() < 0.5) { carveHorizontal(a.cx, b.cx, a.cy); carveVertical(a.cy, b.cy, b.cx); }
@@ -208,19 +447,18 @@ function isAdjacentEdgeFloorForRoom(x, y, room) {
   const tile = map[y]?.[x];
   if (!(tile === "." || tile === "D" || tile === "L" || tile === "C")) return false;
 
-  const touchesLeft = x === room.x - 1 && y >= room.y && y < room.y + room.h;
-  const touchesRight = x === room.x + room.w && y >= room.y && y < room.y + room.h;
-  const touchesTop = y === room.y - 1 && x >= room.x && x < room.x + room.w;
-  const touchesBottom = y === room.y + room.h && x >= room.x && x < room.x + room.w;
-
-  return touchesLeft || touchesRight || touchesTop || touchesBottom;
+  if (roomContainsTile(room, x, y)) return false;
+  return roomContainsTile(room, x - 1, y) ||
+         roomContainsTile(room, x + 1, y) ||
+         roomContainsTile(room, x, y - 1) ||
+         roomContainsTile(room, x, y + 1);
 }
 
 
 function roomForTile(tx, ty) {
   // First: true room interior wins.
   for (const room of rooms) {
-    if (tx >= room.x && tx < room.x + room.w && ty >= room.y && ty < room.y + room.h) {
+    if (roomContainsTile(room, tx, ty)) {
       return room;
     }
   }
@@ -260,7 +498,7 @@ function isBossBorderCell(room,x,y){
 }
 
 function isInsideRoom(room,x,y){
-  return x>=room.x && x<room.x+room.w && y>=room.y && y<room.y+room.h;
+  return roomContainsTile(room, x, y);
 }
 
 function isFloorLikeForBossDoor(tile){
@@ -367,7 +605,7 @@ function isNearCrawlerTile(x, y, radius = 1) {
 }
 
 function isTileInsideRoom(x, y, room) {
-  return room && x >= room.x && x < room.x + room.w && y >= room.y && y < room.y + room.h;
+  return room && roomContainsTile(room, x, y);
 }
 
 function nudgeCrawlerIntoBossRoom() {
@@ -582,9 +820,8 @@ function placeObjects(tile, count, excludedRooms = []) {
     const i = Math.floor(Math.random() * rooms.length);
     if (excluded.has(i)) continue;
     const room = rooms[i];
-    const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
-    const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
-    if (map[y][x] === ".") { map[y][x] = tile; placed++; }
+    const spot = chooseRandomRoomTile(room, 1);
+    if (spot) { map[spot.y][spot.x] = tile; placed++; }
   }
 }
 
@@ -596,9 +833,10 @@ function placeEnemies(count, excludedRooms = [], spawnRoom = null) {
     const i = Math.floor(Math.random() * rooms.length);
     if (excluded.has(i)) continue;
     const room = rooms[i];
-    const x = room.x + 1 + Math.floor(Math.random() * Math.max(1, room.w - 2));
-    const y = room.y + 1 + Math.floor(Math.random() * Math.max(1, room.h - 2));
-    if (map[y][x] === ".") {
+    const spot = chooseRandomRoomTile(room, 1);
+    if (spot) {
+      const x = spot.x;
+      const y = spot.y;
       const enemyLevel = rollScaledEnemyLevel(room, spawnRoom);
       const maxHp = 24 + enemyLevel * 10;
       enemies.push({
