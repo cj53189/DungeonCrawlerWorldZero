@@ -242,7 +242,6 @@
     #btnLog { right: 24px; top: 74px; width: 52px; height: 52px; font-size: 12px; }
     #btnRecap { right: 84px; top: 74px; width: 52px; height: 52px; font-size: 11px; }
     #btnNew { right: 144px; top: 74px; width: 52px; height: 52px; font-size: 11px; }
-    #btnLight { right: 24px; top: 134px; width: 52px; height: 52px; font-size: 10px; }
 
     #controllerHint {
       display: none;

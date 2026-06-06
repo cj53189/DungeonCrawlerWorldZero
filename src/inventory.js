@@ -1,5 +1,5 @@
-const SLOT_LABELS={head:"Head",chest:"Chest",legs:"Legs",feet:"Feet",accessory:"Accessory"};
-const ITEM_BASES={head:["Helmet","Cap","Crown","Hood"],chest:["Vest","Tunic","Breastplate","Jacket"],legs:["Pants","Greaves","Shorts","Trousers"],feet:["Boots","Sandals","Crocs","Footwraps"],accessory:["Ring","Charm","Badge","Pendant"]};
+const SLOT_LABELS={head:"Head",chest:"Chest",legs:"Legs",feet:"Feet",accessory:"Accessory",light:"Light"};
+const ITEM_BASES={head:["Helmet","Cap","Crown","Hood"],chest:["Vest","Tunic","Breastplate","Jacket"],legs:["Pants","Greaves","Shorts","Trousers"],feet:["Boots","Sandals","Crocs","Footwraps"],accessory:["Ring","Charm","Badge","Pendant"],light:["Torch","Lantern","Glow Charm"]};
 const ITEM_PREFIXES=["Goblin","Rat-hide","Bone","Rusty","Lucky","Crawler","Moldy","Questionable","Royal","Screaming"];
 const ROOM_NAMES={small:["Crypt Nook","Goblin Pantry","Collapsed Alcove","Rat Nest","Old Guard Room"],medium:["Bone Gallery","Broken Armory","Forgotten Shrine","Goblin Barracks","Hall of Echoes","Mushroom Chapel"],large:["Feast Hall","The Drowned Hall","Cavern of Teeth","Hall of Rusted Banners"],boss:["The Rat King's Court","The Bone Collector's Pit","Champion's Den","The Blood-Marked Chamber","The Old Arena"]};
 function makeId(p="item"){return `${p}_${Date.now()}_${Math.floor(Math.random()*999999)}`;}
@@ -11,11 +11,15 @@ function generateGear(forceRare=false){
  const item={id:makeId("gear"),type:"gear",slot,rarity,name:`${rarity} ${choose(ITEM_PREFIXES)} ${choose(ITEM_BASES[slot])}`,hp:0,attack:0,speed:0,defense:0,audience:0};
  if(slot==="head")item.audience=p*2; if(slot==="chest")item.hp=p*9; if(slot==="legs")item.defense=p; if(slot==="feet")item.speed=p*.08;
  if(slot==="accessory"){if(Math.random()<.5)item.attack=p*2; else item.audience=p*3;}
- if(Math.random()<.28)item.hp+=p*4; if(Math.random()<.22)item.attack+=p; if(Math.random()<.18)item.defense+=1;
+ if(slot==="light"){item.lightRadius=118+p*16; item.lightIntensity=.27+p*.035; item.lightType=item.name.toLowerCase().includes("lantern")?"lantern":"torch";}
+ if(slot!=="light"&&Math.random()<.28)item.hp+=p*4; if(slot!=="light"&&Math.random()<.22)item.attack+=p; if(slot!=="light"&&Math.random()<.18)item.defense+=1;
  return item;
 }
 function generateLootBox(forceRare=false){const rarity=rollRarity(forceRare);return{id:makeId("box"),type:"lootbox",rarity,name:`${rarity} Prize Box`,opened:false};}
-function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room."; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
+function generateStarterTorch(){return{id:makeId("torch"),type:"gear",slot:"light",rarity:"Common",name:"Common Crawler Torch",hp:0,attack:0,speed:0,defense:0,audience:0,lightRadius:128,lightIntensity:.31,lightType:"torch"};}
+function hasEquippedLightSource(){return !!player.equipment?.light?.lightRadius;}
+function getEquippedLightSource(){return hasEquippedLightSource()?player.equipment.light:null;}
+function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room."; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); if(i.lightRadius)b.push(`Personal light ${Math.round(i.lightRadius/TILE)} tiles`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
 function addItem(item){
  player.inventory.push(item);
  if(item.type==="lootbox"){stats.lootBoxesFound++; achievement("NEW LOOT BOX",`You found a ${item.name}. It can only be opened in a safe room.`,`box_${item.id}`);}

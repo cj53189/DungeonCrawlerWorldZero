@@ -397,12 +397,14 @@ function restartGame() { pendingFloorAdvance = false; resetState(); }
 function updateLightingToggleLabel() {
   const button = document.getElementById("lightingToggle");
   if (!button) return;
-  button.textContent = lightingEnabled ? "Lighting ON" : "Lighting OFF";
-  button.setAttribute("aria-pressed", lightingEnabled ? "true" : "false");
-  button.classList.toggle("off", !lightingEnabled);
+  lightingEnabled = true;
+  button.disabled = true;
+  button.textContent = "Lighting ON";
+  button.setAttribute("aria-pressed", "true");
 }
 
 function toggleLighting() {
-  lightingEnabled = !lightingEnabled;
+  // Lighting is always enabled for environment art; no player-facing toggle.
+  lightingEnabled = true;
   updateLightingToggleLabel();
 }

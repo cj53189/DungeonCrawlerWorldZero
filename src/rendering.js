@@ -450,11 +450,19 @@ function drawEnvironmentalDecals(camX, camY) {
 }
 
 
+function shouldLightAffectTile(x, y) {
+  if (visible[y]?.[x]) return true;
+
+  // Let hallway torch glow linger in remembered corridor/doorway tiles without
+  // revealing unseen rooms or changing the underlying visibility arrays.
+  return !!seen[y]?.[x] && typeof isHallwayOrDoorwayFloor === "function" && isHallwayOrDoorwayFloor(x, y);
+}
+
 function addVisibleLightingClip(startX, endX, startY, endY) {
   ctx.beginPath();
   for (let y = startY; y <= endY; y++) {
     for (let x = startX; x <= endX; x++) {
-      if (visible[y]?.[x]) ctx.rect(x * TILE, y * TILE, TILE, TILE);
+      if (shouldLightAffectTile(x, y)) ctx.rect(x * TILE, y * TILE, TILE, TILE);
     }
   }
   ctx.clip();
@@ -477,17 +485,21 @@ function drawRadialLight(light) {
 function drawAtmosphericLighting(startX, endX, startY, endY) {
   if (!lightingEnabled) return;
 
-  const playerFlicker = 0.94 + Math.sin(frameCount * 0.19) * 0.045 + Math.sin(frameCount * 0.47) * 0.018;
-  const lights = [{
-    type: "lantern",
-    x: player.x,
-    y: player.y,
-    radius: isMobileLike() ? 142 : 164,
-    intensity: 0.36 * playerFlicker
-  }];
+  const lights = [];
+  const equippedLight = typeof getEquippedLightSource === "function" ? getEquippedLightSource() : null;
+  if (equippedLight) {
+    const playerFlicker = 0.94 + Math.sin(frameCount * 0.19) * 0.045 + Math.sin(frameCount * 0.47) * 0.018;
+    lights.push({
+      type: equippedLight.lightType || "torch",
+      x: player.x,
+      y: player.y,
+      radius: Math.max(isMobileLike() ? 112 : 132, equippedLight.lightRadius || 128),
+      intensity: (equippedLight.lightIntensity || 0.30) * playerFlicker
+    });
+  }
 
   for (const light of environmentalLights) {
-    if (!visible[light.tileY]?.[light.tileX]) continue;
+    if (!shouldDrawEnvironmentalLight(light, startX, endX, startY, endY)) continue;
     const flicker = light.type === "crystal"
       ? 0.96 + Math.sin(frameCount * 0.055 + light.tileX) * 0.04
       : 0.90 + Math.sin(frameCount * 0.17 + light.tileY) * 0.07 + Math.sin(frameCount * 0.41 + light.tileX) * 0.03;
@@ -501,13 +513,47 @@ function drawAtmosphericLighting(startX, endX, startY, endY) {
   ctx.restore();
 }
 
+function shouldDrawEnvironmentalLight(light, startX, endX, startY, endY) {
+  if (visible[light.tileY]?.[light.tileX]) return true;
+  if (!seen[light.tileY]?.[light.tileX]) return false;
+
+  const radiusTiles = Math.ceil((light.radius || 96) / TILE);
+  if (light.tileX + radiusTiles < startX || light.tileX - radiusTiles > endX ||
+      light.tileY + radiusTiles < startY || light.tileY - radiusTiles > endY) return false;
+
+  for (let y = Math.max(startY, light.tileY - radiusTiles); y <= Math.min(endY, light.tileY + radiusTiles); y++) {
+    for (let x = Math.max(startX, light.tileX - radiusTiles); x <= Math.min(endX, light.tileX + radiusTiles); x++) {
+      if (shouldLightAffectTile(x, y)) return true;
+    }
+  }
+
+  return false;
+}
+
 function drawEnvironmentalLightFixtures() {
   if (!lightingEnabled) return;
   for (const light of environmentalLights) {
     if (!visible[light.tileY]?.[light.tileX]) continue;
     ctx.save();
-    ctx.translate(light.x, light.y);
-    if (light.type === "crystal") {
+    ctx.translate(light.fixtureX ?? light.x, light.fixtureY ?? light.y);
+    if (light.type === "campfire") {
+      ctx.fillStyle = "rgba(95,58,30,0.82)";
+      ctx.fillRect(-8, 5, 16, 4);
+      ctx.fillStyle = "rgba(255,202,84,0.95)";
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(7, 5);
+      ctx.lineTo(-6, 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,88,28,0.76)";
+      ctx.beginPath();
+      ctx.moveTo(0, -5);
+      ctx.lineTo(4, 5);
+      ctx.lineTo(-4, 5);
+      ctx.closePath();
+      ctx.fill();
+    } else if (light.type === "crystal") {
       ctx.fillStyle = "rgba(115,210,255,0.88)";
       ctx.beginPath();
       ctx.moveTo(0, -8);
@@ -524,10 +570,17 @@ function drawEnvironmentalLightFixtures() {
       ctx.arc(0, -2, light.type === "torch" ? 4.2 : 5.2, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = "rgba(90,58,28,0.85)";
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(0, 2);
-      ctx.lineTo(0, 10);
+      if (light.mount === "wall") {
+        ctx.moveTo(-5 * (light.dirY || 1), 5 * (light.dirX || 0));
+        ctx.lineTo(5 * (light.dirY || 1), -5 * (light.dirX || 0));
+      } else {
+        ctx.moveTo(0, 2);
+        ctx.lineTo(0, 10);
+      }
       ctx.stroke();
+      ctx.lineWidth = 1;
     }
     ctx.restore();
   }

@@ -35,8 +35,8 @@ function resetRunProgress() {
   player.speed = player.baseSpeed;
   player.defense = 0;
   player.audienceBonus = 0;
-  player.inventory = [];
-  player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null};
+  player.inventory = typeof generateStarterTorch === "function" ? [generateStarterTorch()] : [];
+  player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null,light:null};
   player.coins = 0;
   player.attackCooldown = 0;
   player.currentWeaponId = "fists";
@@ -83,8 +83,8 @@ function resetState(options = {}) {
     player.speed = player.baseSpeed;
     player.defense = 0;
     player.audienceBonus = 0;
-    player.inventory = [];
-    player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null};
+    player.inventory = typeof generateStarterTorch === "function" ? [generateStarterTorch()] : [];
+    player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null,light:null};
     }
   player.currentRoomId = null;
   player.lastTileX = 0;

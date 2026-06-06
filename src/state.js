@@ -84,7 +84,7 @@ const player = {
   x: TILE * 2.5, y: TILE * 2.5, r: 11, speed: 2.45,
   hp: 100, maxHp: 100, coins: 0,
   level: 1, xp: 0, xpToNext: 40, attackDamage: 20,
-  baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{},
+  baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{head:null,chest:null,legs:null,feet:null,accessory:null,light:null},
   attackCooldown: 0, currentWeaponId: "fists", aimX: 1, aimY: 0,
   safe: true, wasSafe: true, currentRoomId:null, lastTileX:0, lastTileY:0
 };
