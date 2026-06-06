@@ -702,6 +702,22 @@ function getMinimapScale(){
   return isMobileLike() ? 1.45 : 2.2;
 }
 
+const MOBILE_MINIMAP_SIZE = 120;
+const MOBILE_MINIMAP_BORDER = 8;
+const MOBILE_MINIMAP_TILE_SCALE = 6;
+
+function isPointInsideMobileMinimap(px, py, centerX, centerY, radius){
+  return Math.hypot(px - centerX, py - centerY) <= radius;
+}
+
+function drawMobileMinimapMarker(x, y, radius, color, centerX, centerY, clipRadius){
+  if(!isPointInsideMobileMinimap(x, y, centerX, centerY, clipRadius)) return;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+}
+
 function rebuildMinimapCache(scale){
   const w=Math.ceil(MAP_COLS*scale), h=Math.ceil(MAP_ROWS*scale);
   if(minimapCanvas.width!==w || minimapCanvas.height!==h){
@@ -730,6 +746,11 @@ function rebuildMinimapCache(scale){
 }
 
 function drawMinimap(){
+  if(isMobileLike()){
+    drawMobileMinimap();
+    return;
+  }
+
   const scale=getMinimapScale();
 
   if(minimapDirty || minimapLastScale!==scale){
@@ -785,5 +806,100 @@ function drawMinimap(){
       ctx.fill();
     }
   }
+}
+
+function drawMobileMinimap(){
+  const size = Math.min(MOBILE_MINIMAP_SIZE, Math.max(86, Math.floor(canvas.width * 0.28)));
+  const border = MOBILE_MINIMAP_BORDER;
+  const radius = size / 2;
+  const innerRadius = radius - border;
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height - radius - 12;
+  const x0 = centerX - radius;
+  const y0 = centerY - radius;
+  const scale = MOBILE_MINIMAP_TILE_SCALE;
+  const playerTileX = player.x / TILE;
+  const playerTileY = player.y / TILE;
+  const tileRadius = Math.ceil(innerRadius / scale) + 1;
+  const startTileX = Math.max(0, Math.floor(playerTileX) - tileRadius);
+  const endTileX = Math.min(MAP_COLS - 1, Math.floor(playerTileX) + tileRadius);
+  const startTileY = Math.max(0, Math.floor(playerTileY) - tileRadius);
+  const endTileY = Math.min(MAP_ROWS - 1, Math.floor(playerTileY) + tileRadius);
+
+  ctx.save();
+
+  ctx.fillStyle = "rgba(0,0,0,0.66)";
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = "rgba(255,216,107,0.26)";
+  ctx.lineWidth = border;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius - border / 2, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, innerRadius, 0, Math.PI * 2);
+  ctx.clip();
+
+  ctx.fillStyle = "rgba(12,12,12,0.82)";
+  ctx.fillRect(x0, y0, size, size);
+
+  for(let y = startTileY; y <= endTileY; y++){
+    for(let x = startTileX; x <= endTileX; x++){
+      if(!seen[y]?.[x] && !(stairwellFound && x === stairwellX && y === stairwellY)) continue;
+      const t = map[y][x];
+      if(t === "#") ctx.fillStyle = "rgba(95,95,95,0.52)";
+      else if(t === "S") ctx.fillStyle = "rgba(123,224,123,0.9)";
+      else if(t === "E") ctx.fillStyle = stairwellFound ? "rgba(80,160,255,1)" : "rgba(80,120,255,0.95)";
+      else if(t === "L") ctx.fillStyle = "rgba(255,90,90,0.95)";
+      else ctx.fillStyle = "rgba(180,180,180,0.62)";
+
+      const px = centerX + (x - playerTileX) * scale;
+      const py = centerY + (y - playerTileY) * scale;
+      ctx.fillRect(Math.floor(px), Math.floor(py), Math.ceil(scale), Math.ceil(scale));
+    }
+  }
+
+  for (const corpse of corpses) {
+    if (corpse.looted) continue;
+    const cx = Math.floor(corpse.x / TILE);
+    const cy = Math.floor(corpse.y / TILE);
+    if (!seen[cy]?.[cx]) continue;
+    const px = centerX + ((corpse.x / TILE) - playerTileX) * scale;
+    const py = centerY + ((corpse.y / TILE) - playerTileY) * scale;
+    drawMobileMinimapMarker(px, py, corpse.boss ? 3 : 2.2, corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)", centerX, centerY, innerRadius);
+  }
+
+  if(stairwellFound && stairwellX !== null && stairwellY !== null){
+    const sx = centerX + ((stairwellX + 0.5) - playerTileX) * scale;
+    const sy = centerY + ((stairwellY + 0.5) - playerTileY) * scale;
+    const pulse = 4 + Math.sin(frameCount * 0.08);
+    drawMobileMinimapMarker(sx, sy, pulse, "rgba(80,160,255,0.95)", centerX, centerY, innerRadius);
+  }
+
+  if(bossEnemy && bossEnemy.hp > 0){
+    const bx = Math.floor(bossEnemy.x / TILE), by = Math.floor(bossEnemy.y / TILE);
+    if(seen[by]?.[bx]){
+      const px = centerX + ((bossEnemy.x / TILE) - playerTileX) * scale;
+      const py = centerY + ((bossEnemy.y / TILE) - playerTileY) * scale;
+      drawMobileMinimapMarker(px, py, 3, "#ffd86b", centerX, centerY, innerRadius);
+    }
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  ctx.strokeStyle = "rgba(255,255,255,0.28)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, radius - 0.5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = 1;
 }
 
