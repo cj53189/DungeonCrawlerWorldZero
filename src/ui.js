@@ -277,7 +277,7 @@ function restoreRunProgress(snapshot) {
   player.aimX = snapshot.player.aimX || 1;
   player.aimY = snapshot.player.aimY || 0;
   player.inventory = snapshot.player.inventory.map(item => ({ ...item }));
-  player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null,light:null, ...Object.fromEntries(Object.entries(snapshot.player.equipment || {}).map(([slot, item]) => [slot, item ? { ...item } : null]))};
+  player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:null, ...Object.fromEntries(Object.entries(snapshot.player.equipment || {}).map(([slot, item]) => [slot, item ? { ...item } : null]))};
 
   for (const key of Object.keys(stats)) stats[key] = snapshot.stats[key] ?? 0;
   audienceScore = snapshot.audienceScore;

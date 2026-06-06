@@ -36,7 +36,7 @@ function resetRunProgress() {
   player.defense = 0;
   player.audienceBonus = 0;
   player.inventory = [];
-  player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
+  player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
   player.coins = 0;
   player.attackCooldown = 0;
   player.currentWeaponId = "fists";
@@ -84,7 +84,7 @@ function resetState(options = {}) {
     player.defense = 0;
     player.audienceBonus = 0;
     player.inventory = [];
-    player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
+    player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
     }
   player.currentRoomId = null;
   player.lastTileX = 0;
@@ -108,6 +108,7 @@ function resetState(options = {}) {
   document.getElementById("centerMessage").style.display = "none";
   document.getElementById("logPanel").style.display = "none";
   const invPanel=document.getElementById("inventoryPanel"); if(invPanel) invPanel.style.display="none";
+  closeLootWindow();
   hideSafeRoomRecap();
 
   generateDungeon();

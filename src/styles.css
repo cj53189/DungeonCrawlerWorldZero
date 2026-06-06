@@ -452,7 +452,7 @@
 
   
 
-    #inventoryPanel {
+    #inventoryPanel, #lootWindow {
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
       pointer-events: auto;
@@ -472,7 +472,10 @@
       display: none;
       box-shadow: 0 0 0 1px rgba(255,210,116,0.12) inset, 0 18px 42px rgba(0,0,0,0.58), 0 0 28px rgba(168,84,30,0.16);
     }
-    #inventoryPanel h3 { margin: 0 0 10px 0; color: #f6d07a; font-size: 16px; text-transform: uppercase; letter-spacing: 0.15em; }
+    #inventoryPanel h3, #lootWindow h3 { margin: 0 0 10px 0; color: #f6d07a; font-size: 16px; text-transform: uppercase; letter-spacing: 0.15em; }
+    #lootWindow { width:min(620px, calc(100vw - 32px)); max-height:min(58vh, 460px); z-index:130; }
+    #lootWindowGrid { max-height:320px; overflow-y:auto; padding-right:4px; }
+    .lootWindowFooter { display:flex; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,216,107,0.16); }
     .inventoryHeader { display:flex; justify-content:space-between; gap:14px; align-items:flex-start; padding:10px 12px; margin-bottom:12px; border:1px solid rgba(255,209,113,0.2); border-radius:12px; background:rgba(0,0,0,0.26); }
     .inventoryTitle { color:#ffdf91; font-size:15px; font-weight:900; text-transform:uppercase; letter-spacing:0.08em; }
     .inventorySubTitle,.inventoryPower { color:#bcae9c; font-size:11px; }
@@ -486,7 +489,7 @@
     .weaponhammer { border-color:rgba(255,190,90,0.52); background:linear-gradient(135deg, rgba(255,160,50,0.18), rgba(255,255,255,0.05)); }
     .weaponspear { border-color:rgba(155,255,175,0.48); background:linear-gradient(135deg, rgba(80,220,120,0.16), rgba(255,255,255,0.05)); }
     .weaponbow { border-color:rgba(255,240,135,0.52); background:linear-gradient(135deg, rgba(255,230,90,0.16), rgba(255,255,255,0.05)); }
-    .equipGrid { display:grid; grid-template-columns:repeat(6, minmax(92px, 1fr)); gap:8px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid rgba(255,216,107,0.18); }
+    .equipGrid { display:grid; grid-template-columns:repeat(auto-fit, minmax(92px, 1fr)); gap:8px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px solid rgba(255,216,107,0.18); }
     .equipSlot,.invItem { position:relative; min-height:92px; border:1px solid rgba(255,255,255,0.16); border-radius:12px; padding:9px; color:#ddd; background:radial-gradient(circle at 50% 0%, rgba(255,255,255,0.08), rgba(0,0,0,0.26) 64%); box-shadow:inset 0 0 18px rgba(0,0,0,0.25); }
     .equipSlot.empty,.invItem.empty { border-style:dashed; border-color:rgba(180,160,120,0.34); color:#8f8678; background:rgba(0,0,0,0.18); }
     .equipLabel,.itemSlot { color:#c0ad8d; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.08em; }
@@ -507,12 +510,14 @@
     .rarityEpic .itemName,.rarityEpic .equipName { color:#cf8cff; }
     .itemTypeLootBox { background:radial-gradient(circle at 50% 0%, rgba(255,196,82,0.2), rgba(0,0,0,0.26) 68%); }
     .itemTypeLight { background:radial-gradient(circle at 50% 0%, rgba(255,245,160,0.22), rgba(20,16,8,0.28) 68%); }
+    .itemTypeWeapon { background:radial-gradient(circle at 50% 0%, rgba(145,205,255,0.22), rgba(6,12,20,0.28) 68%); }
+    .itemTypeCoins { background:radial-gradient(circle at 50% 0%, rgba(255,216,107,0.2), rgba(22,16,6,0.28) 68%); }
     #inventoryHelp { color:#b5a890; font-size:11px; margin-top:12px; font-style:italic; text-align:center; }
     #btnInv { right:204px; top:74px; width:52px; height:52px; font-size:11px; }
     #btnWeapon { right:34px; bottom:124px; width:58px; height:58px; font-size:11px; background:rgba(145,205,255,0.24); border-color:rgba(145,205,255,0.48); }
     @media (hover:none) and (pointer:coarse), (max-width:900px) {
-      #inventoryPanel { left:8px; right:8px; bottom:8px; transform:none; width:auto; max-width:none; max-height:62vh; font-size:10px; padding:10px; }
-      #inventoryPanel h3 { font-size:11px; }
+      #inventoryPanel, #lootWindow { left:8px; right:8px; bottom:8px; transform:none; width:auto; max-width:none; max-height:62vh; font-size:10px; padding:10px; }
+      #inventoryPanel h3, #lootWindow h3 { font-size:11px; }
       .inventoryHeader { flex-direction:column; gap:4px; padding:8px; }
       .inventoryPower { text-align:left; }
       .weaponGrid { grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; }

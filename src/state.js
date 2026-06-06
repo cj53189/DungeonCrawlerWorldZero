@@ -9,6 +9,7 @@ const VIEW_RADIUS = 9;
 const MEMORY_RADIUS = 12;
 
 let map, seen, visible, rooms, enemies, corpses, openedChests, achievements, achievementHistory, activePopups;
+let activeLootCorpseId = null;
 let dungeonVisuals = { floor: [], decals: [] };
 let environmentalLights = [];
 let lightingEnabled = true;
@@ -79,6 +80,7 @@ const WEAPON_DEFINITIONS = {
   }
 };
 const WEAPON_ORDER = ["fists", "greatsword", "hammer", "spear", "bow"];
+const LOOTABLE_WEAPON_IDS = WEAPON_ORDER.filter(id => id !== "fists");
 
 const player = {
   x: TILE * 2.5, y: TILE * 2.5, r: 11, speed: 2.45,
@@ -96,22 +98,59 @@ const stats = {
   riskyMoments: 0, safeRoomEntries: 0, exitFinds: 0, floorRooms: 0, lootBoxesFound:0, lootBoxesOpened:0, gearFound:0, bossesDefeated:0
 };
 
+function normalizeWeaponItem(item) {
+  if (!item || item.type !== "weapon") return null;
+  const base = WEAPON_DEFINITIONS[item.weaponId] || WEAPON_DEFINITIONS.fists;
+  return {
+    ...base,
+    itemId: item.id,
+    rarity: item.rarity || "Common",
+    name: item.name || base.name,
+    damage: item.damage ?? base.damage,
+    range: item.range ?? base.range,
+    cooldown: item.cooldown ?? base.cooldown,
+    telegraphColor: item.telegraphColor || base.telegraphColor
+  };
+}
+
 function getCurrentWeapon() {
-  return WEAPON_DEFINITIONS[player.currentWeaponId] || WEAPON_DEFINITIONS.fists;
+  const equippedWeapon = normalizeWeaponItem(player.equipment?.weapon);
+  return equippedWeapon || WEAPON_DEFINITIONS.fists;
 }
 
 function setPlayerWeapon(weaponId, announce = true) {
-  if (!WEAPON_DEFINITIONS[weaponId]) return;
-  player.currentWeaponId = weaponId;
-  player.attackCooldown = Math.min(player.attackCooldown, Math.ceil(getCurrentWeapon().cooldown * 0.35));
-  if (announce && typeof announcer === "function") announcer(`Weapon readied: ${getCurrentWeapon().name}.`);
-  if (typeof updateHUD === "function") updateHUD();
+  if (weaponId === "fists") {
+    if (player.equipment?.weapon && typeof unequipItem === "function") unequipItem("weapon", announce);
+    else { player.currentWeaponId = "fists"; if (announce && typeof announcer === "function") announcer("Weapon readied: Fists."); }
+    if (typeof updateHUD === "function") updateHUD();
+    return;
+  }
+
+  const idx = player.inventory.findIndex(item => item.type === "weapon" && item.weaponId === weaponId);
+  if (idx >= 0 && typeof equipItem === "function") {
+    equipItem(player.inventory[idx].id);
+    return;
+  }
+
+  if (player.equipment?.weapon?.weaponId === weaponId) {
+    player.currentWeaponId = weaponId;
+    player.attackCooldown = Math.min(player.attackCooldown, Math.ceil(getCurrentWeapon().cooldown * 0.35));
+    if (announce && typeof announcer === "function") announcer(`Weapon readied: ${getCurrentWeapon().name}.`);
+    if (typeof updateHUD === "function") updateHUD();
+    return;
+  }
+
+  if (announce && typeof announcer === "function") announcer("You do not have that weapon. Loot something pointy first.");
 }
 
 function cyclePlayerWeapon(direction = 1) {
-  const currentIndex = Math.max(0, WEAPON_ORDER.indexOf(player.currentWeaponId));
-  const nextIndex = (currentIndex + direction + WEAPON_ORDER.length) % WEAPON_ORDER.length;
-  setPlayerWeapon(WEAPON_ORDER[nextIndex]);
+  const equipped = player.equipment?.weapon;
+  if (equipped) setPlayerWeapon("fists");
+  else {
+    const firstWeapon = player.inventory.find(item => item.type === "weapon");
+    if (firstWeapon) equipItem(firstWeapon.id);
+    else setPlayerWeapon("fists");
+  }
 }
 
 function updatePlayerAim(dx, dy) {
