@@ -44,11 +44,14 @@ function updatePlayer() {
   const movementX = keyboardX + gamepadState.moveX + touchState.moveX;
   const movementY = keyboardY + gamepadState.moveY + touchState.moveY;
   const aimLength = Math.hypot(gamepadState.aimX, gamepadState.aimY);
+  const touchAttackAimLength = Math.hypot(touchState.attackX, touchState.attackY);
   const fallbackAimX = keyboardX + touchState.moveX;
   const fallbackAimY = keyboardY + touchState.moveY;
 
   if (aimLength > 0) {
     updatePlayerAim(gamepadState.aimX, gamepadState.aimY);
+  } else if (touchAttackAimLength > 0) {
+    updatePlayerAim(touchState.attackX, touchState.attackY);
   } else if (Math.hypot(fallbackAimX, fallbackAimY) > 0) {
     updatePlayerAim(fallbackAimX, fallbackAimY);
   } else if (gamepadState.connected && !gamepadState.hasAimInput && Math.hypot(gamepadState.moveX, gamepadState.moveY) > 0) {
@@ -65,6 +68,7 @@ function updatePlayer() {
 
   moveEntity(player, dx, dy);
   player.attackCooldown = Math.max(0, player.attackCooldown - 1);
+  if (touchState.attackActive) attack();
 
   const currentTile = tileAt(player.x, player.y);
   player.safe = currentTile === "S";
