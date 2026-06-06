@@ -256,11 +256,9 @@ function beginRoomReveal(room, px, py) {
   if (!room) return;
 
   let maxDist = 1;
-  for (let y = room.y; y < room.y + room.h; y++) {
-    for (let x = room.x; x < room.x + room.w; x++) {
-      maxDist = Math.max(maxDist, Math.hypot(x - px, y - py));
-    }
-  }
+  forEachRoomTile(room, (x, y) => {
+    maxDist = Math.max(maxDist, Math.hypot(x - px, y - py));
+  });
 
   roomRevealState = {
     roomId: room.id,
@@ -286,22 +284,20 @@ function updateRoomReveal(room, px, py) {
 
   let changed = false;
 
-  for (let y = room.y; y < room.y + room.h; y++) {
-    for (let x = room.x; x < room.x + room.w; x++) {
-      if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) continue;
+  forEachRoomTile(room, (x, y) => {
+    if (x < 0 || y < 0 || x >= MAP_COLS || y >= MAP_ROWS) return;
 
-      const dist = Math.hypot(x - roomRevealState.originX, y - roomRevealState.originY);
-      const revealedByWave = dist <= radius;
+    const dist = Math.hypot(x - roomRevealState.originX, y - roomRevealState.originY);
+    const revealedByWave = dist <= radius;
 
-      if (revealedByWave || progress >= 1) {
-        visible[y][x] = true;
-        if (!seen[y][x]) {
-          seen[y][x] = true;
-          changed = true;
-        }
+    if (revealedByWave || progress >= 1) {
+      visible[y][x] = true;
+      if (!seen[y][x]) {
+        seen[y][x] = true;
+        changed = true;
       }
     }
-  }
+  });
 
   if (progress >= 1) {
     roomRevealState.complete = true;
@@ -338,17 +334,7 @@ function revealTileForVision(x, y) {
 function revealAdjacentRoomEdgeFloors(room) {
   if (!room) return;
 
-  const candidates = [];
-
-  for (let x = room.x; x < room.x + room.w; x++) {
-    candidates.push({x, y: room.y - 1});
-    candidates.push({x, y: room.y + room.h});
-  }
-
-  for (let y = room.y; y < room.y + room.h; y++) {
-    candidates.push({x: room.x - 1, y});
-    candidates.push({x: room.x + room.w, y});
-  }
+  const candidates = roomAdjacentTiles(room);
 
   for (const t of candidates) {
     if (t.x < 0 || t.y < 0 || t.x >= MAP_COLS || t.y >= MAP_ROWS) continue;
@@ -371,17 +357,7 @@ function revealAdjacentRoomEdgeFloors(room) {
 function revealRoomDoorEdges(room) {
   if (!room) return;
 
-  const edgeCandidates = [];
-
-  for (let x = room.x; x < room.x + room.w; x++) {
-    edgeCandidates.push({x, y: room.y - 1});
-    edgeCandidates.push({x, y: room.y + room.h});
-  }
-
-  for (let y = room.y; y < room.y + room.h; y++) {
-    edgeCandidates.push({x: room.x - 1, y});
-    edgeCandidates.push({x: room.x + room.w, y});
-  }
+  const edgeCandidates = roomAdjacentTiles(room);
 
   for (const t of edgeCandidates) {
     if (t.x < 0 || t.y < 0 || t.x >= MAP_COLS || t.y >= MAP_ROWS) continue;
@@ -445,16 +421,12 @@ function updateVisibility(force=false) {
   let count = 0;
   for (const room of rooms) {
     if (!room.seen) {
-      for (let y = room.y; y < room.y + room.h; y++) {
-        for (let x = room.x; x < room.x + room.w; x++) {
-          if (seen[y][x]) {
-            room.seen = true;
-            count++;
-            break;
-          }
+      forEachRoomTile(room, (x, y) => {
+        if (!room.seen && seen[y]?.[x]) {
+          room.seen = true;
+          count++;
         }
-        if (room.seen) break;
-      }
+      });
     }
   }
 
