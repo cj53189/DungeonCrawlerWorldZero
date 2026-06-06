@@ -36,7 +36,7 @@ function resetRunProgress() {
   player.defense = 0;
   player.audienceBonus = 0;
   player.inventory = [];
-  player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null};
+  player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
   player.coins = 0;
   player.attackCooldown = 0;
   player.currentWeaponId = "fists";
@@ -84,7 +84,7 @@ function resetState(options = {}) {
     player.defense = 0;
     player.audienceBonus = 0;
     player.inventory = [];
-    player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null};
+    player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
     }
   player.currentRoomId = null;
   player.lastTileX = 0;
