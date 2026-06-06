@@ -1,6 +1,7 @@
-const SLOT_LABELS={head:"Head",chest:"Chest",legs:"Legs",feet:"Feet",accessory:"Accessory",light:"Light"};
+const SLOT_LABELS={weapon:"Weapon",head:"Head",chest:"Chest",legs:"Legs",feet:"Feet",accessory:"Accessory",light:"Light"};
 const ITEM_BASES={head:["Helmet","Cap","Crown","Hood"],chest:["Vest","Tunic","Breastplate","Jacket"],legs:["Pants","Greaves","Shorts","Trousers"],feet:["Boots","Sandals","Crocs","Footwraps"],accessory:["Ring","Charm","Badge","Pendant"]};
 const ITEM_PREFIXES=["Goblin","Rat-hide","Bone","Rusty","Lucky","Crawler","Moldy","Questionable","Royal","Screaming"];
+const WEAPON_PREFIXES=["Notched","Goblin-Forged","Bone","Rusted","Whispering","Crawler","Mold-Blessed","Royal","Arena-Worn","Blood-Marked"];
 const ROOM_NAMES={small:["Crypt Nook","Goblin Pantry","Collapsed Alcove","Rat Nest","Old Guard Room"],medium:["Bone Gallery","Broken Armory","Forgotten Shrine","Goblin Barracks","Hall of Echoes","Mushroom Chapel"],large:["Feast Hall","The Drowned Hall","Cavern of Teeth","Hall of Rusted Banners"],boss:["The Rat King's Court","The Bone Collector's Pit","Champion's Den","The Blood-Marked Chamber","The Old Arena"]};
 function makeId(p="item"){return `${p}_${Date.now()}_${Math.floor(Math.random()*999999)}`;}
 function choose(a){return a[Math.floor(Math.random()*a.length)];}
@@ -15,26 +16,37 @@ function generateGear(forceRare=false){
  return item;
 }
 function generateLootBox(forceRare=false){const rarity=rollRarity(forceRare);return{id:makeId("box"),type:"lootbox",rarity,name:`${rarity} Prize Box`,opened:false};}
+function generateWeapon(forceRare=false, forcedWeaponId=null){
+ const weaponId=forcedWeaponId&&WEAPON_DEFINITIONS[forcedWeaponId]&&forcedWeaponId!=="fists"?forcedWeaponId:choose(LOOTABLE_WEAPON_IDS);
+ const base=WEAPON_DEFINITIONS[weaponId],rarity=rollRarity(forceRare),p=rarityPower(rarity);
+ const damage=base.damage+Math.max(1,p*3)+Math.floor(Math.random()*(p+2));
+ const range=base.range+(weaponId==="bow"?p*14:p*4);
+ const cooldown=Math.max(10,base.cooldown-Math.floor(p*1.5));
+ return{id:makeId("weapon"),type:"weapon",slot:"weapon",weaponId,rarity,name:`${rarity} ${choose(WEAPON_PREFIXES)} ${base.name}`,damage,range,cooldown,attackShape:{...base.attackShape},telegraphColor:base.telegraphColor};
+}
 function generateTorchItem(){return{id:makeId("torch"),type:"light",slot:"light",rarity:"Common",name:"Crawler Torch",radius:isMobileLike()?142:164,intensity:.36};}
 function hasEquippedLightSource(){return !!player.equipment?.light && player.equipment.light.type==="light";}
-function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room."; if(i.type==="light")return"Equipped light source. Illuminates the crawler while carried."; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
+function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room."; if(i.type==="light")return"Equipped light source. Illuminates the crawler while carried."; if(i.type==="weapon")return`${i.damage} DMG · ${i.range} RNG · ${i.cooldown} CD`; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
 function addItem(item){
  player.inventory.push(item);
  if(item.type==="lootbox"){stats.lootBoxesFound++; achievement("NEW LOOT BOX",`You found a ${item.name}. It can only be opened in a safe room.`,`box_${item.id}`);}
  else if(item.type==="light"){achievement("NEW LIGHT",`You found ${item.name}. ${itemDescription(item)}`,`light_${item.id}`);}
+ else if(item.type==="weapon"){achievement("NEW WEAPON",`You found ${item.name}. ${itemDescription(item)}`,`weapon_${item.id}`);}
  else{stats.gearFound++; achievement("NEW GEAR",`You found ${item.name}. ${itemDescription(item)}`,`gear_${item.id}`);}
  updateInventoryUI(); updateHUD();
 }
 function equipItem(id){
- const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const item=player.inventory[idx]; if(item.type!=="gear"&&item.type!=="light")return;
+ const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const item=player.inventory[idx]; if(item.type!=="gear"&&item.type!=="light"&&item.type!=="weapon")return;
  const old=player.equipment[item.slot]; player.equipment[item.slot]=item; player.inventory.splice(idx,1); if(old)player.inventory.push(old);
+ if(item.type==="weapon") player.currentWeaponId=item.weaponId;
  recalcEquipmentStats(); achievement("EQUIPPED",`You equipped ${item.name}. ${itemDescription(item)}`,`equip_${item.id}`); updateInventoryUI(); updateHUD(); visibilityDirty=true;
 }
-function unequipItem(slot){
+function unequipItem(slot, announce=true){
  if(!Object.prototype.hasOwnProperty.call(player.equipment,slot))return;
  const item=player.equipment[slot]; if(!item)return;
  player.equipment[slot]=null; player.inventory.push(item);
- recalcEquipmentStats(); announcer(`You unequipped ${item.name}. ${item.type==="light"?"The crawler is now relying on dungeon ambience and questionable courage.":"It returns to your pack."}`); updateInventoryUI(); updateHUD(); visibilityDirty=true;
+ if(slot==="weapon") player.currentWeaponId="fists";
+ recalcEquipmentStats(); if(announce) announcer(`You unequipped ${item.name}. ${item.type==="light"?"The crawler is now relying on dungeon ambience and questionable courage.":item.type==="weapon"?"Your fists are now back on the payroll.":"It returns to your pack."}`); updateInventoryUI(); updateHUD(); visibilityDirty=true;
 }
 function openLootBox(id){
  const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const box=player.inventory[idx]; if(box.type!=="lootbox")return;
@@ -45,7 +57,8 @@ function openLootBox(id){
  if(!achievements.has("firstLootBoxOpen"))achievement("NEW ACHIEVEMENT: Delayed Gratification","You waited until a safe room to open a box. Somewhere, an impulse-control researcher just shed a single tear.","firstLootBoxOpen");
  updateInventoryUI(); updateHUD();
 }
-function discardItem(id){const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const [item]=player.inventory.splice(idx,1); announcer(`You discarded ${item.name}. The dungeon has sold it to someone with lower standards.`); updateInventoryUI(); updateHUD();}
+function discardItem(id){const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const [item]=player.inventory.splice(idx,1); announcer(`You dropped ${item.name}. The dungeon has sold it to someone with lower standards.`); updateInventoryUI(); updateHUD();}
+function dropEquippedItem(slot){if(!Object.prototype.hasOwnProperty.call(player.equipment,slot))return; const item=player.equipment[slot]; if(!item)return; player.equipment[slot]=null; if(slot==="weapon")player.currentWeaponId="fists"; recalcEquipmentStats(); announcer(`You dropped ${item.name}. A future archaeologist will misinterpret this as a ritual.`); updateInventoryUI(); updateHUD(); visibilityDirty=true;}
 function recalcEquipmentStats(){
  let hp=0,atk=0,spd=0,def=0,aud=0; for(const item of Object.values(player.equipment)){if(!item||item.type==="light")continue; hp+=item.hp||0; atk+=item.attack||0; spd+=item.speed||0; def+=item.defense||0; aud+=item.audience||0;}
  const old=player.maxHp; player.maxHp=100+(player.level-1)*14+hp; player.attackDamage=20+(player.level-1)*4+atk; player.speed=player.baseSpeed+spd; player.defense=def; player.audienceBonus=aud; if(player.maxHp>old)player.hp+=player.maxHp-old; player.hp=Math.min(player.hp,player.maxHp);
@@ -61,6 +74,8 @@ function setupInventoryActionHandlers(){
   if(weaponButton){setPlayerWeapon(weaponButton.dataset.weaponId);updateInventoryUI();return;}
   const unequipButton=e.target.closest("button[data-action='unequip'][data-slot]");
   if(unequipButton){unequipItem(unequipButton.dataset.slot);return;}
+  const dropEquippedButton=e.target.closest("button[data-action='drop-equipped'][data-slot]");
+  if(dropEquippedButton){dropEquippedItem(dropEquippedButton.dataset.slot);return;}
   const button=e.target.closest("button[data-action][data-item-id]");
   if(!button)return;
   const id=button.dataset.itemId;
@@ -70,31 +85,29 @@ function setupInventoryActionHandlers(){
  });
 }
 function rarityClass(item){return `rarity${(item?.rarity||"Common").replace(/[^a-z0-9]/gi,"")}`;}
-function typeClass(item){return `itemType${item?.type==="lootbox"?"LootBox":item?.type==="light"?"Light":"Gear"}`;}
+function typeClass(item){return `itemType${item?.type==="lootbox"?"LootBox":item?.type==="light"?"Light":item?.type==="weapon"?"Weapon":"Gear"}`;}
 function slotIcon(item){
  if(!item)return "?";
  if(item.type==="lootbox")return "⬡";
  if(item.type==="light")return "✦";
+ if(item.type==="weapon")return {greatsword:"⚔",hammer:"◉",spear:"↗",bow:"弓"}[item.weaponId]||"⚔";
  return {head:"◠",chest:"▣",legs:"▥",feet:"⌞",accessory:"◇"}[item.slot]||"◆";
 }
 function renderItemCard(item, extraClass=""){
- const action=item.type==="gear"||item.type==="light"?"equip":"open";
+ const action=item.type==="gear"||item.type==="light"||item.type==="weapon"?"equip":"open";
  const actionLabel=action==="equip"?"Equip":"Open";
- const slotLabel=item.type==="gear"||item.type==="light"?SLOT_LABELS[item.slot]:"Loot Box";
+ const slotLabel=item.type==="gear"||item.type==="light"||item.type==="weapon"?SLOT_LABELS[item.slot]:"Loot Box";
  return `<div class="invItem ${rarityClass(item)} ${typeClass(item)} ${extraClass}"><div class="itemIcon">${slotIcon(item)}</div><div class="itemName">${escapeHtml(item.name)}</div><div class="itemSlot">${escapeHtml(slotLabel)} · ${escapeHtml(item.rarity||"Common")}</div><div class="itemMeta">${escapeHtml(itemDescription(item))}</div><div class="itemActions"><button class="itemBtn" type="button" data-action="${action}" data-item-id="${escapeHtml(item.id)}">${actionLabel}</button><button class="itemBtn" type="button" data-action="drop" data-item-id="${escapeHtml(item.id)}">Drop</button></div></div>`;
 }
 function renderEquipmentSlot(slot){
  const item=player.equipment[slot];
  if(!item)return `<div class="equipSlot empty"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipEmpty">Empty</div></div>`;
- const unequipAction=slot==="light"?`<div class="itemActions"><button class="itemBtn" type="button" data-action="unequip" data-slot="${escapeHtml(slot)}">Unequip</button></div>`:"";
- return `<div class="equipSlot ${rarityClass(item)} ${typeClass(item)}"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipName">${escapeHtml(item.name)}</div><div class="equipMeta">${escapeHtml(itemDescription(item))}</div>${unequipAction}</div>`;
+ const actions=`<div class="itemActions"><button class="itemBtn" type="button" data-action="unequip" data-slot="${escapeHtml(slot)}">Unequip</button><button class="itemBtn" type="button" data-action="drop-equipped" data-slot="${escapeHtml(slot)}">Drop</button></div>`;
+ return `<div class="equipSlot ${rarityClass(item)} ${typeClass(item)}"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipName">${escapeHtml(item.name)}</div><div class="equipMeta">${escapeHtml(itemDescription(item))}</div>${actions}</div>`;
 }
 function renderWeaponGrid(){
- return WEAPON_ORDER.map(id=>{
-  const weapon=WEAPON_DEFINITIONS[id];
-  const active=id===player.currentWeaponId;
-  return `<button class="weaponCell weapon${escapeHtml(id)} ${active?"active":""}" type="button" data-weapon-id="${escapeHtml(id)}"><span>${escapeHtml(weapon.name)}</span><small>${weapon.damage} DMG · ${weapon.range} RNG</small></button>`;
- }).join("");
+ const current=getCurrentWeapon();
+ return `<button class="weaponCell weaponfists ${current.id==="fists"?"active":""}" type="button" data-weapon-id="fists"><span>Fists</span><small>Unequipped fallback</small></button>` + (player.equipment.weapon?`<button class="weaponCell weapon${escapeHtml(player.equipment.weapon.weaponId)} active" type="button" data-weapon-id="${escapeHtml(player.equipment.weapon.weaponId)}"><span>${escapeHtml(player.equipment.weapon.name)}</span><small>${escapeHtml(itemDescription(player.equipment.weapon))}</small></button>`:`<div class="weaponCell empty"><span>No weapon equipped</span><small>Loot and equip weapons from corpses.</small></div>`);
 }
 function updateInventoryUI(){
  const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
@@ -111,6 +124,7 @@ function rewardChestLoot(){
  if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}
  else if(roll<.68)addItem(generateLootBox());
  else if(roll<.78)addItem(generateTorchItem());
+ else if(roll<.88)addItem(generateWeapon());
  else addItem(generateGear());
  if(!achievements.has("firstWearableLoot")&&stats.gearFound>0)achievement("NEW ACHIEVEMENT: Pants Adjacent","You found wearable equipment. Whether this improves your dignity remains under review.","firstWearableLoot");
  updateInventoryUI(); updateHUD();

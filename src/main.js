@@ -15,6 +15,7 @@ function gameLoop() {
 }
 
 initInputControls();
+setupLootWindowHandlers();
 resetState();
 gameLoop();
 

@@ -50,9 +50,11 @@ function rollEnemyLoot(enemy) {
   if (coins > 0) loot.push({ type: "coins", amount: coins, name: `${coins} Coins` });
 
   const gearChance = enemy.boss ? 0.85 : 0.09 + Math.min(0.12, (enemy.level || 1) * 0.01);
+  const weaponChance = enemy.boss ? 1 : 0.16 + Math.min(0.18, (enemy.level || 1) * 0.012) + Math.min(0.10, currentFloor * 0.015);
   const boxChance = enemy.boss ? 0.95 : 0.07 + Math.min(0.10, currentFloor * 0.015);
 
   if (Math.random() < gearChance) loot.push(generateGear(enemy.boss || enemy.level > player.level + 2));
+  if (Math.random() < weaponChance) loot.push(generateWeapon(enemy.boss || enemy.level > player.level + 2));
   if (Math.random() < boxChance) loot.push(generateLootBox(enemy.boss || enemy.level > player.level + 2));
   return loot;
 }
@@ -73,36 +75,106 @@ function createCorpse(enemy) {
   return corpse;
 }
 
-function lootCorpse(corpse) {
-  if (!corpse || corpse.looted) return;
-  corpse.looted = true;
+function getCorpseById(id) {
+  return corpses.find(corpse => corpse.id === id) || null;
+}
+
+function closeLootWindow() {
+  activeLootCorpseId = null;
+  const panel = document.getElementById("lootWindow");
+  if (panel) panel.style.display = "none";
+}
+
+function formatLootItem(item) {
+  if (!item) return "";
+  if (item.type === "coins") return `${item.amount} coins`;
+  return item.name || "Unknown Loot";
+}
+
+function renderCorpseLootWindow(corpse) {
+  const panel = document.getElementById("lootWindow");
+  if (!panel || !corpse) return;
+  const title = document.getElementById("lootWindowTitle");
+  const grid = document.getElementById("lootWindowGrid");
+  if (title) title.textContent = corpse.name;
+  if (!grid) return;
 
   if (!corpse.loot.length) {
-    announcer(`You searched ${corpse.name}. It contained disappointment and several fluids best left unidentified.`);
-    return;
+    grid.innerHTML = `<div class="invItem empty"><div class="itemIcon">□</div><div class="itemName">Empty Corpse</div><div class="itemMeta">This container has already contributed all available tragedy.</div></div>`;
+  } else {
+    grid.innerHTML = corpse.loot.map((item, index) => {
+      if (item.type === "coins") {
+        return `<div class="invItem rarityCommon itemTypeCoins"><div class="itemIcon">¢</div><div class="itemName">${escapeHtml(formatLootItem(item))}</div><div class="itemSlot">Currency</div><div class="itemMeta">Spendable poor decisions.</div><div class="itemActions"><button class="itemBtn" type="button" data-loot-index="${index}">Take</button></div></div>`;
+      }
+      return `<div class="invItem ${rarityClass(item)} ${typeClass(item)}"><div class="itemIcon">${slotIcon(item)}</div><div class="itemName">${escapeHtml(item.name)}</div><div class="itemSlot">${escapeHtml(item.type === "weapon" ? "Weapon" : item.type === "lootbox" ? "Loot Box" : SLOT_LABELS[item.slot] || "Loot")} · ${escapeHtml(item.rarity || "Common")}</div><div class="itemMeta">${escapeHtml(itemDescription(item))}</div><div class="itemActions"><button class="itemBtn" type="button" data-loot-index="${index}">Take</button></div></div>`;
+    }).join("");
   }
+  panel.style.display = "block";
+}
 
-  const gained = [];
-  for (const item of corpse.loot) {
-    if (item.type === "coins") {
-      player.coins += item.amount;
-      gained.push(`${item.amount} coins`);
-    } else {
-      player.inventory.push(item);
-      if (item.type === "lootbox") stats.lootBoxesFound++;
-      if (item.type === "gear") stats.gearFound++;
-      gained.push(item.name);
-    }
-  }
+function openCorpseLootWindow(corpse) {
+  if (!corpse || corpse.looted) return;
+  activeLootCorpseId = corpse.id;
+  renderCorpseLootWindow(corpse);
+}
 
+function finishCorpseLootIfEmpty(corpse) {
+  if (!corpse || corpse.loot.length) return;
+  corpse.looted = true;
   changeAudience(corpse.boss ? 8 : 1);
   achievement(
     corpse.boss ? "BOSS CORPSE LOOTED" : "CORPSE LOOTED",
-    `You searched ${corpse.name} and found ${gained.join(", ")}. The dungeon reminds you this is technically recycling.`,
+    `You finished looting ${corpse.name}. The dungeon reminds you this is technically recycling.`,
     `loot_${corpse.id}`
   );
-  updateInventoryUI();
+  closeLootWindow();
   updateHUD();
 }
 
+function takeCorpseLootItem(corpse, index) {
+  if (!corpse || corpse.looted || index < 0 || index >= corpse.loot.length) return;
+  const [item] = corpse.loot.splice(index, 1);
+  if (item.type === "coins") {
+    player.coins += item.amount;
+    announcer(`You took ${item.amount} coins from ${corpse.name}. Brave accounting.`);
+  } else {
+    player.inventory.push(item);
+    if (item.type === "lootbox") stats.lootBoxesFound++;
+    if (item.type === "gear") stats.gearFound++;
+    achievement(item.type === "weapon" ? "WEAPON LOOTED" : "CORPSE LOOT", `You took ${item.name} from ${corpse.name}. ${itemDescription(item)}`, `corpse_take_${corpse.id}_${item.id}`);
+  }
+  updateInventoryUI();
+  updateHUD();
+  finishCorpseLootIfEmpty(corpse);
+  if (!corpse.looted) renderCorpseLootWindow(corpse);
+}
+
+function takeAllCorpseLoot(corpse) {
+  if (!corpse || corpse.looted) return;
+  if (!corpse.loot.length) {
+    announcer(`You searched ${corpse.name}. It contained disappointment and several fluids best left unidentified.`);
+    finishCorpseLootIfEmpty(corpse);
+    return;
+  }
+  while (corpse.loot.length) takeCorpseLootItem(corpse, 0);
+}
+
+function setupLootWindowHandlers() {
+  const panel = document.getElementById("lootWindow");
+  if (!panel || panel.dataset.actionsBound === "true") return;
+  panel.dataset.actionsBound = "true";
+  panel.addEventListener("click", e => {
+    const closeButton = e.target.closest("#closeLootWindowBtn");
+    if (closeButton) { closeLootWindow(); return; }
+    const corpse = getCorpseById(activeLootCorpseId);
+    const takeAllButton = e.target.closest("#takeAllLootBtn");
+    if (takeAllButton) { takeAllCorpseLoot(corpse); return; }
+    const takeButton = e.target.closest("button[data-loot-index]");
+    if (takeButton) takeCorpseLootItem(corpse, Number(takeButton.dataset.lootIndex));
+  });
+}
+
+function lootCorpse(corpse) {
+  openCorpseLootWindow(corpse);
+}
 

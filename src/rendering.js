@@ -704,7 +704,7 @@ function getMinimapScale(){
 
 const MOBILE_MINIMAP_SIZE = 120;
 const MOBILE_MINIMAP_BORDER = 8;
-const MOBILE_MINIMAP_TILE_SCALE = 6;
+const MOBILE_MINIMAP_TILE_SCALE = 4.8;
 
 function isPointInsideMobileMinimap(px, py, centerX, centerY, radius){
   return Math.hypot(px - centerX, py - centerY) <= radius;
