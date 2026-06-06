@@ -78,6 +78,15 @@
       font-weight: bold;
     }
 
+    .hudWeapon {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #ffd86b;
+      font-weight: bold;
+    }
+
+    .hudWeapon span { color: #fff; }
+
     .hudStair {
       display: none;
       margin-top: 6px;
@@ -269,6 +278,7 @@
         font-size: 10px;
       }
 
+      .hudWeapon,
       .hudStair {
         font-size: 9px;
       }
@@ -392,6 +402,7 @@
     .itemBtn { border:1px solid rgba(255,255,255,0.22); border-radius:6px; background:rgba(255,255,255,0.08); color:#fff; padding:4px 7px; font-size:11px; cursor:pointer; }
     #inventoryHelp { color:#aaa; font-size:11px; margin-top:8px; font-style:italic; }
     #btnInv { right:204px; top:74px; width:52px; height:52px; font-size:11px; }
+    #btnWeapon { right:34px; bottom:124px; width:58px; height:58px; font-size:11px; background:rgba(145,205,255,0.24); border-color:rgba(145,205,255,0.48); }
     @media (hover:none) and (pointer:coarse), (max-width:900px) {
       #inventoryPanel { left:8px; bottom:8px; width:300px; max-width:54vw; max-height:170px; font-size:10px; }
       #inventoryPanel h3 { font-size:10px; }

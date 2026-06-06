@@ -229,6 +229,7 @@ function captureRunProgress() {
       maxHp: player.maxHp, hp: player.hp, attackDamage: player.attackDamage,
       baseSpeed: player.baseSpeed, speed: player.speed, defense: player.defense,
       audienceBonus: player.audienceBonus, coins: player.coins,
+      currentWeaponId: player.currentWeaponId, aimX: player.aimX, aimY: player.aimY,
       inventory: player.inventory.map(item => ({ ...item })),
       equipment: Object.fromEntries(Object.entries(player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null]))
     },
@@ -252,6 +253,9 @@ function restoreRunProgress(snapshot) {
   player.defense = snapshot.player.defense;
   player.audienceBonus = snapshot.player.audienceBonus;
   player.coins = snapshot.player.coins;
+  player.currentWeaponId = snapshot.player.currentWeaponId || "fists";
+  player.aimX = snapshot.player.aimX || 1;
+  player.aimY = snapshot.player.aimY || 0;
   player.inventory = snapshot.player.inventory.map(item => ({ ...item }));
   player.equipment = Object.fromEntries(Object.entries(snapshot.player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null]));
 
@@ -304,6 +308,8 @@ function updateHUD() {
   setText("playerXP", xpNow);
   setText("xpNext", xpMax);
   setText("audience", audienceScore);
+  const weapon = getCurrentWeapon();
+  setText("weaponName", weapon.name);
   setText("timer", isFinalDescentWindow() ? `FINAL ${formatTimer(floorTimeLeft)}` : formatTimer(floorTimeLeft));
   setText("roomsSeen", roomsSeen);
   setText("roomTotal", rooms.length);

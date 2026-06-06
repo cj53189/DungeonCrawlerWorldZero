@@ -39,6 +39,9 @@ function resetRunProgress() {
   player.equipment = {head:null,chest:null,legs:null,feet:null,accessory:null};
   player.coins = 0;
   player.attackCooldown = 0;
+  player.currentWeaponId = "fists";
+  player.aimX = 1;
+  player.aimY = 0;
   currentFloor = 0;
   pendingFloorAdvance = false;
 }
@@ -53,6 +56,8 @@ function resetState(options = {}) {
   }
   enemies = [];
   corpses = [];
+  projectiles = [];
+  attackTelegraphs = [];
   openedChests = new Set();
   if (!preserveRun) {
     achievements = new Set();
@@ -90,6 +95,8 @@ function resetState(options = {}) {
   lastVisibilityTileY=null;
   roomRevealState = { roomId: null, startFrame: 0, originX: 0, originY: 0, maxDist: 0, complete: false };
   player.attackCooldown = 0;
+  projectiles = [];
+  attackTelegraphs = [];
   player.safe = true;
   player.wasSafe = true;
 

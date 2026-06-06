@@ -17,6 +17,7 @@ function setupTouchControls() {
   const btnRecap = document.getElementById("btnRecap");
   const btnNew = document.getElementById("btnNew");
   const btnInv = document.getElementById("btnInv");
+  const btnWeapon = document.getElementById("btnWeapon");
 
   const prevent = (e) => {
     e.preventDefault();
@@ -89,12 +90,14 @@ function setupTouchControls() {
   btnLog.addEventListener("touchstart", e => { prevent(e); toggleLog(); }, { passive: false });
   btnRecap.addEventListener("touchstart", e => { prevent(e); toggleSafeRoomRecap(); }, { passive: false });
   btnNew.addEventListener("touchstart", e => { prevent(e); restartGame(); }, { passive: false });
+  if (btnWeapon) btnWeapon.addEventListener("touchstart", e => { prevent(e); cyclePlayerWeapon(1); }, { passive: false });
 
   btnAttack.addEventListener("click", e => { prevent(e); attack(); });
   btnInteract.addEventListener("click", e => { prevent(e); interact(); });
   btnLog.addEventListener("click", e => { prevent(e); toggleLog(); });
   btnRecap.addEventListener("click", e => { prevent(e); toggleSafeRoomRecap(); });
   btnNew.addEventListener("click", e => { prevent(e); restartGame(); });
+  if (btnWeapon) btnWeapon.addEventListener("click", e => { prevent(e); cyclePlayerWeapon(1); });
 
   document.addEventListener("gesturestart", e => e.preventDefault());
   document.addEventListener("touchmove", e => {
@@ -179,6 +182,7 @@ function setupTouchControls() {
   const btnRecap = document.getElementById("btnRecap");
   const btnNew = document.getElementById("btnNew");
   const btnInv = document.getElementById("btnInv");
+  const btnWeapon = document.getElementById("btnWeapon");
 
   if (!base || !knob) return;
 
@@ -271,6 +275,7 @@ function setupTouchControls() {
   bindButton(btnRecap, toggleRecapPanelMobile);
   bindButton(btnNew, restartGame);
   bindButton(btnInv, toggleInventoryPanel);
+  bindButton(btnWeapon, () => cyclePlayerWeapon(1));
 
   document.addEventListener("gesturestart", e => e.preventDefault());
   document.addEventListener("touchmove", e => {
@@ -337,6 +342,9 @@ window.addEventListener("keydown", e => {
   if (e.key.toLowerCase() === "n") restartGame();
   if (e.key.toLowerCase() === "i") toggleInventoryPanel();
   if (e.code === "Space") { e.preventDefault(); attack(); }
+  if (["1", "2", "3", "4", "5"].includes(e.key)) setPlayerWeapon(WEAPON_ORDER[Number(e.key) - 1]);
+  if (e.key.toLowerCase() === "q") cyclePlayerWeapon(-1);
+  if (e.key.toLowerCase() === "z") cyclePlayerWeapon(1);
 });
 window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
 
@@ -378,6 +386,8 @@ function pollGamepad() {
   if (justPressed(8)) toggleLog();                   // View/Select
   if (justPressed(3)) toggleSafeRoomRecap();         // Y/Triangle
   if (justPressed(1)) toggleInventoryPanel();        // B/Circle
+  if (justPressed(4)) cyclePlayerWeapon(-1);         // LB/L1
+  if (justPressed(6)) cyclePlayerWeapon(1);          // LT/L2
   if (justPressed(9)) restartGame();                 // Menu/Start
 
   gamepadState.previousButtons = gp.buttons.map(button => button.pressed);
