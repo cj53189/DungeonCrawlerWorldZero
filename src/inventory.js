@@ -45,11 +45,31 @@ function recalcEquipmentStats(){
  const old=player.maxHp; player.maxHp=100+(player.level-1)*14+hp; player.attackDamage=20+(player.level-1)*4+atk; player.speed=player.baseSpeed+spd; player.defense=def; player.audienceBonus=aud; if(player.maxHp>old)player.hp+=player.maxHp-old; player.hp=Math.min(player.hp,player.maxHp);
 }
 function lootBoxCount(){return player.inventory.filter(i=>i.type==="lootbox").length;}
+function escapeHtml(value){return String(value).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));}
+function setupInventoryActionHandlers(){
+ const list=document.getElementById("inventoryList");
+ if(!list||list.dataset.actionsBound==="true")return;
+ list.dataset.actionsBound="true";
+ list.addEventListener("click",e=>{
+  const button=e.target.closest("button[data-action][data-item-id]");
+  if(!button)return;
+  const id=button.dataset.itemId;
+  if(button.dataset.action==="equip")equipItem(id);
+  if(button.dataset.action==="open")openLootBox(id);
+  if(button.dataset.action==="drop")discardItem(id);
+ });
+}
 function updateInventoryUI(){
  const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
- eq.innerHTML=`<div class="equipGrid">${Object.keys(SLOT_LABELS).map(s=>`<div>${SLOT_LABELS[s]}</div><div>${player.equipment[s]?player.equipment[s].name:"Empty"}</div>`).join("")}</div><div class="itemMeta">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · Audience Bonus ${player.audienceBonus}</div>`;
+ setupInventoryActionHandlers();
+ eq.innerHTML=`<div class="equipGrid">${Object.keys(SLOT_LABELS).map(s=>`<div>${SLOT_LABELS[s]}</div><div>${escapeHtml(player.equipment[s]?player.equipment[s].name:"Empty")}</div>`).join("")}</div><div class="itemMeta">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · Audience Bonus ${player.audienceBonus}</div>`;
  if(!player.inventory.length){list.innerHTML='<div class="invItem">Inventory empty. The dungeon recommends crime.</div>';return;}
- list.innerHTML=player.inventory.map(item=>`<div class="invItem"><div class="itemName">${item.name}</div><div class="itemMeta">${item.type==="gear"||item.type==="light"?SLOT_LABELS[item.slot]+" · ":""}${itemDescription(item)}</div><div class="itemActions">${item.type==="gear"||item.type==="light"?`<button class="itemBtn" onclick="equipItem('${item.id}')">Equip</button>`:`<button class="itemBtn" onclick="openLootBox('${item.id}')">Open</button>`}<button class="itemBtn" onclick="discardItem('${item.id}')">Drop</button></div></div>`).join("");
+ list.innerHTML=player.inventory.map(item=>{
+  const action=item.type==="gear"||item.type==="light"?"equip":"open";
+  const actionLabel=action==="equip"?"Equip":"Open";
+  const slotLabel=item.type==="gear"||item.type==="light"?`${SLOT_LABELS[item.slot]} · `:"";
+  return `<div class="invItem"><div class="itemName">${escapeHtml(item.name)}</div><div class="itemMeta">${escapeHtml(slotLabel)}${escapeHtml(itemDescription(item))}</div><div class="itemActions"><button class="itemBtn" type="button" data-action="${action}" data-item-id="${escapeHtml(item.id)}">${actionLabel}</button><button class="itemBtn" type="button" data-action="drop" data-item-id="${escapeHtml(item.id)}">Drop</button></div></div>`;
+ }).join("");
 }
 function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.style.display==="block"){p.style.display="none";return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display="block";}
 function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p)p.style.display="none";}

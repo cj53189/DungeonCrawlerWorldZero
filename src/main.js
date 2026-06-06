@@ -14,6 +14,7 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
+initInputControls();
 resetState();
 gameLoop();
 
