@@ -47,10 +47,12 @@ function recalcEquipmentStats(){
 function lootBoxCount(){return player.inventory.filter(i=>i.type==="lootbox").length;}
 function escapeHtml(value){return String(value).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));}
 function setupInventoryActionHandlers(){
- const list=document.getElementById("inventoryList");
- if(!list||list.dataset.actionsBound==="true")return;
- list.dataset.actionsBound="true";
- list.addEventListener("click",e=>{
+ const panel=document.getElementById("inventoryPanel");
+ if(!panel||panel.dataset.actionsBound==="true")return;
+ panel.dataset.actionsBound="true";
+ panel.addEventListener("click",e=>{
+  const weaponButton=e.target.closest("button[data-weapon-id]");
+  if(weaponButton){setPlayerWeapon(weaponButton.dataset.weaponId);updateInventoryUI();return;}
   const button=e.target.closest("button[data-action][data-item-id]");
   if(!button)return;
   const id=button.dataset.itemId;
@@ -59,17 +61,39 @@ function setupInventoryActionHandlers(){
   if(button.dataset.action==="drop")discardItem(id);
  });
 }
+function rarityClass(item){return `rarity${(item?.rarity||"Common").replace(/[^a-z0-9]/gi,"")}`;}
+function typeClass(item){return `itemType${item?.type==="lootbox"?"LootBox":item?.type==="light"?"Light":"Gear"}`;}
+function slotIcon(item){
+ if(!item)return "?";
+ if(item.type==="lootbox")return "⬡";
+ if(item.type==="light")return "✦";
+ return {head:"◠",chest:"▣",legs:"▥",feet:"⌞",accessory:"◇"}[item.slot]||"◆";
+}
+function renderItemCard(item, extraClass=""){
+ const action=item.type==="gear"||item.type==="light"?"equip":"open";
+ const actionLabel=action==="equip"?"Equip":"Open";
+ const slotLabel=item.type==="gear"||item.type==="light"?SLOT_LABELS[item.slot]:"Loot Box";
+ return `<div class="invItem ${rarityClass(item)} ${typeClass(item)} ${extraClass}"><div class="itemIcon">${slotIcon(item)}</div><div class="itemName">${escapeHtml(item.name)}</div><div class="itemSlot">${escapeHtml(slotLabel)} · ${escapeHtml(item.rarity||"Common")}</div><div class="itemMeta">${escapeHtml(itemDescription(item))}</div><div class="itemActions"><button class="itemBtn" type="button" data-action="${action}" data-item-id="${escapeHtml(item.id)}">${actionLabel}</button><button class="itemBtn" type="button" data-action="drop" data-item-id="${escapeHtml(item.id)}">Drop</button></div></div>`;
+}
+function renderEquipmentSlot(slot){
+ const item=player.equipment[slot];
+ if(!item)return `<div class="equipSlot empty"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipEmpty">Empty</div></div>`;
+ return `<div class="equipSlot ${rarityClass(item)} ${typeClass(item)}"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipName">${escapeHtml(item.name)}</div><div class="equipMeta">${escapeHtml(itemDescription(item))}</div></div>`;
+}
+function renderWeaponGrid(){
+ return WEAPON_ORDER.map(id=>{
+  const weapon=WEAPON_DEFINITIONS[id];
+  const active=id===player.currentWeaponId;
+  return `<button class="weaponCell weapon${escapeHtml(id)} ${active?"active":""}" type="button" data-weapon-id="${escapeHtml(id)}"><span>${escapeHtml(weapon.name)}</span><small>${weapon.damage} DMG · ${weapon.range} RNG</small></button>`;
+ }).join("");
+}
 function updateInventoryUI(){
  const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
  setupInventoryActionHandlers();
- eq.innerHTML=`<div class="equipGrid">${Object.keys(SLOT_LABELS).map(s=>`<div>${SLOT_LABELS[s]}</div><div>${escapeHtml(player.equipment[s]?player.equipment[s].name:"Empty")}</div>`).join("")}</div><div class="itemMeta">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · Audience Bonus ${player.audienceBonus}</div>`;
- if(!player.inventory.length){list.innerHTML='<div class="invItem">Inventory empty. The dungeon recommends crime.</div>';return;}
- list.innerHTML=player.inventory.map(item=>{
-  const action=item.type==="gear"||item.type==="light"?"equip":"open";
-  const actionLabel=action==="equip"?"Equip":"Open";
-  const slotLabel=item.type==="gear"||item.type==="light"?`${SLOT_LABELS[item.slot]} · `:"";
-  return `<div class="invItem"><div class="itemName">${escapeHtml(item.name)}</div><div class="itemMeta">${escapeHtml(slotLabel)}${escapeHtml(itemDescription(item))}</div><div class="itemActions"><button class="itemBtn" type="button" data-action="${action}" data-item-id="${escapeHtml(item.id)}">${actionLabel}</button><button class="itemBtn" type="button" data-action="drop" data-item-id="${escapeHtml(item.id)}">Drop</button></div></div>`;
- }).join("");
+ eq.innerHTML=`<div class="inventoryHeader"><div><div class="inventoryTitle">Stash & Armory</div><div class="inventorySubTitle">Diablo-style loot grid</div></div><div class="inventoryPower">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · AUD +${player.audienceBonus}</div></div><div class="weaponGrid">${renderWeaponGrid()}</div><div class="equipGrid">${Object.keys(SLOT_LABELS).map(renderEquipmentSlot).join("")}</div>`;
+ if(!player.inventory.length){list.innerHTML='<div class="inventoryGrid"><div class="invItem empty"><div class="itemIcon">□</div><div class="itemName">Empty Pack</div><div class="itemMeta">Inventory empty. The dungeon recommends crime.</div></div></div>';return;}
+ const sorted=[...player.inventory].sort((a,b)=>(rarityPower(b.rarity)-rarityPower(a.rarity))||String(a.type).localeCompare(String(b.type))||String(a.slot||"").localeCompare(String(b.slot||""))||String(a.name).localeCompare(String(b.name)));
+ list.innerHTML=`<div class="inventoryGrid">${sorted.map(item=>renderItemCard(item)).join("")}</div>`;
 }
 function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.style.display==="block"){p.style.display="none";return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display="block";}
 function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p)p.style.display="none";}
