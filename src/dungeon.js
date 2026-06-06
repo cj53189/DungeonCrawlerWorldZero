@@ -74,6 +74,7 @@ function generateDungeon() {
   placeObjects("C", Math.min(10, Math.max(4, Math.floor(rooms.length / 5))), [startRoom, exitRoom, bossRoom, spawnRoom]);
   placeEnemies(Math.min(16, Math.max(6, Math.floor(rooms.length / 3))), [startRoom, bossRoom, spawnRoom], spawnRoom);
   placeBossEnemy();
+  buildDungeonVisuals();
   stats.floorRooms = rooms.length;
 }
 
@@ -905,6 +906,120 @@ function getFarthestRoom(fromRoom) {
     if (d > bestDist) { bestDist = d; best = r; }
   }
   return best;
+}
+
+
+const VISUAL_FLOOR_TYPES = ["crack", "scratch", "rubble", "stain", "worn"];
+const VISUAL_DECAL_TYPES = ["debris", "brokenStone", "dust", "scorch", "coins", "marking"];
+const VISUAL_DECORATION_TILES = new Set([".", "S"]);
+
+function tileHash(x, y, salt = 0) {
+  let n = (x * 374761393 + y * 668265263 + currentFloor * 982451653 + salt * 1442695041) >>> 0;
+  n ^= n << 13;
+  n ^= n >>> 17;
+  n ^= n << 5;
+  return (n >>> 0) / 4294967295;
+}
+
+function visualThemeForRoom(room) {
+  const name = (room?.name || "").toLowerCase();
+  if (room?.type === "safe") return { density: 0.015, floorBias: "worn", weights: { dust: 0.7, debris: 0.3 } };
+  if (room?.type === "boss") return { density: 0.026, floorBias: "stain", weights: { scorch: 0.45, brokenStone: 0.35, debris: 0.2 } };
+  if (name.includes("collapsed") || room?.shape === "alcove") return { density: 0.075, floorBias: "rubble", weights: { debris: 0.42, brokenStone: 0.42, dust: 0.16 } };
+  if (name.includes("barracks") || name.includes("guard") || name.includes("armory")) return { density: 0.045, floorBias: "scratch", weights: { debris: 0.55, brokenStone: 0.25, dust: 0.2 } };
+  if (name.includes("treasury") || name.includes("feast")) return { density: 0.026, floorBias: "worn", weights: { coins: 0.45, dust: 0.35, debris: 0.2 } };
+  if (name.includes("chapel") || name.includes("shrine")) return { density: 0.035, floorBias: "worn", weights: { marking: 0.42, dust: 0.38, scorch: 0.2 } };
+  return { density: 0.025, floorBias: null, weights: { dust: 0.34, debris: 0.28, brokenStone: 0.2, scorch: 0.18 } };
+}
+
+function weightedVisualPick(weights, roll) {
+  let total = 0;
+  for (const value of Object.values(weights)) total += value;
+  let threshold = roll * total;
+  for (const [type, weight] of Object.entries(weights)) {
+    threshold -= weight;
+    if (threshold <= 0) return type;
+  }
+  return Object.keys(weights)[0] || "dust";
+}
+
+function createFloorDetail(x, y, room) {
+  const r = tileHash(x, y, 11);
+  if (r > 0.24) return null;
+
+  const theme = room ? visualThemeForRoom(room) : { floorBias: null };
+  let type = VISUAL_FLOOR_TYPES[Math.floor(tileHash(x, y, 12) * VISUAL_FLOOR_TYPES.length) % VISUAL_FLOOR_TYPES.length];
+  if (theme.floorBias && tileHash(x, y, 13) < 0.45) type = theme.floorBias;
+
+  return {
+    type,
+    rotation: Math.floor(tileHash(x, y, 14) * 4),
+    ox: Math.floor(tileHash(x, y, 15) * 12) - 6,
+    oy: Math.floor(tileHash(x, y, 16) * 12) - 6,
+    scale: 0.75 + tileHash(x, y, 17) * 0.45
+  };
+}
+
+function isVisualDecalBaseTile(x, y) {
+  return VISUAL_DECORATION_TILES.has(map[y]?.[x]);
+}
+
+function canPlaceVisualDecal(x, y) {
+  if (!isVisualDecalBaseTile(x, y)) return false;
+  return x !== Math.floor(player.x / TILE) || y !== Math.floor(player.y / TILE);
+}
+
+function buildDungeonVisuals() {
+  dungeonVisuals = {
+    floor: Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(null)),
+    decals: []
+  };
+
+  for (let y = 0; y < MAP_ROWS; y++) {
+    for (let x = 0; x < MAP_COLS; x++) {
+      if (!VISUAL_DECORATION_TILES.has(map[y]?.[x])) continue;
+      dungeonVisuals.floor[y][x] = createFloorDetail(x, y, roomForTile(x, y));
+    }
+  }
+
+  for (const room of rooms) {
+    const theme = visualThemeForRoom(room);
+    const tiles = roomTileList(room, 1).filter(t => canPlaceVisualDecal(t.x, t.y));
+    const target = Math.min(Math.ceil(tiles.length * theme.density), Math.max(1, Math.floor(tiles.length / 12)));
+    let placed = 0;
+    let guard = 0;
+
+    while (placed < target && guard < target * 18 + 20 && tiles.length > 0) {
+      guard++;
+      const index = Math.floor(Math.random() * tiles.length);
+      const tile = tiles.splice(index, 1)[0];
+      if (!canPlaceVisualDecal(tile.x, tile.y)) continue;
+      if (dungeonVisuals.decals.some(d => Math.abs(d.x - tile.x) <= 1 && Math.abs(d.y - tile.y) <= 1)) continue;
+
+      dungeonVisuals.decals.push({
+        x: tile.x,
+        y: tile.y,
+        type: weightedVisualPick(theme.weights, Math.random()),
+        rotation: Math.random() * Math.PI * 2,
+        scale: 0.7 + Math.random() * 0.55,
+        ox: Math.floor(Math.random() * 10) - 5,
+        oy: Math.floor(Math.random() * 10) - 5,
+        roomId: room.id
+      });
+      placed++;
+    }
+  }
+}
+
+function validateDungeonVisualsAreVisualOnly() {
+  if (!dungeonVisuals) return false;
+  const floorOk = dungeonVisuals.floor.length === MAP_ROWS && dungeonVisuals.floor.every(row => row.length === MAP_COLS);
+  const decalsOk = dungeonVisuals.decals.every(decal =>
+    VISUAL_DECAL_TYPES.includes(decal.type) &&
+    isVisualDecalBaseTile(decal.x, decal.y) &&
+    !["C", "E", "D", "L", "#"].includes(map[decal.y]?.[decal.x])
+  );
+  return floorOk && decalsOk;
 }
 
 function placeObjects(tile, count, excludedRooms = []) {

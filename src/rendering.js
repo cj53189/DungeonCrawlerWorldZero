@@ -315,6 +315,130 @@ function drawCombatVisuals() {
   }
 }
 
+
+const FLOORLIKE_VISUAL_TILES = new Set([".", "S", "C", "E"]);
+
+function drawFloorDetail(detail, px, py, isVisible) {
+  if (!detail) return;
+  const alpha = isVisible ? 1 : 0.42;
+  const cx = px + TILE / 2 + detail.ox;
+  const cy = py + TILE / 2 + detail.oy;
+  const s = detail.scale;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(detail.rotation * Math.PI / 2);
+  ctx.globalAlpha = alpha;
+  ctx.lineCap = "round";
+
+  if (detail.type === "crack") {
+    ctx.strokeStyle = "rgba(0,0,0,0.26)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-8 * s, -4 * s);
+    ctx.lineTo(-2 * s, -1 * s);
+    ctx.lineTo(2 * s, 5 * s);
+    ctx.lineTo(8 * s, 2 * s);
+    ctx.stroke();
+  } else if (detail.type === "scratch") {
+    ctx.strokeStyle = "rgba(210,210,190,0.09)";
+    ctx.lineWidth = 1;
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-8 * s, i * 4 * s);
+      ctx.lineTo(7 * s, (i * 4 - 3) * s);
+      ctx.stroke();
+    }
+  } else if (detail.type === "rubble") {
+    ctx.fillStyle = "rgba(120,115,100,0.18)";
+    ctx.fillRect(-7 * s, -4 * s, 5 * s, 4 * s);
+    ctx.fillRect(1 * s, -2 * s, 6 * s, 5 * s);
+    ctx.fillRect(-2 * s, 4 * s, 4 * s, 3 * s);
+  } else if (detail.type === "stain") {
+    ctx.fillStyle = "rgba(35,22,18,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 9 * s, 5 * s, 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (detail.type === "worn") {
+    ctx.strokeStyle = "rgba(230,220,190,0.07)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-9 * s, -9 * s, 18 * s, 18 * s);
+  }
+
+  ctx.restore();
+}
+
+function drawWallFloorShadow(x, y, px, py, isVisible) {
+  if (!FLOORLIKE_VISUAL_TILES.has(map[y]?.[x])) return;
+  const alpha = isVisible ? 0.17 : 0.08;
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  if (map[y - 1]?.[x] === "#") ctx.fillRect(px, py, TILE, 5);
+  if (map[y + 1]?.[x] === "#") ctx.fillRect(px, py + TILE - 5, TILE, 5);
+  if (map[y]?.[x - 1] === "#") ctx.fillRect(px, py, 5, TILE);
+  if (map[y]?.[x + 1] === "#") ctx.fillRect(px + TILE - 5, py, 5, TILE);
+}
+
+function drawVisualDecal(decal, isVisible) {
+  const px = decal.x * TILE + TILE / 2 + decal.ox;
+  const py = decal.y * TILE + TILE / 2 + decal.oy;
+  const s = decal.scale;
+
+  ctx.save();
+  ctx.translate(px, py);
+  ctx.rotate(decal.rotation);
+  ctx.globalAlpha = isVisible ? 1 : 0.38;
+
+  if (decal.type === "debris") {
+    ctx.fillStyle = "rgba(120,110,92,0.42)";
+    for (let i = 0; i < 5; i++) ctx.fillRect((i * 5 - 10) * s, ((i % 2) * 6 - 4) * s, 3 * s, 3 * s);
+  } else if (decal.type === "brokenStone") {
+    ctx.fillStyle = "rgba(145,140,122,0.36)";
+    ctx.fillRect(-8 * s, -5 * s, 8 * s, 7 * s);
+    ctx.fillRect(2 * s, -2 * s, 7 * s, 6 * s);
+    ctx.strokeStyle = "rgba(0,0,0,0.16)";
+    ctx.strokeRect(-8 * s, -5 * s, 8 * s, 7 * s);
+  } else if (decal.type === "dust") {
+    ctx.fillStyle = "rgba(190,180,150,0.13)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 12 * s, 7 * s, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (decal.type === "scorch") {
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 11 * s, 8 * s, 0.25, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (decal.type === "coins") {
+    ctx.fillStyle = "rgba(224,177,74,0.72)";
+    for (let i = 0; i < 4; i++) {
+      ctx.beginPath();
+      ctx.arc((i * 5 - 7) * s, ((i % 2) * 5 - 2) * s, 2.4 * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (decal.type === "marking") {
+    ctx.strokeStyle = "rgba(190,185,150,0.18)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-10 * s, 0);
+    ctx.lineTo(10 * s, 0);
+    ctx.moveTo(0, -10 * s);
+    ctx.lineTo(0, 10 * s);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawEnvironmentalDecals(camX, camY) {
+  if (!dungeonVisuals?.decals) return;
+  for (const decal of dungeonVisuals.decals) {
+    const px = decal.x * TILE;
+    const py = decal.y * TILE;
+    if (px < camX - TILE || px > camX + canvas.width + TILE || py < camY - TILE || py > camY + canvas.height + TILE) continue;
+    if (!seen[decal.y]?.[decal.x]) continue;
+    drawVisualDecal(decal, visible[decal.y]?.[decal.x]);
+  }
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const camX = player.x - canvas.width / 2;
@@ -347,6 +471,9 @@ function draw() {
         ctx.fillRect(px, py, TILE, TILE);
       }
 
+      drawWallFloorShadow(x, y, px, py, isVisible);
+      drawFloorDetail(dungeonVisuals?.floor?.[y]?.[x], px, py, isVisible);
+
       if (t === "D") { ctx.fillStyle = isVisible ? "#7b4a22" : "#3f2a18"; ctx.fillRect(px + 5, py + 5, TILE - 10, TILE - 10); }
       if (t === "L") {
         ctx.fillStyle = isVisible ? "#4b1111" : "#241010";
@@ -369,6 +496,7 @@ function draw() {
     }
   }
 
+  drawEnvironmentalDecals(camX, camY);
   drawEngravedRoomNames(camX, camY);
 
   for (const corpse of corpses) {
@@ -401,6 +529,11 @@ for (const enemy of enemies) {
   }
 
   drawCombatVisuals();
+
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath();
+  ctx.ellipse(player.x, player.y + player.r * 0.72, player.r * 1.05, Math.max(4, player.r * 0.42), 0, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.fillStyle = player.safe ? "#7be07b" : "#f1f1f1";
   ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
