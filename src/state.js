@@ -10,6 +10,8 @@ const MEMORY_RADIUS = 12;
 
 let map, seen, visible, rooms, enemies, corpses, openedChests, achievements, achievementHistory, activePopups;
 let dungeonVisuals = { floor: [], decals: [] };
+let environmentalLights = [];
+let lightingEnabled = true;
 let projectiles = [], attackTelegraphs = [];
 let bossRoom=null,bossEnemy=null,currentRoomName="Safe Room";
 let currentFloor = 0, stairwellFound = false, stairwellX = null, stairwellY = null, finalDescentAnnounced = false;

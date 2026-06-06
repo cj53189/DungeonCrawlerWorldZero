@@ -368,6 +368,16 @@ function drawFloorDetail(detail, px, py, isVisible) {
   ctx.restore();
 }
 
+function drawWallAmbientShadow(px, py, isVisible) {
+  ctx.fillStyle = isVisible ? "rgba(0,0,0,0.13)" : "rgba(0,0,0,0.08)";
+  ctx.fillRect(px, py + TILE * 0.62, TILE, TILE * 0.38);
+  ctx.strokeStyle = isVisible ? "rgba(0,0,0,0.20)" : "rgba(0,0,0,0.14)";
+  ctx.beginPath();
+  ctx.moveTo(px, py + TILE - 0.5);
+  ctx.lineTo(px + TILE, py + TILE - 0.5);
+  ctx.stroke();
+}
+
 function drawWallFloorShadow(x, y, px, py, isVisible) {
   if (!FLOORLIKE_VISUAL_TILES.has(map[y]?.[x])) return;
   const alpha = isVisible ? 0.17 : 0.08;
@@ -439,6 +449,90 @@ function drawEnvironmentalDecals(camX, camY) {
   }
 }
 
+
+function addVisibleLightingClip(startX, endX, startY, endY) {
+  ctx.beginPath();
+  for (let y = startY; y <= endY; y++) {
+    for (let x = startX; x <= endX; x++) {
+      if (visible[y]?.[x]) ctx.rect(x * TILE, y * TILE, TILE, TILE);
+    }
+  }
+  ctx.clip();
+}
+
+function drawRadialLight(light) {
+  const radius = light.radius || 96;
+  const intensity = Math.max(0, Math.min(0.75, light.intensity || 0.25));
+  const type = light.type || "lantern";
+  const colors = ENVIRONMENTAL_LIGHT_COLORS?.[type] || ENVIRONMENTAL_LIGHT_COLORS?.lantern;
+  const gradient = ctx.createRadialGradient(light.x, light.y, 0, light.x, light.y, radius);
+  gradient.addColorStop(0, `${colors.inner}${intensity})`);
+  gradient.addColorStop(0.34, `${colors.inner}${intensity * 0.42})`);
+  gradient.addColorStop(0.72, `${colors.outer}${intensity * 0.16})`);
+  gradient.addColorStop(1, `${colors.outer}0)`);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(light.x - radius, light.y - radius, radius * 2, radius * 2);
+}
+
+function drawAtmosphericLighting(startX, endX, startY, endY) {
+  if (!lightingEnabled) return;
+
+  const playerFlicker = 0.94 + Math.sin(frameCount * 0.19) * 0.045 + Math.sin(frameCount * 0.47) * 0.018;
+  const lights = [{
+    type: "lantern",
+    x: player.x,
+    y: player.y,
+    radius: isMobileLike() ? 142 : 164,
+    intensity: 0.36 * playerFlicker
+  }];
+
+  for (const light of environmentalLights) {
+    if (!visible[light.tileY]?.[light.tileX]) continue;
+    const flicker = light.type === "crystal"
+      ? 0.96 + Math.sin(frameCount * 0.055 + light.tileX) * 0.04
+      : 0.90 + Math.sin(frameCount * 0.17 + light.tileY) * 0.07 + Math.sin(frameCount * 0.41 + light.tileX) * 0.03;
+    lights.push({ ...light, intensity: light.intensity * flicker });
+  }
+
+  ctx.save();
+  addVisibleLightingClip(startX, endX, startY, endY);
+  ctx.globalCompositeOperation = "lighter";
+  for (const light of lights) drawRadialLight(light);
+  ctx.restore();
+}
+
+function drawEnvironmentalLightFixtures() {
+  if (!lightingEnabled) return;
+  for (const light of environmentalLights) {
+    if (!visible[light.tileY]?.[light.tileX]) continue;
+    ctx.save();
+    ctx.translate(light.x, light.y);
+    if (light.type === "crystal") {
+      ctx.fillStyle = "rgba(115,210,255,0.88)";
+      ctx.beginPath();
+      ctx.moveTo(0, -8);
+      ctx.lineTo(6, 0);
+      ctx.lineTo(0, 9);
+      ctx.lineTo(-6, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(220,245,255,0.7)";
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = light.type === "torch" ? "rgba(255,145,44,0.92)" : "rgba(255,220,130,0.86)";
+      ctx.beginPath();
+      ctx.arc(0, -2, light.type === "torch" ? 4.2 : 5.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(90,58,28,0.85)";
+      ctx.beginPath();
+      ctx.moveTo(0, 2);
+      ctx.lineTo(0, 10);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const camX = player.x - canvas.width / 2;
@@ -463,6 +557,7 @@ function draw() {
         ctx.fillRect(px, py, TILE, TILE);
         ctx.strokeStyle = isVisible ? "#444" : "#262626";
         ctx.strokeRect(px, py, TILE, TILE);
+        drawWallAmbientShadow(px, py, isVisible);
       } else if (t === "S") {
         ctx.fillStyle = isVisible ? "#203522" : "#172418";
         ctx.fillRect(px, py, TILE, TILE);
@@ -497,6 +592,8 @@ function draw() {
   }
 
   drawEnvironmentalDecals(camX, camY);
+  drawAtmosphericLighting(startX, endX, startY, endY);
+  drawEnvironmentalLightFixtures();
   drawEngravedRoomNames(camX, camY);
 
   for (const corpse of corpses) {

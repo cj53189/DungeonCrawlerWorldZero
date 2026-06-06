@@ -57,6 +57,7 @@ function resetState(options = {}) {
   enemies = [];
   corpses = [];
   dungeonVisuals = { floor: [], decals: [] };
+  environmentalLights = [];
   projectiles = [];
   attackTelegraphs = [];
   openedChests = new Set();
@@ -115,6 +116,7 @@ function resetState(options = {}) {
 
   updateVisibility(true);
   updateHUD();
+  updateLightingToggleLabel();
   renderLog();
 
   achievement(`NEW FLOOR: ${getFloorLabel()}`, `This floor contains ${rooms.length} rooms. The dungeon has provided a generous supply of places to make mistakes.`, `startFloor${currentFloor}`);

@@ -393,3 +393,16 @@ function restartGame() { pendingFloorAdvance = false; resetState(); }
 
 
 
+
+function updateLightingToggleLabel() {
+  const button = document.getElementById("lightingToggle");
+  if (!button) return;
+  button.textContent = lightingEnabled ? "Lighting ON" : "Lighting OFF";
+  button.setAttribute("aria-pressed", lightingEnabled ? "true" : "false");
+  button.classList.toggle("off", !lightingEnabled);
+}
+
+function toggleLighting() {
+  lightingEnabled = !lightingEnabled;
+  updateLightingToggleLabel();
+}
