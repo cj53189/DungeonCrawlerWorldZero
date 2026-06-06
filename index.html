@@ -58,17 +58,17 @@
   <div id="announcer"></div>
   <div id="prompt"></div>
 
-  <div id="touchControls" aria-hidden="true">
+  <div id="touchControls" aria-label="Touch controls">
     <div id="stickBase"><div id="stickKnob"></div></div>
-    <div id="btnAttack" class="touchButton">ATK</div>
-    <div id="btnInteract" class="touchButton">E</div>
-    <div id="btnLog" class="touchButton">LOG</div>
-    <div id="btnRecap" class="touchButton">RECAP</div>
-    <div id="btnNew" class="touchButton">NEW</div>
-    <div id="btnInv" class="touchButton">INV</div>
-    <div id="btnWeapon" class="touchButton">WPN</div>
-    <div id="btnLight" class="touchButton disabled" aria-disabled="true">LITE</div>
-    <div id="controllerHint">Controller: left stick/D-pad move · right stick aim · A interact · X/RB/RT attack · LB/LT weapon</div>
+    <button id="btnAttack" class="touchButton" type="button" aria-label="Attack">ATK</button>
+    <button id="btnInteract" class="touchButton" type="button" aria-label="Interact">E</button>
+    <button id="btnLog" class="touchButton" type="button" aria-label="Open commentary log">LOG</button>
+    <button id="btnRecap" class="touchButton" type="button" aria-label="Open safe room recap">RECAP</button>
+    <button id="btnNew" class="touchButton" type="button" aria-label="Start new run">NEW</button>
+    <button id="btnInv" class="touchButton" type="button" aria-label="Open inventory">INV</button>
+    <button id="btnWeapon" class="touchButton" type="button" aria-label="Cycle weapon">WPN</button>
+    <button id="btnLight" class="touchButton disabled" type="button" aria-disabled="true" aria-label="Lighting controls">LITE</button>
+    <div id="controllerHint">Keys: WASD/Arrows move · Space attack · E interact · I inventory · L log · R recap · Q/Z weapon</div>
   </div>
 
 
@@ -99,37 +99,19 @@
     <div class="box">
       <h1 id="centerTitle"></h1>
       <p id="centerText"></p>
-      <button id="centerButton" onclick="restartGame()">Generate New Floor</button>
+      <button id="centerButton" type="button">Generate New Floor</button>
     </div>
   </div>
 
-<script>
-(() => {
-  const scripts = [
-    "./src/state.js",
-    "./src/input.js",
-    "./src/run-state.js",
-    "./src/entities.js",
-    "./src/dungeon.js",
-    "./src/simulation.js",
-    "./src/inventory.js",
-    "./src/ui.js",
-    "./src/rendering.js",
-    "./src/main.js"
-  ];
-
-  const gameScript = document.createElement("script");
-  gameScript.textContent = scripts.map(src => {
-    const request = new XMLHttpRequest();
-    request.open("GET", src, false);
-    request.send(null);
-    if (request.status && request.status >= 400) {
-      throw new Error(`Failed to load ${src}`);
-    }
-    return request.responseText;
-  }).join("\n");
-  document.body.appendChild(gameScript);
-})();
-</script>
+<script defer src="./src/state.js"></script>
+<script defer src="./src/input.js"></script>
+<script defer src="./src/run-state.js"></script>
+<script defer src="./src/entities.js"></script>
+<script defer src="./src/dungeon.js"></script>
+<script defer src="./src/simulation.js"></script>
+<script defer src="./src/inventory.js"></script>
+<script defer src="./src/ui.js"></script>
+<script defer src="./src/rendering.js"></script>
+<script defer src="./src/main.js"></script>
 </body>
 </html>

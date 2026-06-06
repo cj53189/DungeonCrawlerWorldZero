@@ -8,169 +8,6 @@ function isMobileLike() {
   return window.matchMedia("(hover: none) and (pointer: coarse)").matches || window.innerWidth <= 900;
 }
 
-function setupTouchControls() {
-  const base = document.getElementById("stickBase");
-  const knob = document.getElementById("stickKnob");
-  const btnAttack = document.getElementById("btnAttack");
-  const btnInteract = document.getElementById("btnInteract");
-  const btnLog = document.getElementById("btnLog");
-  const btnRecap = document.getElementById("btnRecap");
-  const btnNew = document.getElementById("btnNew");
-  const btnInv = document.getElementById("btnInv");
-  const btnWeapon = document.getElementById("btnWeapon");
-  const btnLight = document.getElementById("btnLight");
-
-  const prevent = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-
-  function resetStick() {
-    touchState.moveX = 0;
-    touchState.moveY = 0;
-    touchState.activeTouchId = null;
-    knob.style.left = "39px";
-    knob.style.top = "39px";
-  }
-
-  function updateStick(clientX, clientY) {
-    const rect = base.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dx = clientX - cx;
-    const dy = clientY - cy;
-    const max = rect.width / 2 - 25;
-    const dist = Math.hypot(dx, dy);
-    const clamped = Math.min(max, dist);
-    const angle = Math.atan2(dy, dx);
-
-    const knobX = Math.cos(angle) * clamped;
-    const knobY = Math.sin(angle) * clamped;
-
-    knob.style.left = `${39 + knobX}px`;
-    knob.style.top = `${39 + knobY}px`;
-
-    touchState.moveX = Math.abs(dx / max) > 0.12 ? Math.max(-1, Math.min(1, dx / max)) : 0;
-    touchState.moveY = Math.abs(dy / max) > 0.12 ? Math.max(-1, Math.min(1, dy / max)) : 0;
-  }
-
-  base.addEventListener("touchstart", e => {
-    prevent(e);
-    const t = e.changedTouches[0];
-    touchState.activeTouchId = t.identifier;
-    updateStick(t.clientX, t.clientY);
-  }, { passive: false });
-
-  base.addEventListener("touchmove", e => {
-    prevent(e);
-    for (const t of e.changedTouches) {
-      if (t.identifier === touchState.activeTouchId) {
-        updateStick(t.clientX, t.clientY);
-        break;
-      }
-    }
-  }, { passive: false });
-
-  base.addEventListener("touchend", e => {
-    prevent(e);
-    for (const t of e.changedTouches) {
-      if (t.identifier === touchState.activeTouchId) {
-        resetStick();
-        break;
-      }
-    }
-  }, { passive: false });
-
-  base.addEventListener("touchcancel", e => {
-    prevent(e);
-    resetStick();
-  }, { passive: false });
-
-  btnAttack.addEventListener("touchstart", e => { prevent(e); attack(); }, { passive: false });
-  btnInteract.addEventListener("touchstart", e => { prevent(e); interact(); }, { passive: false });
-  btnLog.addEventListener("touchstart", e => { prevent(e); toggleLog(); }, { passive: false });
-  btnRecap.addEventListener("touchstart", e => { prevent(e); toggleSafeRoomRecap(); }, { passive: false });
-  btnNew.addEventListener("touchstart", e => { prevent(e); restartGame(); }, { passive: false });
-  if (btnWeapon) btnWeapon.addEventListener("touchstart", e => { prevent(e); cyclePlayerWeapon(1); }, { passive: false });
-  if (btnLight) btnLight.addEventListener("touchstart", e => { prevent(e); toggleLighting(); }, { passive: false });
-
-  btnAttack.addEventListener("click", e => { prevent(e); attack(); });
-  btnInteract.addEventListener("click", e => { prevent(e); interact(); });
-  btnLog.addEventListener("click", e => { prevent(e); toggleLog(); });
-  btnRecap.addEventListener("click", e => { prevent(e); toggleSafeRoomRecap(); });
-  btnNew.addEventListener("click", e => { prevent(e); restartGame(); });
-  if (btnWeapon) btnWeapon.addEventListener("click", e => { prevent(e); cyclePlayerWeapon(1); });
-  if (btnLight) btnLight.addEventListener("click", e => { prevent(e); toggleLighting(); });
-
-  document.addEventListener("gesturestart", e => e.preventDefault());
-  document.addEventListener("touchmove", e => {
-    const allowPanelScroll = e.target.closest && e.target.closest("#logPanel, #safeRoomRecap, #inventoryPanel, #inventoryPanel");
-    if (isMobileLike() && !allowPanelScroll) e.preventDefault();
-  }, { passive: false });
-}
-
-
-function setupDirectPanelButtonFallbacks() {
-  const logBtn = document.getElementById("btnLog");
-  const recapBtn = document.getElementById("btnRecap");
-
-  const bindDirect = (el, fn) => {
-    if (!el) return;
-
-    let last = 0;
-    const fire = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      const now = performance.now();
-      if (now - last < 180) return;
-      last = now;
-      fn();
-    };
-
-    el.addEventListener("pointerdown", fire, { passive: false, capture: true });
-    el.addEventListener("touchstart", fire, { passive: false, capture: true });
-    el.addEventListener("click", fire, { capture: true });
-  };
-
-  bindDirect(logBtn, toggleLogPanelMobile);
-  bindDirect(recapBtn, toggleRecapPanelMobile);
-}
-
-
-
-function setupInventoryButtonFallback() {
-  const invBtn = document.getElementById("btnInv");
-  if (!invBtn || invBtn.dataset.invFallbackBound === "true") return;
-  invBtn.dataset.invFallbackBound = "true";
-
-  let last = 0;
-  const fire = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-
-    const now = performance.now();
-    if (now - last < 180) return;
-    last = now;
-
-    toggleInventoryPanel();
-  };
-
-  invBtn.addEventListener("pointerdown", fire, { passive: false, capture: true });
-  invBtn.addEventListener("touchstart", fire, { passive: false, capture: true });
-  invBtn.addEventListener("click", fire, { capture: true });
-}
-
-
-setupTouchControls();
-setupInventoryButtonFallback();
-
-
-function isMobileLike() {
-  return window.matchMedia("(hover: none) and (pointer: coarse)").matches || window.innerWidth <= 900;
-}
-
 function updateInputVisibility() {
   const shouldShowTouch = isMobileLike() && !gamepadState.connected;
   document.body.classList.toggle("showTouchControls", shouldShowTouch);
@@ -318,10 +155,40 @@ function setupDirectPanelButtonFallbacks() {
 }
 
 
-setupTouchControls();
-setupPanelCloseButtons();
-setupDirectPanelButtonFallbacks();
-updateInputVisibility();
+function setupInventoryButtonFallback() {
+  const invBtn = document.getElementById("btnInv");
+  if (!invBtn || invBtn.dataset.invFallbackBound === "true") return;
+  invBtn.dataset.invFallbackBound = "true";
+
+  let last = 0;
+  const fire = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+    const now = performance.now();
+    if (now - last < 180) return;
+    last = now;
+
+    toggleInventoryPanel();
+  };
+
+  invBtn.addEventListener("pointerdown", fire, { passive: false, capture: true });
+  invBtn.addEventListener("touchstart", fire, { passive: false, capture: true });
+  invBtn.addEventListener("click", fire, { capture: true });
+}
+
+
+function initInputControls() {
+  if (document.body.dataset.inputControlsInitialized === "true") return;
+  document.body.dataset.inputControlsInitialized = "true";
+
+  setupTouchControls();
+  setupPanelCloseButtons();
+  setupDirectPanelButtonFallbacks();
+  setupInventoryButtonFallback();
+  updateInputVisibility();
+}
 
 window.addEventListener("gamepadconnected", e => {
   gamepadState.connected = true;

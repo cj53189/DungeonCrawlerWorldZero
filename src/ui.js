@@ -61,8 +61,16 @@ function announcer(text) { achievement("DUNGEON AI COMMENTARY", text); }
 
 function showPopup(title, body) {
   const wrapper = document.createElement("div");
+  const titleEl = document.createElement("div");
+  const bodyEl = document.createElement("div");
+
   wrapper.className = "popup";
-  wrapper.innerHTML = `<div class="title">${title}</div><div class="body">${body}</div>`;
+  titleEl.className = "title";
+  bodyEl.className = "body";
+  titleEl.textContent = title;
+  bodyEl.textContent = body;
+  wrapper.append(titleEl, bodyEl);
+
   document.getElementById("announcer").prepend(wrapper);
   activePopups.unshift(wrapper);
   while (activePopups.length > MAX_ACTIVE_POPUPS) {
@@ -81,9 +89,21 @@ function addToLog(title, body) {
   renderLog();
 }
 function renderLog() {
-  document.getElementById("logEntries").innerHTML = achievementHistory.map(entry => `
-    <div class="logEntry"><div class="logTitle">${entry.title}</div><div>${entry.body}</div></div>
-  `).join("");
+  const entries = document.getElementById("logEntries");
+  entries.textContent = "";
+
+  for (const entry of achievementHistory) {
+    const wrapper = document.createElement("div");
+    const title = document.createElement("div");
+    const body = document.createElement("div");
+
+    wrapper.className = "logEntry";
+    title.className = "logTitle";
+    title.textContent = entry.title;
+    body.textContent = entry.body;
+    wrapper.append(title, body);
+    entries.appendChild(wrapper);
+  }
 }
 function toggleLog() {
   const panel = document.getElementById("logPanel");
