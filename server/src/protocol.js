@@ -3,7 +3,8 @@ const CLIENT_MESSAGES = Object.freeze({
   CREATE_LOBBY: "create_lobby",
   JOIN_LOBBY: "join_lobby",
   QUICK_MATCH: "quick_match",
-  LEAVE_LOBBY: "leave_lobby"
+  LEAVE_LOBBY: "leave_lobby",
+  CRAWLER_STATE: "crawler_state"
 });
 
 const SERVER_MESSAGES = Object.freeze({
@@ -14,6 +15,7 @@ const SERVER_MESSAGES = Object.freeze({
   MATCHMAKING_UPDATE: "matchmaking_update",
   STAGING_COMPLETE: "staging_complete",
   PLAYER_LEFT: "player_left",
+  CRAWLER_SNAPSHOT: "crawler_snapshot",
   ERROR: "error"
 });
 

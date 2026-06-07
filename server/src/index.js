@@ -42,6 +42,9 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.LEAVE_LOBBY:
           rooms.leaveLobby(playerId);
           break;
+        case CLIENT_MESSAGES.CRAWLER_STATE:
+          rooms.updateCrawlerState(playerId, message.state || message);
+          break;
         default:
           safeSend(ws, SERVER_MESSAGES.ERROR, { message: `Unsupported message type: ${message.type}` });
       }

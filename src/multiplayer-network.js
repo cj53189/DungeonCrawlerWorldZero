@@ -8,7 +8,8 @@ const multiplayerNetwork = {
   playerId: null,
   lastError: null,
   reconnectTimer: null,
-  countdownTimer: null
+  countdownTimer: null,
+  lastCrawlerStateSentAt: 0
 };
 
 function isMultiplayerNetworkReady() {
@@ -162,7 +163,11 @@ function handleMultiplayerServerMessage(message) {
       if (typeof floorCollapseDeath === "function" && !gameLost) floorCollapseDeath();
       break;
     case "player_left":
+      multiplayer.remotePlayers.delete(message.playerId);
       if (typeof announcer === "function") announcer(`${message.name || "A crawler"} left Floor 0. The collapse timer will not increase.`);
+      break;
+    case "crawler_snapshot":
+      applyServerCrawlerSnapshot(message);
       break;
     case "error":
       handleMultiplayerNetworkError(message.message || "Floor 0 collapse server request failed.");
@@ -170,6 +175,68 @@ function handleMultiplayerServerMessage(message) {
   }
 
   if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+}
+
+function captureLocalCrawlerNetworkState() {
+  return {
+    x: player.x,
+    y: player.y,
+    aimX: Number.isFinite(player.aimX) ? player.aimX : undefined,
+    aimY: Number.isFinite(player.aimY) ? player.aimY : undefined,
+    hp: player.hp,
+    maxHp: player.maxHp,
+    currentFloor,
+    status: gameLost || player.hp <= 0 ? "downed" : (gameMode === GAME_MODES.MULTIPLAYER_STASIS ? "stasis" : "active")
+  };
+}
+
+function maybeSendLocalCrawlerState(now = Date.now()) {
+  if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0) return false;
+  if (!isMultiplayerNetworkReady()) return false;
+  if (now - multiplayerNetwork.lastCrawlerStateSentAt < 100) return false;
+
+  multiplayerNetwork.lastCrawlerStateSentAt = now;
+  return sendMultiplayerMessage("crawler_state", { state: captureLocalCrawlerNetworkState() });
+}
+
+function applyServerCrawlerSnapshot(snapshot) {
+  if (!multiplayer.enabled || !multiplayer.usingServer) return;
+  if (snapshot.lobbyCode && multiplayer.roomId && snapshot.lobbyCode !== multiplayer.roomId) return;
+  if (snapshot.currentFloor !== 0 || currentFloor !== 0) {
+    multiplayer.remotePlayers = new Map();
+    return;
+  }
+
+  const rosterById = new Map(multiplayer.partyMembers.map(member => [member.id, member]));
+  const nextRemotePlayers = new Map();
+
+  for (const crawler of snapshot.players || []) {
+    if (!crawler || crawler.id === multiplayer.playerId) continue;
+    if (!rosterById.has(crawler.id)) continue;
+
+    const x = Number(crawler.x);
+    const y = Number(crawler.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+    const member = rosterById.get(crawler.id);
+    nextRemotePlayers.set(crawler.id, {
+      id: crawler.id,
+      name: member?.name || crawler.name || "Crawler",
+      x,
+      y,
+      r: player.r,
+      aimX: Number.isFinite(Number(crawler.aimX)) ? Number(crawler.aimX) : undefined,
+      aimY: Number.isFinite(Number(crawler.aimY)) ? Number(crawler.aimY) : undefined,
+      hp: Math.max(0, Number(crawler.hp) || 0),
+      maxHp: Math.max(1, Number(crawler.maxHp) || player.maxHp),
+      currentFloor: 0,
+      status: crawler.status || "active",
+      color: member?.color || crawler.color || "#75c7ff",
+      updatedAt: crawler.updatedAt || Date.now()
+    });
+  }
+
+  multiplayer.remotePlayers = nextRemotePlayers;
 }
 
 function applyServerLobbyUpdate(update) {
@@ -196,6 +263,10 @@ function applyServerLobbyUpdate(update) {
   setGameMode(update.mode === "quick_match" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
   ensureServerFloor0Dungeon();
   syncFloor0TimerFromServer();
+  if (currentFloor === 0 && multiplayer.remotePlayers?.size) {
+    const rosterIds = new Set(multiplayer.partyMembers.map(member => member.id));
+    multiplayer.remotePlayers = new Map(Array.from(multiplayer.remotePlayers).filter(([id]) => rosterIds.has(id)));
+  }
 }
 
 function normalizeFloor0Metadata(floor0, fallbackCollapseAt) {
