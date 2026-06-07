@@ -703,7 +703,7 @@ function getMinimapScale(){
 }
 
 const MOBILE_MINIMAP_SIZE = 120;
-const MOBILE_MINIMAP_BORDER = 8;
+const MOBILE_MINIMAP_BORDER = 4;
 const MOBILE_MINIMAP_TILE_SCALE = 4.8;
 
 function isPointInsideMobileMinimap(px, py, centerX, centerY, radius){
@@ -716,6 +716,61 @@ function drawMobileMinimapMarker(x, y, radius, color, centerX, centerY, clipRadi
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function safeRoomWaypoint(){
+  const safeRoom = rooms?.find(room => room.type === "safe");
+  if(!safeRoom) return null;
+  const discovered = safeRoom.seen || seen?.[safeRoom.cy]?.[safeRoom.cx];
+  if(!discovered) return null;
+  return { x: safeRoom.cx + 0.5, y: safeRoom.cy + 0.5 };
+}
+
+function drawMobileWaypointMarker(targetX, targetY, color, strokeColor, centerX, centerY, innerRadius, label){
+  const playerTileX = player.x / TILE;
+  const playerTileY = player.y / TILE;
+  const dx = (targetX - playerTileX) * MOBILE_MINIMAP_TILE_SCALE;
+  const dy = (targetY - playerTileY) * MOBILE_MINIMAP_TILE_SCALE;
+  const dist = Math.hypot(dx, dy);
+  if(dist < 0.001) return;
+
+  const markerRadius = innerRadius - 7;
+  const inside = dist <= markerRadius;
+  const markerX = inside ? centerX + dx : centerX + (dx / dist) * markerRadius;
+  const markerY = inside ? centerY + dy : centerY + (dy / dist) * markerRadius;
+  const pulse = inside ? 4 + Math.sin(frameCount * 0.08) : 5 + Math.sin(frameCount * 0.1) * 0.7;
+
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = inside ? 2 : 2.5;
+
+  if(inside){
+    ctx.beginPath();
+    ctx.arc(markerX, markerY, pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    const angle = Math.atan2(dy, dx);
+    ctx.translate(markerX, markerY);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(7, 0);
+    ctx.lineTo(-4, -6);
+    ctx.lineTo(-2, 0);
+    ctx.lineTo(-4, 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  ctx.font = "8px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
+  ctx.fillText(label, markerX, markerY + (inside ? 0.2 : 0));
+  ctx.restore();
 }
 
 function rebuildMinimapCache(scale){
@@ -872,11 +927,13 @@ function drawMobileMinimap(){
     drawMobileMinimapMarker(px, py, corpse.boss ? 3 : 2.2, corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)", centerX, centerY, innerRadius);
   }
 
+  const safeWaypoint = safeRoomWaypoint();
+  if(safeWaypoint){
+    drawMobileWaypointMarker(safeWaypoint.x, safeWaypoint.y, "rgba(91,235,126,0.96)", "rgba(205,255,214,0.98)", centerX, centerY, innerRadius, "S");
+  }
+
   if(stairwellFound && stairwellX !== null && stairwellY !== null){
-    const sx = centerX + ((stairwellX + 0.5) - playerTileX) * scale;
-    const sy = centerY + ((stairwellY + 0.5) - playerTileY) * scale;
-    const pulse = 4 + Math.sin(frameCount * 0.08);
-    drawMobileMinimapMarker(sx, sy, pulse, "rgba(80,160,255,0.95)", centerX, centerY, innerRadius);
+    drawMobileWaypointMarker(stairwellX + 0.5, stairwellY + 0.5, "rgba(80,160,255,0.96)", "rgba(190,215,255,1)", centerX, centerY, innerRadius, "⇩");
   }
 
   if(bossEnemy && bossEnemy.hp > 0){

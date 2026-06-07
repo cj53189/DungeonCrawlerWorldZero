@@ -516,15 +516,39 @@
     #btnInv { right:204px; top:74px; width:52px; height:52px; font-size:11px; }
     #btnWeapon { right:34px; bottom:124px; width:58px; height:58px; font-size:11px; background:rgba(145,205,255,0.24); border-color:rgba(145,205,255,0.48); }
     @media (hover:none) and (pointer:coarse), (max-width:900px) {
-      #inventoryPanel, #lootWindow { left:8px; right:8px; bottom:8px; transform:none; width:auto; max-width:none; max-height:62vh; font-size:10px; padding:10px; }
+      #inventoryPanel {
+        left: 8px;
+        right: auto;
+        bottom: 8px;
+        transform: none;
+        width: calc(33vw - 12px);
+        max-width: 260px;
+        max-height: 54vh;
+        font-size: 9px;
+        padding: 8px;
+        border-width: 1px;
+        border-radius: 10px;
+      }
+
+      #lootWindow { left:8px; right:8px; bottom:8px; transform:none; width:auto; max-width:none; max-height:62vh; font-size:10px; padding:10px; }
       #inventoryPanel h3, #lootWindow h3 { font-size:11px; }
-      .inventoryHeader { flex-direction:column; gap:4px; padding:8px; }
-      .inventoryPower { text-align:left; }
-      .weaponGrid { grid-template-columns:repeat(2, minmax(0,1fr)); gap:6px; }
-      .equipGrid { grid-template-columns:repeat(3, minmax(0,1fr)); gap:6px; }
-      .inventoryGrid { grid-template-columns:repeat(2, minmax(0,1fr)); gap:7px; }
-      .equipSlot,.invItem { min-height:78px; padding:7px; }
-      .itemMeta,.equipMeta,#inventoryHelp,.itemBtn { font-size:9px; }
+      #inventoryPanel h3 { margin-bottom:6px; letter-spacing:0.08em; }
+      #inventoryPanel .panelClose { width:20px; height:20px; font-size:14px; line-height:16px; }
+      #inventoryPanel .inventoryHeader { flex-direction:column; gap:3px; padding:6px; margin-bottom:7px; border-radius:8px; }
+      #inventoryPanel .inventoryTitle { font-size:10px; }
+      #inventoryPanel .inventorySubTitle { display:none; }
+      #inventoryPanel .inventoryPower { text-align:left; font-size:8px; }
+      #inventoryPanel .weaponGrid { grid-template-columns:1fr; gap:5px; margin-bottom:7px; }
+      #inventoryPanel .weaponCell { min-height:38px; padding:5px 6px; border-radius:8px; }
+      #inventoryPanel .weaponCell small { font-size:8px; }
+      #inventoryPanel .equipGrid { grid-template-columns:1fr; gap:5px; margin-bottom:8px; padding-bottom:8px; }
+      #inventoryPanel .inventoryGrid { grid-template-columns:1fr; gap:6px; }
+      #inventoryPanel .equipSlot,#inventoryPanel .invItem { min-height:58px; padding:6px; border-radius:8px; }
+      #inventoryPanel .itemIcon { width:24px; height:24px; margin-bottom:4px; font-size:15px; border-radius:7px; }
+      #inventoryPanel .itemActions { gap:4px; margin-top:5px; }
+      #inventoryPanel .itemMeta,#inventoryPanel .equipMeta,#inventoryHelp,#inventoryPanel .itemBtn { font-size:8px; }
+      #inventoryPanel .itemBtn { padding:4px 6px; }
+      #inventoryHelp { margin-top:7px; }
     }
 
   
