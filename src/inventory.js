@@ -117,8 +117,8 @@ function updateInventoryUI(){
  const sorted=[...player.inventory].sort((a,b)=>(rarityPower(b.rarity)-rarityPower(a.rarity))||String(a.type).localeCompare(String(b.type))||String(a.slot||"").localeCompare(String(b.slot||""))||String(a.name).localeCompare(String(b.name)));
  list.innerHTML=`<div class="inventoryGrid">${sorted.map(item=>renderItemCard(item)).join("")}</div>`;
 }
-function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.style.display==="block"){p.style.display="none";return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display="block";}
-function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p)p.style.display="none";}
+function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.style.display==="block"){p.style.display="none"; if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur(); return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display="block"; if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
+function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p){p.style.display="none"; if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur();}}
 function rewardChestLoot(){
  const roll=Math.random();
  if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}

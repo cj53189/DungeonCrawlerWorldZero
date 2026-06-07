@@ -265,7 +265,8 @@ window.addEventListener("gamepadconnected", e => {
   gamepadState.connected = true;
   gamepadState.name = e.gamepad.id || "Controller";
   updateInputVisibility();
-  achievement("CONTROLLER CONNECTED", "A mysterious handheld device has joined the crawl. Try not to blame it for your decisions.", "controllerConnected");
+  achievement("CONTROLLER CONNECTED", "A mysterious handheld device has joined the crawl. D-pad maneuvers open windows; A/Cross confirms the selected option.", "controllerConnected");
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
   updateHUD();
 });
 
@@ -325,8 +326,9 @@ function pollGamepad() {
   const dpadX = (gp.buttons[15]?.pressed ? 1 : 0) - (gp.buttons[14]?.pressed ? 1 : 0);
   const dpadY = (gp.buttons[13]?.pressed ? 1 : 0) - (gp.buttons[12]?.pressed ? 1 : 0);
 
-  gamepadState.moveX = Math.abs(axisX) > GAMEPAD_DEADZONE ? axisX : dpadX;
-  gamepadState.moveY = Math.abs(axisY) > GAMEPAD_DEADZONE ? axisY : dpadY;
+  const controllerWindowOpen = typeof hasControllerWindowOpen === "function" && hasControllerWindowOpen();
+  gamepadState.moveX = Math.abs(axisX) > GAMEPAD_DEADZONE ? axisX : (controllerWindowOpen ? 0 : dpadX);
+  gamepadState.moveY = Math.abs(axisY) > GAMEPAD_DEADZONE ? axisY : (controllerWindowOpen ? 0 : dpadY);
 
   const aimLength = Math.hypot(aimAxisX, aimAxisY);
   if (aimLength > GAMEPAD_DEADZONE) {
@@ -344,15 +346,30 @@ function pollGamepad() {
     return pressed && !wasPressed;
   };
 
-  if (justPressed(0)) interact();                    // A / Cross
-  if (justPressed(2) || justPressed(5) || justPressed(7)) attack(); // X/Square, RB, RT
-  if (justPressed(8)) toggleLog();                   // View/Select
-  if (justPressed(3)) toggleSafeRoomRecap();         // Y/Triangle
-  if (justPressed(1)) toggleInventoryPanel();        // B/Circle
-  if (justPressed(4)) cyclePlayerWeapon(-1);         // LB/L1
-  if (justPressed(6)) cyclePlayerWeapon(1);          // LT/L2
-  if (justPressed(9) && gameMode !== GAME_MODES.TITLE) restartGame();                 // Menu/Start
-  if (justPressed(10)) toggleLighting();              // Left stick
+  const dpadLeftPressed = justPressed(14);
+  const dpadRightPressed = justPressed(15);
+  const dpadUpPressed = justPressed(12);
+  const dpadDownPressed = justPressed(13);
+  const uiConfirmPressed = justPressed(0) || justPressed(2); // A / Cross, or X / Square while a window is active
+  const uiWindowOpen = typeof hasControllerWindowOpen === "function" && hasControllerWindowOpen();
+
+  if (uiWindowOpen) {
+    if (dpadLeftPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(-1, 0);
+    if (dpadRightPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(1, 0);
+    if (dpadUpPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(0, -1);
+    if (dpadDownPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(0, 1);
+    if (uiConfirmPressed && typeof activateControllerWindowSelection === "function") activateControllerWindowSelection();
+  } else {
+    if (justPressed(0)) interact();                    // A / Cross
+    if (justPressed(2) || justPressed(5) || justPressed(7)) attack(); // X/Square, RB, RT
+    if (justPressed(8)) toggleLog();                   // View/Select
+    if (justPressed(3)) toggleSafeRoomRecap();         // Y/Triangle
+    if (justPressed(1)) toggleInventoryPanel();        // B/Circle
+    if (justPressed(4)) cyclePlayerWeapon(-1);         // LB/L1
+    if (justPressed(6)) cyclePlayerWeapon(1);          // LT/L2
+    if (justPressed(9) && gameMode !== GAME_MODES.TITLE) restartGame();                 // Menu/Start
+    if (justPressed(10)) toggleLighting();              // Left stick
+  }
 
   gamepadState.previousButtons = gp.buttons.map(button => button.pressed);
 }

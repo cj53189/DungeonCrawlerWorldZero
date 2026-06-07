@@ -107,7 +107,10 @@ function renderLog() {
 }
 function toggleLog() {
   const panel = document.getElementById("logPanel");
-  panel.style.display = panel.style.display === "none" || panel.style.display === "" ? "block" : "none";
+  const opening = panel.style.display === "none" || panel.style.display === "";
+  panel.style.display = opening ? "block" : "none";
+  if (opening && typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
+  if (!opening && document.activeElement && panel.contains(document.activeElement)) document.activeElement.blur();
 }
 
 
@@ -116,11 +119,15 @@ function openLogPanel() {
   const recap = document.getElementById("safeRoomRecap");
   if (recap) recap.style.display = "none";
   if (panel) panel.style.display = "block";
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
 }
 
 function closeLogPanel() {
   const panel = document.getElementById("logPanel");
-  if (panel) panel.style.display = "none";
+  if (panel) {
+    panel.style.display = "none";
+    if (document.activeElement && panel.contains(document.activeElement)) document.activeElement.blur();
+  }
 }
 
 function openRecapPanel() {
@@ -135,11 +142,15 @@ function openRecapPanel() {
 
   showSafeRoomRecap();
   if (recap) recap.style.display = "block";
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
 }
 
 function closeRecapPanel() {
   const recap = document.getElementById("safeRoomRecap");
-  if (recap) recap.style.display = "none";
+  if (recap) {
+    recap.style.display = "none";
+    if (document.activeElement && recap.contains(document.activeElement)) document.activeElement.blur();
+  }
 }
 
 
@@ -153,11 +164,13 @@ function toggleLogPanelMobile() {
 
   if (isVisiblePanel(log)) {
     log.style.display = "none";
+    if (document.activeElement && log.contains(document.activeElement)) document.activeElement.blur();
     return;
   }
 
   if (recap) recap.style.display = "none";
   if (log) log.style.display = "block";
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
 }
 
 function toggleRecapPanelMobile() {
@@ -166,6 +179,7 @@ function toggleRecapPanelMobile() {
 
   if (isVisiblePanel(recap)) {
     recap.style.display = "none";
+    if (document.activeElement && recap.contains(document.activeElement)) document.activeElement.blur();
     return;
   }
 
@@ -177,6 +191,7 @@ function toggleRecapPanelMobile() {
   if (log) log.style.display = "none";
   showSafeRoomRecap();
   if (recap) recap.style.display = "block";
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
 }
 
 function getOpenScrollablePanel() {
@@ -201,8 +216,9 @@ function updatePanelScrollFromController() {
   if (!panel) return;
 
   const rightY = gp.axes[3] || 0;
-  const dpadDown = gp.buttons[13]?.pressed ? 1 : 0;
-  const dpadUp = gp.buttons[12]?.pressed ? -1 : 0;
+  const controllerWindowHasButtons = typeof getControllerWindowButtons === "function" && getControllerWindowButtons(panel).length > 0;
+  const dpadDown = !controllerWindowHasButtons && gp.buttons[13]?.pressed ? 1 : 0;
+  const dpadUp = !controllerWindowHasButtons && gp.buttons[12]?.pressed ? -1 : 0;
   const scrollInput = Math.abs(rightY) > 0.18 ? rightY : (dpadDown + dpadUp);
 
   if (Math.abs(scrollInput) > 0.05) {
@@ -233,6 +249,120 @@ function setupPanelCloseButtons() {
   bind(closeInventory, closeInventoryPanel);
 }
 
+
+function isControllerWindowVisible(el) {
+  if (!el) return false;
+  const style = window.getComputedStyle(el);
+  return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+}
+
+function getActiveControllerWindow() {
+  const selectors = [
+    "#centerMessage",
+    "#lootWindow",
+    "#inventoryPanel",
+    "#multiplayerPanel",
+    "#titleScreen",
+    "#safeRoomRecap",
+    "#logPanel"
+  ];
+
+  return selectors
+    .map(selector => document.querySelector(selector))
+    .find(isControllerWindowVisible) || null;
+}
+
+function getControllerWindowButtons(root = getActiveControllerWindow()) {
+  if (!root) return [];
+  return Array.from(root.querySelectorAll("button, [role='button'], input[type='button'], input[type='submit'], [tabindex]"))
+    .filter(el => {
+      if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
+      if (el.tabIndex < 0 && !["BUTTON", "INPUT"].includes(el.tagName)) return false;
+      const style = window.getComputedStyle(el);
+      return style.display !== "none" && style.visibility !== "hidden" && el.getClientRects().length > 0;
+    });
+}
+
+function getPreferredControllerButton(buttons) {
+  return buttons.find(button => !button.classList.contains("panelClose")) || buttons[0] || null;
+}
+
+function focusControllerWindowButton(button) {
+  if (!button) return false;
+  button.focus({ preventScroll: true });
+  button.scrollIntoView({ block: "nearest", inline: "nearest" });
+  return true;
+}
+
+function syncControllerWindowFocus() {
+  if (!gamepadState.connected) return false;
+  const root = getActiveControllerWindow();
+  if (!root) return false;
+  const buttons = getControllerWindowButtons(root);
+  if (!buttons.length) return false;
+  if (root.contains(document.activeElement) && buttons.includes(document.activeElement)) return true;
+  return focusControllerWindowButton(getPreferredControllerButton(buttons));
+}
+
+function moveControllerWindowFocus(dx, dy) {
+  const root = getActiveControllerWindow();
+  const buttons = getControllerWindowButtons(root);
+  if (!root || !buttons.length) return false;
+
+  const current = root.contains(document.activeElement) && buttons.includes(document.activeElement)
+    ? document.activeElement
+    : getPreferredControllerButton(buttons);
+  if (!current) return false;
+
+  const currentRect = current.getBoundingClientRect();
+  const currentCenter = {
+    x: currentRect.left + currentRect.width / 2,
+    y: currentRect.top + currentRect.height / 2
+  };
+
+  let best = null;
+  let bestScore = Infinity;
+  for (const button of buttons) {
+    if (button === current) continue;
+    const rect = button.getBoundingClientRect();
+    const center = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    const offsetX = center.x - currentCenter.x;
+    const offsetY = center.y - currentCenter.y;
+    const forward = dx ? offsetX * dx : offsetY * dy;
+    if (forward <= 4) continue;
+    const sideways = dx ? Math.abs(offsetY) : Math.abs(offsetX);
+    const score = forward + sideways * 1.65;
+    if (score < bestScore) {
+      best = button;
+      bestScore = score;
+    }
+  }
+
+  if (!best) {
+    const currentIndex = Math.max(0, buttons.indexOf(current));
+    const step = dx + dy > 0 ? 1 : -1;
+    best = buttons[(currentIndex + step + buttons.length) % buttons.length];
+  }
+
+  return focusControllerWindowButton(best);
+}
+
+function activateControllerWindowSelection() {
+  const root = getActiveControllerWindow();
+  const buttons = getControllerWindowButtons(root);
+  if (!root || !buttons.length) return false;
+  const current = root.contains(document.activeElement) && buttons.includes(document.activeElement)
+    ? document.activeElement
+    : getPreferredControllerButton(buttons);
+  if (!current) return false;
+  focusControllerWindowButton(current);
+  current.click();
+  return true;
+}
+
+function hasControllerWindowOpen() {
+  return !!getActiveControllerWindow();
+}
 
 
 function formatTimer(seconds) {
@@ -314,6 +444,7 @@ function showTitleScreen() {
   const title = document.getElementById("titleScreen");
   if (title) title.style.display = "flex";
   updateModeChrome();
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
 }
 
 function hideTitleScreen() {
@@ -336,6 +467,7 @@ function setMultiplayerPanelOpen(isOpen) {
 function showMultiplayerPanel() {
   setMultiplayerPanelOpen(true);
   updateMultiplayerPanel();
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
 }
 
 function hideMultiplayerPanel() {
@@ -475,6 +607,7 @@ function showCenter(title, text, buttonText = "Generate New Floor", buttonHandle
     button.onclick = buttonHandler;
   }
   document.getElementById("centerMessage").style.display = "flex";
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
 }
 
 function descendStairwell() {
