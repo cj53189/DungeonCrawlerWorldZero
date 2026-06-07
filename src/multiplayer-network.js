@@ -112,6 +112,8 @@ function prepareServerLobbyState({ status, partyCode }) {
   multiplayer.collapseAt = null;
   multiplayer.isPartyLeader = false;
   multiplayer.stagingEndsAt = null;
+  multiplayer.floor0Metadata = null;
+  multiplayer.activeFloor0Seed = null;
   multiplayer.networkStatus = "connected";
 
   setGameMode(status === "matchmaking" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
@@ -156,10 +158,8 @@ function handleMultiplayerServerMessage(message) {
       floorTimeLeft = 0;
       if (typeof updateHUD === "function") updateHUD();
       if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
-      if (typeof announcer === "function") announcer("Floor 0 collapse resolved. Floor 1 transition pending.");
-      if (typeof showCenter === "function") {
-        showCenter("Floor 0 Collapse", "Floor 0 collapsed before a server-driven Floor 1 transition was available. Real Floor 1 server startup is not implemented in this slice.", "Return to Title", returnToTitle);
-      }
+      if (typeof announcer === "function") announcer("Floor 0 collapse resolved. The floor is collapsing.");
+      if (typeof floorCollapseDeath === "function" && !gameLost) floorCollapseDeath();
       break;
     case "player_left":
       if (typeof announcer === "function") announcer(`${message.name || "A crawler"} left Floor 0. The collapse timer will not increase.`);
@@ -181,9 +181,9 @@ function applyServerLobbyUpdate(update) {
   multiplayer.status = translateServerLobbyStatus(update.status, update.mode);
   multiplayer.adminId = update.adminId || null;
   multiplayer.isPartyLeader = !!(update.adminId && update.adminId === multiplayer.playerId);
-  multiplayer.stagingEndsAt = update.floor0CollapseAt ? Date.parse(update.floor0CollapseAt) : (update.stagingEndsAt ? Date.parse(update.stagingEndsAt) : null);
+  multiplayer.floor0Metadata = normalizeFloor0Metadata(update.floor0, update.floor0CollapseAt || update.stagingEndsAt);
+  multiplayer.stagingEndsAt = multiplayer.floor0Metadata?.collapseAtMs || (update.floor0CollapseAt ? Date.parse(update.floor0CollapseAt) : (update.stagingEndsAt ? Date.parse(update.stagingEndsAt) : null));
   multiplayer.collapseAt = multiplayer.stagingEndsAt;
-  syncFloor0TimerFromServer();
   multiplayer.partyMembers = (update.players || []).map((player, index) => ({
     id: player.id,
     name: player.id === multiplayer.playerId ? "You" : (player.name || `Crawler ${index + 1}`),
@@ -194,6 +194,63 @@ function applyServerLobbyUpdate(update) {
   }));
 
   setGameMode(update.mode === "quick_match" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
+  ensureServerFloor0Dungeon();
+  syncFloor0TimerFromServer();
+}
+
+function normalizeFloor0Metadata(floor0, fallbackCollapseAt) {
+  if (!floor0 || floor0.floor !== 0 || !floor0.seed) return null;
+  const collapseAt = floor0.collapseAt || fallbackCollapseAt || null;
+  return {
+    floor: 0,
+    seed: String(floor0.seed),
+    safeRoomId: Number.isFinite(Number(floor0.safeRoomId)) ? Number(floor0.safeRoomId) : 0,
+    spawnRoom: floor0.spawnRoom || { id: Number.isFinite(Number(floor0.safeRoomId)) ? Number(floor0.safeRoomId) : 0 },
+    spawnPoints: Array.isArray(floor0.spawnPoints) ? floor0.spawnPoints.map((point, index) => ({ ...point, index })) : [],
+    stairs: floor0.stairs || null,
+    collapseAt,
+    collapseAtMs: collapseAt ? Date.parse(collapseAt) : null
+  };
+}
+
+function ensureServerFloor0Dungeon() {
+  if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0 || !multiplayer.floor0Metadata?.seed) return;
+  if (multiplayer.activeFloor0Seed === multiplayer.floor0Metadata.seed) {
+    placeLocalCrawlerAtFloor0Spawn();
+    return;
+  }
+
+  resetState();
+  multiplayer.activeFloor0Seed = multiplayer.floor0Metadata.seed;
+  placeLocalCrawlerAtFloor0Spawn();
+  if (typeof updateVisibility === "function") updateVisibility(true);
+  if (typeof updateHUD === "function") updateHUD();
+}
+
+function getLocalFloor0SpawnIndex() {
+  const localIndex = multiplayer.partyMembers.findIndex(member => member.local || member.id === multiplayer.playerId);
+  return Math.max(0, localIndex);
+}
+
+function getFloor0SafeRoom() {
+  const metadata = multiplayer.floor0Metadata;
+  if (!metadata || !rooms?.length) return null;
+  const safeRoomId = Number(metadata.safeRoomId ?? metadata.spawnRoom?.id ?? 0);
+  return rooms.find(room => room.id === safeRoomId) || rooms.find(room => room.type === "safe") || rooms[0] || null;
+}
+
+function placeLocalCrawlerAtFloor0Spawn() {
+  if (!multiplayer.floor0Metadata || currentFloor !== 0) return;
+  const safeRoom = getFloor0SafeRoom();
+  if (!safeRoom) return;
+  const spawnPoints = multiplayer.floor0Metadata.spawnPoints || [];
+  const spawnPoint = spawnPoints[getLocalFloor0SpawnIndex() % Math.max(1, spawnPoints.length)] || { dx: 0, dy: 0 };
+  const tileX = Math.max(safeRoom.x + 1, Math.min(safeRoom.x + safeRoom.w - 2, safeRoom.cx + Number(spawnPoint.dx || 0)));
+  const tileY = Math.max(safeRoom.y + 1, Math.min(safeRoom.y + safeRoom.h - 2, safeRoom.cy + Number(spawnPoint.dy || 0)));
+  player.x = tileX * TILE + TILE / 2;
+  player.y = tileY * TILE + TILE / 2;
+  player.currentRoomId = null;
+  visibilityDirty = true;
 }
 
 function translateServerLobbyStatus(status, mode) {

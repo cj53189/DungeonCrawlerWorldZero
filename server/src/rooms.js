@@ -8,6 +8,12 @@ const {
 } = require("./protocol");
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const FLOOR0_SPAWN_OFFSETS = Object.freeze([
+  { dx: 0, dy: 0 },
+  { dx: 1, dy: 0 },
+  { dx: -1, dy: 0 },
+  { dx: 0, dy: 1 }
+]);
 const PLAYER_COLORS = ["#75c7ff", "#ff9bd1", "#ffd86b", "#9cffb1"];
 
 class LobbyManager {
@@ -131,6 +137,7 @@ class LobbyManager {
       status: LOBBY_STATUS.STAGING,
       createdAt: now,
       floor0CollapseAt: now + FLOOR0_COLLAPSE_CAPS_MS[1],
+      floor0: this.createFloor0Metadata(code, now + FLOOR0_COLLAPSE_CAPS_MS[1]),
       floor0CollapseTimer: null
     };
     this.lobbies.set(code, lobby);
@@ -155,6 +162,7 @@ class LobbyManager {
     const count = Math.max(1, Math.min(TARGET_PLAYERS, lobby.players.length));
     const cap = FLOOR0_COLLAPSE_CAPS_MS[count] || FLOOR0_COLLAPSE_CAPS_MS[TARGET_PLAYERS];
     lobby.floor0CollapseAt = Math.min(lobby.floor0CollapseAt, Date.now() + cap);
+    this.syncFloor0CollapseMetadata(lobby);
   }
 
   scheduleFloor0Collapse(lobby) {
@@ -171,6 +179,7 @@ class LobbyManager {
     lobby.status = LOBBY_STATUS.START_PENDING;
     lobby.adminId = null;
     lobby.floor0CollapseAt = Date.now();
+    this.syncFloor0CollapseMetadata(lobby);
     if (lobby.floor0CollapseTimer) clearTimeout(lobby.floor0CollapseTimer);
     lobby.floor0CollapseTimer = null;
 
@@ -201,11 +210,56 @@ class LobbyManager {
       targetPlayers: TARGET_PLAYERS,
       status: lobby.status,
       stagingEndsAt: new Date(lobby.floor0CollapseAt).toISOString(),
-      floor0CollapseAt: new Date(lobby.floor0CollapseAt).toISOString()
+      floor0CollapseAt: new Date(lobby.floor0CollapseAt).toISOString(),
+      floor0: this.floor0Payload(lobby)
     };
 
     if (lobby.mode === LOBBY_MODES.PRIVATE && lobby.adminId) payload.adminId = lobby.adminId;
     return payload;
+  }
+
+  createFloor0Metadata(code, collapseAt) {
+    const seed = this.makeFloor0Seed(code);
+    return {
+      floor: 0,
+      seed,
+      safeRoomId: 0,
+      spawnRoom: { id: 0, type: "safe" },
+      spawnPoints: FLOOR0_SPAWN_OFFSETS.map((offset, index) => ({
+        id: `floor0_spawn_${index + 1}`,
+        roomId: 0,
+        index,
+        dx: offset.dx,
+        dy: offset.dy
+      })),
+      // TODO: Populate from server-authoritative dungeon generation once Floor 1 transition work owns layout generation.
+      stairs: null,
+      collapseAt: new Date(collapseAt).toISOString()
+    };
+  }
+
+  syncFloor0CollapseMetadata(lobby) {
+    if (!lobby.floor0) lobby.floor0 = this.createFloor0Metadata(lobby.code, lobby.floor0CollapseAt);
+    lobby.floor0.collapseAt = new Date(lobby.floor0CollapseAt).toISOString();
+  }
+
+  floor0Payload(lobby) {
+    this.syncFloor0CollapseMetadata(lobby);
+    return {
+      ...lobby.floor0,
+      spawnRoom: lobby.floor0.spawnRoom ? { ...lobby.floor0.spawnRoom } : null,
+      spawnPoints: lobby.floor0.spawnPoints.map(point => ({ ...point })),
+      stairs: lobby.floor0.stairs ? { ...lobby.floor0.stairs } : null
+    };
+  }
+
+  makeFloor0Seed(code) {
+    let hash = 2166136261;
+    for (const char of String(code || "FLOOR0")) {
+      hash ^= char.charCodeAt(0);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `floor0-${(hash >>> 0).toString(16).padStart(8, "0")}`;
   }
 
   broadcast(lobby, type, payload = {}) {

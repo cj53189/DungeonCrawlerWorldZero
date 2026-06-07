@@ -47,6 +47,8 @@ function resetMultiplayerState() {
   multiplayer.isPartyLeader = false;
   multiplayer.adminId = null;
   multiplayer.stagingEndsAt = null;
+  multiplayer.floor0Metadata = null;
+  multiplayer.activeFloor0Seed = null;
   multiplayer.usingServer = false;
   multiplayer.networkError = null;
 }
@@ -87,6 +89,8 @@ function startMultiplayerFloor0({ partyCode = null, leader = false, status = "pa
   multiplayer.isPartyLeader = leader;
   multiplayer.adminId = leader ? multiplayer.playerId : null;
   multiplayer.stagingEndsAt = null;
+  multiplayer.floor0Metadata = null;
+  multiplayer.activeFloor0Seed = null;
   multiplayer.usingServer = false;
   multiplayer.networkError = null;
   ensureLocalPartyMember();
