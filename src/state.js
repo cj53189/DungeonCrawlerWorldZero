@@ -28,6 +28,34 @@ let gameWon, gameLost, frameCount, floorTimeLeft, collapseStarted;
 let warnedAt360, warnedAt240, warnedAt120, warnedAt60, warnedAt30;
 let lastObservationFrame, audienceScore, currentReputation, roomsSeen;
 
+const GAME_MODES = {
+  TITLE: "title",
+  SINGLE_PLAYER: "single_player",
+  MULTIPLAYER_FLOOR0: "multiplayer_floor0",
+  MULTIPLAYER_MATCHMAKING: "multiplayer_matchmaking",
+  MULTIPLAYER_ACTIVE: "multiplayer_active",
+  MULTIPLAYER_STASIS: "multiplayer_stasis"
+};
+
+const MULTIPLAYER_TARGET_PLAYERS = 4;
+
+let gameMode = GAME_MODES.TITLE;
+
+const multiplayer = {
+  enabled: false,
+  targetPlayers: MULTIPLAYER_TARGET_PLAYERS,
+  playerId: "local_crawler",
+  partyCode: null,
+  roomId: null,
+  status: "offline",
+  partyMembers: [],
+  remotePlayers: new Map(),
+  pvpEnabled: false,
+  floorStartedAt: null,
+  collapseAt: null,
+  isPartyLeader: false
+};
+
 const MAX_ACTIVE_POPUPS = 2;
 const POPUP_LIFETIME_MS = 7800;
 const OBSERVATION_INTERVAL_FRAMES = 60 * 25;

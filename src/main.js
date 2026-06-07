@@ -1,7 +1,7 @@
 function gameLoop() {
   pollGamepad();
   updatePanelScrollFromController();
-  if (!gameWon && !gameLost) {
+  if (!isGameplayUpdatePaused() && !gameWon && !gameLost) {
     updatePlayer();
     updateBossLocks();
     updateEnemies();
@@ -16,7 +16,9 @@ function gameLoop() {
 
 initInputControls();
 setupLootWindowHandlers();
+setupTitleScreenHandlers();
 resetState();
+showTitleScreen();
 gameLoop();
 
 // Jeremiah gold reset fix: full death/new-run reset is handled by resetRunProgress().
