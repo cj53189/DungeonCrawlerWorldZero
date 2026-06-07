@@ -900,7 +900,8 @@ function drawMobileMinimap(){
   const border = MOBILE_MINIMAP_BORDER;
   const radius = size / 2;
   const innerRadius = radius - border;
-  const centerX = canvas.width / 2;
+  const controllerAnchored = gamepadState.connected;
+  const centerX = controllerAnchored ? canvas.width - radius - 14 : canvas.width / 2;
   const centerY = canvas.height - radius - 12;
   const x0 = centerX - radius;
   const y0 = centerY - radius;
