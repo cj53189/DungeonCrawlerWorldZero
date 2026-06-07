@@ -2,7 +2,7 @@ const {
   LOBBY_MODES,
   LOBBY_STATUS,
   SERVER_MESSAGES,
-  STAGING_LIMITS_MS,
+  FLOOR0_COLLAPSE_CAPS_MS,
   TARGET_PLAYERS,
   safeSend
 } = require("./protocol");
@@ -54,7 +54,7 @@ class LobbyManager {
     const client = this.requireClient(playerId);
     const lobby = this.lobbies.get(code);
     if (!lobby || lobby.mode !== LOBBY_MODES.PRIVATE) throw new Error("Lobby code not found.");
-    if (lobby.status !== LOBBY_STATUS.STAGING) throw new Error("That lobby has already left Floor 0 staging.");
+    if (lobby.status !== LOBBY_STATUS.STAGING) throw new Error("That Floor 0 collapse has already resolved.");
     if (lobby.players.length >= TARGET_PLAYERS) throw new Error("That crawler lobby is full.");
 
     this.leaveLobby(playerId, { silent: true });
@@ -130,8 +130,8 @@ class LobbyManager {
       players: [],
       status: LOBBY_STATUS.STAGING,
       createdAt: now,
-      stagingEndsAt: now + STAGING_LIMITS_MS[1],
-      stagingTimer: null
+      floor0CollapseAt: now + FLOOR0_COLLAPSE_CAPS_MS[1],
+      floor0CollapseTimer: null
     };
     this.lobbies.set(code, lobby);
     return lobby;
@@ -146,45 +146,45 @@ class LobbyManager {
       joinedAt: Date.now(),
       color: PLAYER_COLORS[(lobby.players.length) % PLAYER_COLORS.length]
     });
-    this.applyStagingLimit(lobby);
-    this.scheduleStaging(lobby);
+    this.applyFloor0CollapseCap(lobby);
+    this.scheduleFloor0Collapse(lobby);
   }
 
-  applyStagingLimit(lobby) {
+  applyFloor0CollapseCap(lobby) {
     if (lobby.status !== LOBBY_STATUS.STAGING) return;
     const count = Math.max(1, Math.min(TARGET_PLAYERS, lobby.players.length));
-    const limit = STAGING_LIMITS_MS[count] || STAGING_LIMITS_MS[TARGET_PLAYERS];
-    lobby.stagingEndsAt = Math.min(lobby.stagingEndsAt, Date.now() + limit);
+    const cap = FLOOR0_COLLAPSE_CAPS_MS[count] || FLOOR0_COLLAPSE_CAPS_MS[TARGET_PLAYERS];
+    lobby.floor0CollapseAt = Math.min(lobby.floor0CollapseAt, Date.now() + cap);
   }
 
-  scheduleStaging(lobby) {
-    if (lobby.stagingTimer) clearTimeout(lobby.stagingTimer);
+  scheduleFloor0Collapse(lobby) {
+    if (lobby.floor0CollapseTimer) clearTimeout(lobby.floor0CollapseTimer);
     if (lobby.status !== LOBBY_STATUS.STAGING) return;
 
-    const delay = Math.max(0, lobby.stagingEndsAt - Date.now());
-    lobby.stagingTimer = setTimeout(() => this.completeStaging(lobby.code), delay);
+    const delay = Math.max(0, lobby.floor0CollapseAt - Date.now());
+    lobby.floor0CollapseTimer = setTimeout(() => this.resolveFloor0Collapse(lobby.code), delay);
   }
 
-  completeStaging(code) {
+  resolveFloor0Collapse(code) {
     const lobby = this.lobbies.get(code);
     if (!lobby || lobby.status !== LOBBY_STATUS.STAGING) return;
     lobby.status = LOBBY_STATUS.START_PENDING;
     lobby.adminId = null;
-    lobby.stagingEndsAt = Date.now();
-    if (lobby.stagingTimer) clearTimeout(lobby.stagingTimer);
-    lobby.stagingTimer = null;
+    lobby.floor0CollapseAt = Date.now();
+    if (lobby.floor0CollapseTimer) clearTimeout(lobby.floor0CollapseTimer);
+    lobby.floor0CollapseTimer = null;
 
     this.broadcastLobbyUpdate(lobby);
     this.broadcast(lobby, SERVER_MESSAGES.STAGING_COMPLETE, {
       lobbyCode: lobby.code,
-      message: "Floor 1 start pending"
+      message: "Floor 0 collapse resolved"
     });
   }
 
   broadcastLobbyUpdate(lobby) {
     const payload = this.lobbyPayload(lobby);
     this.broadcast(lobby, SERVER_MESSAGES.LOBBY_UPDATE, payload);
-    if (lobby.status === LOBBY_STATUS.STAGING) this.scheduleStaging(lobby);
+    if (lobby.status === LOBBY_STATUS.STAGING) this.scheduleFloor0Collapse(lobby);
   }
 
   lobbyPayload(lobby) {
@@ -200,7 +200,8 @@ class LobbyManager {
       })),
       targetPlayers: TARGET_PLAYERS,
       status: lobby.status,
-      stagingEndsAt: new Date(lobby.stagingEndsAt).toISOString()
+      stagingEndsAt: new Date(lobby.floor0CollapseAt).toISOString(),
+      floor0CollapseAt: new Date(lobby.floor0CollapseAt).toISOString()
     };
 
     if (lobby.mode === LOBBY_MODES.PRIVATE && lobby.adminId) payload.adminId = lobby.adminId;
@@ -226,7 +227,7 @@ class LobbyManager {
   }
 
   destroyLobby(lobby) {
-    if (lobby.stagingTimer) clearTimeout(lobby.stagingTimer);
+    if (lobby.floor0CollapseTimer) clearTimeout(lobby.floor0CollapseTimer);
     this.lobbies.delete(lobby.code);
   }
 

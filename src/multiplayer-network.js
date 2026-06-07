@@ -30,7 +30,7 @@ function connectMultiplayerNetwork() {
       multiplayerNetwork.connecting = false;
       multiplayerNetwork.lastError = null;
       sendMultiplayerMessage("hello");
-      if (typeof announcer === "function") announcer("Crawler lobby server connected.");
+      if (typeof announcer === "function") announcer("Floor 0 collapse server connected.");
     });
 
     socket.addEventListener("message", (event) => {
@@ -38,7 +38,7 @@ function connectMultiplayerNetwork() {
       try {
         message = JSON.parse(event.data);
       } catch {
-        handleMultiplayerNetworkError("Received an unreadable lobby server message.");
+        handleMultiplayerNetworkError("Received an unreadable Floor 0 collapse server message.");
         return;
       }
       handleMultiplayerServerMessage(message);
@@ -50,7 +50,7 @@ function connectMultiplayerNetwork() {
       if (multiplayer.usingServer) {
         multiplayer.status = "offline";
         multiplayer.networkStatus = "disconnected";
-        handleMultiplayerNetworkError("Lobby server disconnected. Local 4-Crawler Test is still available.");
+        handleMultiplayerNetworkError("Floor 0 collapse server disconnected. Local 4-Crawler Test is still available.");
         if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
       }
     });
@@ -58,12 +58,12 @@ function connectMultiplayerNetwork() {
     socket.addEventListener("error", () => {
       multiplayerNetwork.connected = false;
       multiplayerNetwork.connecting = false;
-      handleMultiplayerNetworkError("Could not reach the lobby server. Using local fallback when needed.");
+      handleMultiplayerNetworkError("Could not reach the Floor 0 collapse server. Using local fallback when needed.");
     });
   } catch (err) {
     multiplayerNetwork.connected = false;
     multiplayerNetwork.connecting = false;
-    handleMultiplayerNetworkError(err.message || "Could not create lobby server connection.");
+    handleMultiplayerNetworkError(err.message || "Could not create Floor 0 collapse server connection.");
   }
 }
 
@@ -118,7 +118,7 @@ function prepareServerLobbyState({ status, partyCode }) {
   hideTitleScreen();
   resetState();
   showMultiplayerPanel();
-  if (typeof announcer === "function") announcer("Server crawler lobby request sent.");
+  if (typeof announcer === "function") announcer("Server Floor 0 collapse request sent.");
 }
 
 function handleMultiplayerServerMessage(message) {
@@ -133,13 +133,13 @@ function handleMultiplayerServerMessage(message) {
     case "lobby_created":
       multiplayer.partyCode = message.lobbyCode;
       multiplayer.roomId = message.lobbyCode;
-      if (typeof announcer === "function") announcer(`Crawler Lobby created: ${message.lobbyCode}.`);
+      if (typeof announcer === "function") announcer(`Crawlers Registered for Floor 0 Collapse: ${message.lobbyCode}.`);
       break;
     case "lobby_joined":
       multiplayer.partyCode = message.mode === "quick_match" ? null : message.lobbyCode;
       multiplayer.roomId = message.lobbyCode;
       multiplayer.usingServer = true;
-      if (typeof announcer === "function") announcer(message.mode === "quick_match" ? "Joined Quick Match crawler queue." : `Joined Crawler Lobby ${message.lobbyCode}.`);
+      if (typeof announcer === "function") announcer(message.mode === "quick_match" ? "Joined Quick Match Floor 0 Collapse." : `Joined Floor 0 Collapse ${message.lobbyCode}.`);
       break;
     case "matchmaking_update":
       multiplayer.roomId = message.lobbyCode;
@@ -152,17 +152,20 @@ function handleMultiplayerServerMessage(message) {
     case "staging_complete":
       multiplayer.status = "start_pending";
       multiplayer.stagingEndsAt = Date.now();
+      multiplayer.collapseAt = Date.now();
+      floorTimeLeft = 0;
+      if (typeof updateHUD === "function") updateHUD();
       if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
-      if (typeof announcer === "function") announcer("Floor 0 staging complete. Floor 1 start pending.");
+      if (typeof announcer === "function") announcer("Floor 0 collapse resolved. Floor 1 transition pending.");
       if (typeof showCenter === "function") {
-        showCenter("Floor 1 Start Pending", "The server completed Floor 0 staging. Real Floor 1 server startup is not implemented in this slice.", "Return to Title", returnToTitle);
+        showCenter("Floor 0 Collapse", "Floor 0 collapsed before a server-driven Floor 1 transition was available. Real Floor 1 server startup is not implemented in this slice.", "Return to Title", returnToTitle);
       }
       break;
     case "player_left":
-      if (typeof announcer === "function") announcer(`${message.name || "A crawler"} left the Crawler Lobby.`);
+      if (typeof announcer === "function") announcer(`${message.name || "A crawler"} left Floor 0. The collapse timer will not increase.`);
       break;
     case "error":
-      handleMultiplayerNetworkError(message.message || "Lobby server request failed.");
+      handleMultiplayerNetworkError(message.message || "Floor 0 collapse server request failed.");
       break;
   }
 
@@ -178,7 +181,9 @@ function applyServerLobbyUpdate(update) {
   multiplayer.status = translateServerLobbyStatus(update.status, update.mode);
   multiplayer.adminId = update.adminId || null;
   multiplayer.isPartyLeader = !!(update.adminId && update.adminId === multiplayer.playerId);
-  multiplayer.stagingEndsAt = update.stagingEndsAt ? Date.parse(update.stagingEndsAt) : null;
+  multiplayer.stagingEndsAt = update.floor0CollapseAt ? Date.parse(update.floor0CollapseAt) : (update.stagingEndsAt ? Date.parse(update.stagingEndsAt) : null);
+  multiplayer.collapseAt = multiplayer.stagingEndsAt;
+  syncFloor0TimerFromServer();
   multiplayer.partyMembers = (update.players || []).map((player, index) => ({
     id: player.id,
     name: player.id === multiplayer.playerId ? "You" : (player.name || `Crawler ${index + 1}`),
@@ -204,7 +209,13 @@ function handleMultiplayerNetworkError(message) {
   if (typeof addLog === "function") addLog(`Multiplayer: ${message}`);
 }
 
-function formatStagingCountdown(endsAt) {
+function syncFloor0TimerFromServer() {
+  if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0 || !multiplayer.collapseAt) return;
+  floorTimeLeft = Math.max(0, Math.ceil((multiplayer.collapseAt - Date.now()) / 1000));
+  if (typeof updateHUD === "function") updateHUD();
+}
+
+function formatFloor0CollapseCountdown(endsAt) {
   if (!endsAt) return "--:--";
   const remainingMs = Math.max(0, endsAt - Date.now());
   const totalSeconds = Math.ceil(remainingMs / 1000);
@@ -216,8 +227,9 @@ function formatStagingCountdown(endsAt) {
 function startMultiplayerCountdownTicker() {
   if (multiplayerNetwork.countdownTimer) return;
   multiplayerNetwork.countdownTimer = setInterval(() => {
-    if (multiplayer.enabled && multiplayer.stagingEndsAt && typeof updateMultiplayerPanel === "function") {
-      updateMultiplayerPanel();
+    if (multiplayer.enabled && multiplayer.stagingEndsAt) {
+      syncFloor0TimerFromServer();
+      if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
     }
   }, 1000);
 }

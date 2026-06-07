@@ -1,6 +1,7 @@
 
 function getFloorTimeLimit() {
   // Prototype timing. Later floors get shorter, matching the book's pressure curve.
+  if (currentFloor === 0) return 15 * 60;
   return Math.max(300, 600 - currentFloor * 60);
 }
 
