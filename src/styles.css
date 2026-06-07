@@ -185,16 +185,22 @@
     @keyframes fadeOut { to { opacity: 0; transform: translateX(20px); } }
   
     #touchControls {
-      display: none;
       position: fixed;
       inset: 0;
       z-index: 25;
+      opacity: 0;
+      visibility: hidden;
       pointer-events: none;
       touch-action: none;
       user-select: none;
+      transition: opacity 0.22s ease-out, visibility 0s linear 0.22s;
     }
 
-    body.showTouchControls #touchControls { display: block; }
+    body.showTouchControls #touchControls {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 0.18s ease-out;
+    }
 
     #stickBase {
       position: absolute;
@@ -313,7 +319,7 @@
       }
 
       #touchControls {
-        display: none;
+        display: block;
       }
 
       #hud {
