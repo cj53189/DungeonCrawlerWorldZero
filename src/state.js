@@ -62,7 +62,9 @@ const multiplayer = {
   activeFloor0Seed: null,
   usingServer: false,
   networkStatus: "offline",
-  networkError: null
+  networkError: null,
+  floor0Resolved: null,
+  localFloor0Status: "exploring"
 };
 
 const MAX_ACTIVE_POPUPS = 2;

@@ -616,7 +616,12 @@ function updateFloorTimer() {
     if (floorTimeLeft <= 120 && !warnedAt120) { warnedAt120 = true; achievement("NEW ACHIEVEMENT: Scheduling Conflict", "The floor is preparing to stop existing. Please wrap up any hobbies, grudges, or poor decisions.", "twoMinuteWarning"); }
     if (floorTimeLeft <= 60 && !warnedAt60) { warnedAt60 = true; finalDescentAnnounced = true; achievement("FINAL DESCENT WINDOW", "One minute until collapse. Descending now grants immediate access to the next floor. Remaining here grants the dungeon plausible deniability.", "finalDescentWindow"); }
     if (floorTimeLeft <= 30 && !warnedAt30) { warnedAt30 = true; achievement("NEW ACHIEVEMENT: Time Management Goblin", "You have thirty seconds left and somehow this is still not the worst plan I've seen today.", "thirtySecondWarning"); }
-    if (floorTimeLeft <= 0) floorCollapseDeath();
+    if (floorTimeLeft <= 0) {
+      if (multiplayer.enabled && multiplayer.usingServer && currentFloor === 0) {
+        collapseStarted = true;
+        announcer("Floor 0 collapse timer reached zero. Waiting for server resolution.");
+      } else floorCollapseDeath();
+    }
     updateHUD();
     if (multiplayer.enabled && typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
   }
