@@ -15,6 +15,8 @@ const FLOOR0_SPAWN_OFFSETS = Object.freeze([
   { dx: 0, dy: 1 }
 ]);
 const PLAYER_COLORS = ["#75c7ff", "#ff9bd1", "#ffd86b", "#9cffb1"];
+const CRAWLER_STATE_BROADCAST_MS = 100;
+const CRAWLER_STATUS_VALUES = new Set(["active", "downed", "stasis"]);
 
 class LobbyManager {
   constructor() {
@@ -122,6 +124,7 @@ class LobbyManager {
         playerId,
         name: leavingPlayer.name
       });
+      this.broadcastCrawlerSnapshot(lobby, { force: true });
     }
     this.broadcastLobbyUpdate(lobby);
     return true;
@@ -138,7 +141,9 @@ class LobbyManager {
       createdAt: now,
       floor0CollapseAt: now + FLOOR0_COLLAPSE_CAPS_MS[1],
       floor0: this.createFloor0Metadata(code, now + FLOOR0_COLLAPSE_CAPS_MS[1]),
-      floor0CollapseTimer: null
+      floor0CollapseTimer: null,
+      crawlerSnapshotTimer: null,
+      lastCrawlerSnapshotAt: 0
     };
     this.lobbies.set(code, lobby);
     return lobby;
@@ -151,7 +156,8 @@ class LobbyManager {
       id: client.playerId,
       name: client.name,
       joinedAt: Date.now(),
-      color: PLAYER_COLORS[(lobby.players.length) % PLAYER_COLORS.length]
+      color: PLAYER_COLORS[(lobby.players.length) % PLAYER_COLORS.length],
+      crawlerState: null
     });
     this.applyFloor0CollapseCap(lobby);
     this.scheduleFloor0Collapse(lobby);
@@ -187,6 +193,95 @@ class LobbyManager {
     this.broadcast(lobby, SERVER_MESSAGES.STAGING_COMPLETE, {
       lobbyCode: lobby.code,
       message: "Floor 0 collapse resolved"
+    });
+  }
+
+  updateCrawlerState(playerId, state) {
+    const client = this.requireClient(playerId);
+    if (!client.lobbyCode) return false;
+
+    const lobby = this.lobbies.get(client.lobbyCode);
+    if (!lobby) return false;
+
+    const player = lobby.players.find(candidate => candidate.id === playerId);
+    if (!player) return false;
+
+    const sanitized = this.sanitizeCrawlerState(state);
+    if (!sanitized || sanitized.currentFloor !== 0) {
+      player.crawlerState = null;
+      this.broadcastCrawlerSnapshot(lobby, { force: true });
+      return false;
+    }
+
+    player.crawlerState = {
+      ...sanitized,
+      id: player.id,
+      name: player.name,
+      color: player.color,
+      updatedAt: Date.now()
+    };
+    this.broadcastCrawlerSnapshot(lobby);
+    return true;
+  }
+
+  sanitizeCrawlerState(state) {
+    if (!state || typeof state !== "object") return null;
+
+    const finiteNumber = (value) => {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    };
+
+    const x = finiteNumber(state.x);
+    const y = finiteNumber(state.y);
+    if (x === null || y === null) return null;
+
+    const currentFloor = Math.trunc(finiteNumber(state.currentFloor) ?? 0);
+    const hp = Math.max(0, finiteNumber(state.hp) ?? 0);
+    const maxHp = Math.max(1, finiteNumber(state.maxHp) ?? 1);
+    const aimX = finiteNumber(state.aimX);
+    const aimY = finiteNumber(state.aimY);
+    const status = CRAWLER_STATUS_VALUES.has(state.status) ? state.status : "active";
+
+    return {
+      x,
+      y,
+      hp: Math.min(hp, maxHp),
+      maxHp,
+      currentFloor,
+      status,
+      ...(aimX === null ? {} : { aimX }),
+      ...(aimY === null ? {} : { aimY })
+    };
+  }
+
+  broadcastCrawlerSnapshot(lobby, { force = false } = {}) {
+    if (!lobby || !lobby.players.length) return;
+
+    const now = Date.now();
+    const elapsed = now - (lobby.lastCrawlerSnapshotAt || 0);
+    if (!force && elapsed < CRAWLER_STATE_BROADCAST_MS) {
+      if (!lobby.crawlerSnapshotTimer) {
+        lobby.crawlerSnapshotTimer = setTimeout(() => {
+          lobby.crawlerSnapshotTimer = null;
+          this.broadcastCrawlerSnapshot(lobby, { force: true });
+        }, CRAWLER_STATE_BROADCAST_MS - elapsed);
+      }
+      return;
+    }
+
+    if (lobby.crawlerSnapshotTimer) {
+      clearTimeout(lobby.crawlerSnapshotTimer);
+      lobby.crawlerSnapshotTimer = null;
+    }
+
+    lobby.lastCrawlerSnapshotAt = now;
+    this.broadcast(lobby, SERVER_MESSAGES.CRAWLER_SNAPSHOT, {
+      lobbyCode: lobby.code,
+      currentFloor: 0,
+      players: lobby.players
+        .filter(player => player.crawlerState?.currentFloor === 0)
+        .map(player => ({ ...player.crawlerState }))
     });
   }
 
@@ -282,6 +377,7 @@ class LobbyManager {
 
   destroyLobby(lobby) {
     if (lobby.floor0CollapseTimer) clearTimeout(lobby.floor0CollapseTimer);
+    if (lobby.crawlerSnapshotTimer) clearTimeout(lobby.crawlerSnapshotTimer);
     this.lobbies.delete(lobby.code);
   }
 

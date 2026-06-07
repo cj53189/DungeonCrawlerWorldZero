@@ -10,6 +10,7 @@ function gameLoop() {
     updateVisibility();
     updatePrompt();
   }
+  if (typeof maybeSendLocalCrawlerState === "function") maybeSendLocalCrawlerState();
   draw();
   requestAnimationFrame(gameLoop);
 }
