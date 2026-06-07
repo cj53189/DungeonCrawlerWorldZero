@@ -1,4 +1,45 @@
 function generateDungeon() {
+  const seed = getSharedFloor0Seed();
+  if (!seed) return generateDungeonLayout();
+  return withSeededRandom(seed, generateDungeonLayout);
+}
+
+function getSharedFloor0Seed() {
+  if (!multiplayer?.enabled || !multiplayer.usingServer || currentFloor !== 0) return null;
+  return multiplayer.floor0Metadata?.seed || null;
+}
+
+function hashDungeonSeed(seed) {
+  let hash = 2166136261;
+  for (const char of String(seed || "")) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function createSeededRandom(seed) {
+  let state = hashDungeonSeed(seed) || 0x9e3779b9;
+  return function seededRandom() {
+    state = Math.imul(state + 0x6D2B79F5, 1);
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function withSeededRandom(seed, fn) {
+  const originalRandom = Math.random;
+  Math.random = createSeededRandom(seed);
+  try {
+    return fn();
+  } finally {
+    Math.random = originalRandom;
+  }
+}
+
+function generateDungeonLayout() {
   map = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill("#"));
   seen = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(false));
   visible = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(false));
@@ -51,7 +92,7 @@ function generateDungeon() {
   }
 
   if (rooms.length < 8 || !rooms.some(r => r.forcedBossCandidate)) {
-    generateDungeon();
+    generateDungeonLayout();
     return;
   }
 

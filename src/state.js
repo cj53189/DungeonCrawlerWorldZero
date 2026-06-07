@@ -58,6 +58,8 @@ const multiplayer = {
   isPartyLeader: false,
   adminId: null,
   stagingEndsAt: null,
+  floor0Metadata: null,
+  activeFloor0Seed: null,
   usingServer: false,
   networkStatus: "offline",
   networkError: null
