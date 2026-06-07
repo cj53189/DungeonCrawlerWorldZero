@@ -8,9 +8,46 @@ function isMobileLike() {
   return window.matchMedia("(hover: none) and (pointer: coarse)").matches || window.innerWidth <= 900;
 }
 
+function getDefaultInputMethod() {
+  return isMobileLike() ? "touch" : "keyboard";
+}
+
+function setLastActiveInputMethod(method) {
+  if (!inputState || inputState.lastActiveInputMethod === method) return;
+  inputState.lastActiveInputMethod = method;
+  updateInputVisibility();
+}
+
 function updateInputVisibility() {
-  const shouldShowTouch = isMobileLike() && !gamepadState.connected;
-  document.body.classList.toggle("showTouchControls", shouldShowTouch);
+  const lastInputMethod = inputState.lastActiveInputMethod || getDefaultInputMethod();
+  document.body.classList.toggle("showTouchControls", lastInputMethod === "touch");
+}
+
+function setupAdaptiveInputDetection() {
+  if (document.body.dataset.adaptiveInputDetectionInitialized === "true") return;
+  document.body.dataset.adaptiveInputDetectionInitialized = "true";
+
+  const markTouch = () => {
+    inputState.lastTouchAt = performance.now();
+    setLastActiveInputMethod("touch");
+  };
+
+  const markMouse = () => {
+    if (performance.now() - inputState.lastTouchAt < 700) return;
+    setLastActiveInputMethod("mouse");
+  };
+
+  window.addEventListener("touchstart", markTouch, { passive: true, capture: true });
+  window.addEventListener("pointerdown", e => {
+    if (e.pointerType === "touch") markTouch();
+    else if (e.pointerType === "mouse") markMouse();
+  }, { passive: true, capture: true });
+  window.addEventListener("pointermove", e => {
+    if (e.pointerType === "touch") markTouch();
+    else if (e.pointerType === "mouse") markMouse();
+  }, { passive: true, capture: true });
+  window.addEventListener("mousedown", markMouse, { passive: true, capture: true });
+  window.addEventListener("mousemove", markMouse, { passive: true, capture: true });
 }
 
 function setupTouchControls() {
@@ -254,6 +291,7 @@ function initInputControls() {
   if (document.body.dataset.inputControlsInitialized === "true") return;
   document.body.dataset.inputControlsInitialized = "true";
 
+  setupAdaptiveInputDetection();
   setupTouchControls();
   setupPanelCloseButtons();
   setupDirectPanelButtonFallbacks();
@@ -282,6 +320,7 @@ window.addEventListener("gamepaddisconnected", () => {
 });
 
 window.addEventListener("keydown", e => {
+  setLastActiveInputMethod("keyboard");
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === "e") interact();
   if (e.key.toLowerCase() === "l") toggleLog();
@@ -325,6 +364,15 @@ function pollGamepad() {
   const aimAxisY = gp.axes[3] || 0;
   const dpadX = (gp.buttons[15]?.pressed ? 1 : 0) - (gp.buttons[14]?.pressed ? 1 : 0);
   const dpadY = (gp.buttons[13]?.pressed ? 1 : 0) - (gp.buttons[12]?.pressed ? 1 : 0);
+  const hasActiveGamepadInput =
+    Math.abs(axisX) > GAMEPAD_DEADZONE ||
+    Math.abs(axisY) > GAMEPAD_DEADZONE ||
+    Math.abs(aimAxisX) > GAMEPAD_DEADZONE ||
+    Math.abs(aimAxisY) > GAMEPAD_DEADZONE ||
+    dpadX !== 0 ||
+    dpadY !== 0 ||
+    gp.buttons.some(button => button.pressed);
+  if (hasActiveGamepadInput) setLastActiveInputMethod("gamepad");
 
   const controllerWindowOpen = typeof hasControllerWindowOpen === "function" && hasControllerWindowOpen();
   gamepadState.moveX = Math.abs(axisX) > GAMEPAD_DEADZONE ? axisX : (controllerWindowOpen ? 0 : dpadX);
