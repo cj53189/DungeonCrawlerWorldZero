@@ -51,6 +51,8 @@ function resetMultiplayerState() {
   multiplayer.activeFloor0Seed = null;
   multiplayer.usingServer = false;
   multiplayer.networkError = null;
+  multiplayer.floor0Resolved = null;
+  multiplayer.localFloor0Status = "exploring";
 }
 
 function makePartyCode() {
@@ -62,7 +64,7 @@ function makePartyCode() {
 
 function ensureLocalPartyMember() {
   if (!multiplayer.partyMembers.some(member => member.id === multiplayer.playerId)) {
-    multiplayer.partyMembers.unshift({ id: multiplayer.playerId, name: "You", leader: multiplayer.isPartyLeader, local: true });
+    multiplayer.partyMembers.unshift({ id: multiplayer.playerId, name: "You", leader: multiplayer.isPartyLeader, local: true, floor0Status: multiplayer.localFloor0Status || "exploring" });
   }
 }
 
@@ -93,6 +95,8 @@ function startMultiplayerFloor0({ partyCode = null, leader = false, status = "pa
   multiplayer.activeFloor0Seed = null;
   multiplayer.usingServer = false;
   multiplayer.networkError = null;
+  multiplayer.floor0Resolved = null;
+  multiplayer.localFloor0Status = "exploring";
   ensureLocalPartyMember();
 
   setGameMode(status === "matchmaking" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
@@ -196,6 +200,7 @@ function placeMockRemoteCrawlers() {
 
 function requestMultiplayerStasis() {
   if (!multiplayer.enabled) return false;
+  if (multiplayer.usingServer && currentFloor === 0) return requestServerFloor0StairsReached();
   if (gameMode === GAME_MODES.MULTIPLAYER_STASIS) return true;
 
   stats.exitFinds++;

@@ -45,6 +45,9 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.CRAWLER_STATE:
           rooms.updateCrawlerState(playerId, message.state || message);
           break;
+        case CLIENT_MESSAGES.FLOOR0_STAIRS_REACHED:
+          rooms.markCrawlerAtFloor0Stairs(playerId);
+          break;
         default:
           safeSend(ws, SERVER_MESSAGES.ERROR, { message: `Unsupported message type: ${message.type}` });
       }

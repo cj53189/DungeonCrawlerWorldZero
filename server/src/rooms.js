@@ -17,6 +17,12 @@ const FLOOR0_SPAWN_OFFSETS = Object.freeze([
 const PLAYER_COLORS = ["#75c7ff", "#ff9bd1", "#ffd86b", "#9cffb1"];
 const CRAWLER_STATE_BROADCAST_MS = 100;
 const CRAWLER_STATUS_VALUES = new Set(["active", "downed", "stasis"]);
+const FLOOR0_ADVANCE_STATUSES = Object.freeze({
+  EXPLORING: "exploring",
+  AT_STAIRS: "at_stairs",
+  FAILED: "failed",
+  ADVANCING: "advancing"
+});
 
 class LobbyManager {
   constructor() {
@@ -157,7 +163,9 @@ class LobbyManager {
       name: client.name,
       joinedAt: Date.now(),
       color: PLAYER_COLORS[(lobby.players.length) % PLAYER_COLORS.length],
-      crawlerState: null
+      crawlerState: null,
+      floor0Status: FLOOR0_ADVANCE_STATUSES.EXPLORING,
+      floor0ReachedStairsAt: null
     });
     this.applyFloor0CollapseCap(lobby);
     this.scheduleFloor0Collapse(lobby);
@@ -185,15 +193,60 @@ class LobbyManager {
     lobby.status = LOBBY_STATUS.START_PENDING;
     lobby.adminId = null;
     lobby.floor0CollapseAt = Date.now();
+
+    const advancingPlayers = [];
+    const failedPlayers = [];
+    for (const player of lobby.players) {
+      if (player.floor0Status === FLOOR0_ADVANCE_STATUSES.AT_STAIRS || player.floor0Status === FLOOR0_ADVANCE_STATUSES.ADVANCING) {
+        player.floor0Status = FLOOR0_ADVANCE_STATUSES.ADVANCING;
+        advancingPlayers.push(player);
+      } else {
+        player.floor0Status = FLOOR0_ADVANCE_STATUSES.FAILED;
+        failedPlayers.push(player);
+      }
+    }
     this.syncFloor0CollapseMetadata(lobby);
     if (lobby.floor0CollapseTimer) clearTimeout(lobby.floor0CollapseTimer);
     lobby.floor0CollapseTimer = null;
 
     this.broadcastLobbyUpdate(lobby);
-    this.broadcast(lobby, SERVER_MESSAGES.STAGING_COMPLETE, {
+    this.broadcast(lobby, SERVER_MESSAGES.FLOOR0_RESOLVED, {
       lobbyCode: lobby.code,
-      message: "Floor 0 collapse resolved"
+      floor: 0,
+      advancedPlayerIds: advancingPlayers.map(player => player.id),
+      failedPlayerIds: failedPlayers.map(player => player.id),
+      players: lobby.players.map(player => this.playerStatusPayload(player))
     });
+
+    for (const player of advancingPlayers) {
+      const client = this.clients.get(player.id);
+      if (client) {
+        safeSend(client.ws, SERVER_MESSAGES.FLOOR_START, {
+          lobbyCode: lobby.code,
+          floor: 1,
+          placeholder: true,
+          message: "Floor 1 placeholder start. Movement sync will arrive in a later slice."
+        });
+      }
+    }
+  }
+
+
+  markCrawlerAtFloor0Stairs(playerId) {
+    const client = this.requireClient(playerId);
+    if (!client.lobbyCode) return false;
+
+    const lobby = this.lobbies.get(client.lobbyCode);
+    if (!lobby || lobby.status !== LOBBY_STATUS.STAGING) return false;
+
+    const player = lobby.players.find(candidate => candidate.id === playerId);
+    if (!player || player.floor0Status !== FLOOR0_ADVANCE_STATUSES.EXPLORING) return false;
+
+    player.floor0Status = FLOOR0_ADVANCE_STATUSES.AT_STAIRS;
+    player.floor0ReachedStairsAt = Date.now();
+    this.broadcastLobbyUpdate(lobby);
+    this.broadcastCrawlerSnapshot(lobby, { force: true });
+    return true;
   }
 
   updateCrawlerState(playerId, state) {
@@ -281,7 +334,10 @@ class LobbyManager {
       currentFloor: 0,
       players: lobby.players
         .filter(player => player.crawlerState?.currentFloor === 0)
-        .map(player => ({ ...player.crawlerState }))
+        .map(player => ({
+          ...player.crawlerState,
+          floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING
+        }))
     });
   }
 
@@ -300,7 +356,8 @@ class LobbyManager {
         name: player.name,
         color: player.color,
         joinedAt: player.joinedAt,
-        admin: lobby.mode === LOBBY_MODES.PRIVATE && player.id === lobby.adminId
+        admin: lobby.mode === LOBBY_MODES.PRIVATE && player.id === lobby.adminId,
+        floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING
       })),
       targetPlayers: TARGET_PLAYERS,
       status: lobby.status,
@@ -311,6 +368,17 @@ class LobbyManager {
 
     if (lobby.mode === LOBBY_MODES.PRIVATE && lobby.adminId) payload.adminId = lobby.adminId;
     return payload;
+  }
+
+
+  playerStatusPayload(player) {
+    return {
+      id: player.id,
+      name: player.name,
+      color: player.color,
+      floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING,
+      reachedStairsAt: player.floor0ReachedStairsAt ? new Date(player.floor0ReachedStairsAt).toISOString() : null
+    };
   }
 
   createFloor0Metadata(code, collapseAt) {

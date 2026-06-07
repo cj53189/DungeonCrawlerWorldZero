@@ -479,6 +479,16 @@ function closeMultiplayerPanel() {
   hideMultiplayerPanel();
 }
 
+
+function formatMultiplayerCrawlerStatus(status) {
+  return {
+    exploring: "Exploring",
+    at_stairs: "At Stairs",
+    failed: "Failed",
+    advancing: "Advancing"
+  }[status] || "Exploring";
+}
+
 function updateMultiplayerPanel() {
   const panel = document.getElementById("multiplayerPanel");
   if (!panel) return;
@@ -520,7 +530,11 @@ function updateMultiplayerPanel() {
       const row = document.createElement("div");
       row.className = "mpMember";
       const role = member.admin ? "Admin" : (member.leader && !multiplayer.usingServer ? "Leader" : "Crawler");
-      row.innerHTML = `<span>${member.name}${member.local ? " (local)" : ""}</span><span>${role}</span>`;
+      const floor0Status = formatMultiplayerCrawlerStatus(member.floor0Status || (member.local ? multiplayer.localFloor0Status : "exploring"));
+      const statusText = currentFloor === 0 || ["start_pending", "active"].includes(multiplayer.status)
+        ? `${role} · ${floor0Status}`
+        : role;
+      row.innerHTML = `<span>${member.name}${member.local ? " (local)" : ""}</span><span>${statusText}</span>`;
       list.appendChild(row);
     }
   }

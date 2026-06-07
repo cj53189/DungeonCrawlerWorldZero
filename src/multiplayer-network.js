@@ -99,6 +99,31 @@ function requestServerLeaveLobby() {
   return sendMultiplayerMessage("leave_lobby");
 }
 
+function requestServerFloor0StairsReached() {
+  if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0) return false;
+  if (multiplayer.localFloor0Status === "at_stairs" || multiplayer.localFloor0Status === "advancing") return true;
+  if (!isMultiplayerNetworkReady()) return false;
+
+  stats.exitFinds++;
+  changeAudience(10);
+  multiplayer.localFloor0Status = "at_stairs";
+  applyLocalFloor0Status("at_stairs");
+  gameWon = true;
+  pendingFloorAdvance = false;
+  sendMultiplayerMessage("floor0_stairs_reached", {
+    stairs: multiplayer.floor0Metadata?.stairs || { x: stairwellX, y: stairwellY }
+  });
+  achievement("FLOOR 0 STAIRS REACHED", "You reached the shared Floor 0 stairwell. Hold position until the collapse timer resolves advancement.", "floor0StairsReached");
+  showCenter(
+    "At Floor 0 Stairs",
+    "You are marked At Stairs. When Floor 0 collapses, the server will advance eligible crawlers and fail anyone still exploring.",
+    "Waiting for Collapse",
+    () => {}
+  );
+  if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+  return true;
+}
+
 function prepareServerLobbyState({ status, partyCode }) {
   multiplayer.enabled = true;
   multiplayer.usingServer = true;
@@ -116,6 +141,8 @@ function prepareServerLobbyState({ status, partyCode }) {
   multiplayer.floor0Metadata = null;
   multiplayer.activeFloor0Seed = null;
   multiplayer.networkStatus = "connected";
+  multiplayer.floor0Resolved = null;
+  multiplayer.localFloor0Status = "exploring";
 
   setGameMode(status === "matchmaking" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
   hideTitleScreen();
@@ -153,14 +180,13 @@ function handleMultiplayerServerMessage(message) {
       applyServerLobbyUpdate(message);
       break;
     case "staging_complete":
-      multiplayer.status = "start_pending";
-      multiplayer.stagingEndsAt = Date.now();
-      multiplayer.collapseAt = Date.now();
-      floorTimeLeft = 0;
-      if (typeof updateHUD === "function") updateHUD();
-      if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
-      if (typeof announcer === "function") announcer("Floor 0 collapse resolved. The floor is collapsing.");
-      if (typeof floorCollapseDeath === "function" && !gameLost) floorCollapseDeath();
+      handleServerFloor0Resolved({ lobbyCode: message.lobbyCode, advancedPlayerIds: [], failedPlayerIds: [multiplayer.playerId], players: [] });
+      break;
+    case "floor0_resolved":
+      handleServerFloor0Resolved(message);
+      break;
+    case "floor_start":
+      handleServerFloorStart(message);
       break;
     case "player_left":
       multiplayer.remotePlayers.delete(message.playerId);
@@ -186,7 +212,8 @@ function captureLocalCrawlerNetworkState() {
     hp: player.hp,
     maxHp: player.maxHp,
     currentFloor,
-    status: gameLost || player.hp <= 0 ? "downed" : (gameMode === GAME_MODES.MULTIPLAYER_STASIS ? "stasis" : "active")
+    status: gameLost || player.hp <= 0 ? "downed" : (gameMode === GAME_MODES.MULTIPLAYER_STASIS ? "stasis" : "active"),
+    floor0Status: multiplayer.localFloor0Status || "exploring"
   };
 }
 
@@ -231,6 +258,7 @@ function applyServerCrawlerSnapshot(snapshot) {
       maxHp: Math.max(1, Number(crawler.maxHp) || player.maxHp),
       currentFloor: 0,
       status: crawler.status || "active",
+      floor0Status: normalizeFloor0StatusValue(crawler.floor0Status || member?.floor0Status),
       color: member?.color || crawler.color || "#75c7ff",
       updatedAt: crawler.updatedAt || Date.now()
     });
@@ -257,7 +285,8 @@ function applyServerLobbyUpdate(update) {
     leader: !!player.admin,
     admin: !!player.admin,
     local: player.id === multiplayer.playerId,
-    color: player.color
+    color: player.color,
+    floor0Status: normalizeFloor0StatusValue(player.floor0Status)
   }));
 
   setGameMode(update.mode === "quick_match" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
@@ -267,6 +296,92 @@ function applyServerLobbyUpdate(update) {
     const rosterIds = new Set(multiplayer.partyMembers.map(member => member.id));
     multiplayer.remotePlayers = new Map(Array.from(multiplayer.remotePlayers).filter(([id]) => rosterIds.has(id)));
   }
+}
+
+
+function normalizeFloor0StatusValue(status) {
+  return ["exploring", "at_stairs", "failed", "advancing"].includes(status) ? status : "exploring";
+}
+
+function applyLocalFloor0Status(status) {
+  const normalized = normalizeFloor0StatusValue(status);
+  multiplayer.localFloor0Status = normalized;
+  for (const member of multiplayer.partyMembers) {
+    if (member.local || member.id === multiplayer.playerId) member.floor0Status = normalized;
+  }
+}
+
+function applyServerFloor0Statuses(players = []) {
+  const statuses = new Map((players || []).map(player => [player.id, normalizeFloor0StatusValue(player.floor0Status)]));
+  multiplayer.partyMembers = multiplayer.partyMembers.map(member => ({
+    ...member,
+    floor0Status: statuses.get(member.id) || normalizeFloor0StatusValue(member.floor0Status)
+  }));
+  const localStatus = statuses.get(multiplayer.playerId);
+  if (localStatus) multiplayer.localFloor0Status = localStatus;
+}
+
+function handleServerFloor0Resolved(message) {
+  if (!multiplayer.enabled || !multiplayer.usingServer) return;
+  if (message.lobbyCode && multiplayer.roomId && message.lobbyCode !== multiplayer.roomId) return;
+
+  multiplayer.status = "start_pending";
+  multiplayer.stagingEndsAt = Date.now();
+  multiplayer.collapseAt = Date.now();
+  multiplayer.floor0Resolved = message;
+  floorTimeLeft = 0;
+  applyServerFloor0Statuses(message.players || []);
+
+  const advancing = new Set(message.advancedPlayerIds || []);
+  const failed = new Set(message.failedPlayerIds || []);
+  if (advancing.has(multiplayer.playerId)) {
+    multiplayer.localFloor0Status = "advancing";
+    applyLocalFloor0Status("advancing");
+    gameWon = true;
+    pendingFloorAdvance = false;
+    if (typeof announcer === "function") announcer("Floor 0 resolved: you are advancing to the Floor 1 placeholder.");
+  } else if (failed.has(multiplayer.playerId) || multiplayer.localFloor0Status !== "advancing") {
+    multiplayer.localFloor0Status = "failed";
+    applyLocalFloor0Status("failed");
+    if (typeof floorCollapseDeath === "function" && !gameLost) floorCollapseDeath();
+  }
+
+  if (typeof updateHUD === "function") updateHUD();
+  if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+}
+
+function handleServerFloorStart(message) {
+  if (!multiplayer.enabled || !multiplayer.usingServer) return;
+  if (message.lobbyCode && multiplayer.roomId && message.lobbyCode !== multiplayer.roomId) return;
+  if (Number(message.floor) !== 1 || multiplayer.localFloor0Status !== "advancing") return;
+
+  const snapshot = captureRunProgress();
+  currentFloor = 1;
+  gameWon = false;
+  gameLost = false;
+  pendingFloorAdvance = false;
+  setGameMode(GAME_MODES.MULTIPLAYER_ACTIVE);
+  multiplayer.status = "active";
+  multiplayer.pvpEnabled = false;
+  multiplayer.floorStartedAt = Date.now();
+  multiplayer.collapseAt = multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
+  multiplayer.remotePlayers = new Map();
+  resetState({ preserveRun: true, snapshot });
+  showFloorSplash();
+  if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+  if (typeof announcer === "function") announcer(message.message || "Floor 1 placeholder started for advancing crawlers only.");
+}
+
+function syncSharedFloor0StairsFromDungeon() {
+  if (!multiplayer.floor0Metadata || currentFloor !== 0 || stairwellX === null || stairwellY === null) return;
+  multiplayer.floor0Metadata.stairs = {
+    x: stairwellX,
+    y: stairwellY,
+    tileX: stairwellX,
+    tileY: stairwellY,
+    worldX: stairwellX * TILE + TILE / 2,
+    worldY: stairwellY * TILE + TILE / 2
+  };
 }
 
 function normalizeFloor0Metadata(floor0, fallbackCollapseAt) {
@@ -287,12 +402,14 @@ function normalizeFloor0Metadata(floor0, fallbackCollapseAt) {
 function ensureServerFloor0Dungeon() {
   if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0 || !multiplayer.floor0Metadata?.seed) return;
   if (multiplayer.activeFloor0Seed === multiplayer.floor0Metadata.seed) {
+    syncSharedFloor0StairsFromDungeon();
     placeLocalCrawlerAtFloor0Spawn();
     return;
   }
 
   resetState();
   multiplayer.activeFloor0Seed = multiplayer.floor0Metadata.seed;
+  syncSharedFloor0StairsFromDungeon();
   placeLocalCrawlerAtFloor0Spawn();
   if (typeof updateVisibility === "function") updateVisibility(true);
   if (typeof updateHUD === "function") updateHUD();
