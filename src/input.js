@@ -285,7 +285,7 @@ window.addEventListener("keydown", e => {
   if (e.key.toLowerCase() === "e") interact();
   if (e.key.toLowerCase() === "l") toggleLog();
   if (e.key.toLowerCase() === "r") toggleSafeRoomRecap();
-  if (e.key.toLowerCase() === "n") restartGame();
+  if (e.key.toLowerCase() === "n" && gameMode !== GAME_MODES.TITLE) restartGame();
   if (e.key.toLowerCase() === "i") toggleInventoryPanel();
   if (e.key.toLowerCase() === "k") toggleLighting();
   if (e.code === "Space") { e.preventDefault(); attack(); }
@@ -350,7 +350,7 @@ function pollGamepad() {
   if (justPressed(1)) toggleInventoryPanel();        // B/Circle
   if (justPressed(4)) cyclePlayerWeapon(-1);         // LB/L1
   if (justPressed(6)) cyclePlayerWeapon(1);          // LT/L2
-  if (justPressed(9)) restartGame();                 // Menu/Start
+  if (justPressed(9) && gameMode !== GAME_MODES.TITLE) restartGame();                 // Menu/Start
   if (justPressed(10)) toggleLighting();              // Left stick
 
   gamepadState.previousButtons = gp.buttons.map(button => button.pressed);

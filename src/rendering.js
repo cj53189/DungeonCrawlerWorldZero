@@ -679,6 +679,33 @@ for (const enemy of enemies) {
 
   drawCombatVisuals();
 
+  if (multiplayer.enabled && multiplayer.remotePlayers?.size) {
+    for (const crawler of multiplayer.remotePlayers.values()) {
+      const tx = Math.floor(crawler.x / TILE), ty = Math.floor(crawler.y / TILE);
+      if (!visible[ty]?.[tx]) continue;
+
+      ctx.fillStyle = "rgba(0,0,0,0.28)";
+      ctx.beginPath();
+      ctx.ellipse(crawler.x, crawler.y + crawler.r * 0.72, crawler.r * 1.05, Math.max(4, crawler.r * 0.42), 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = crawler.status === "stasis" ? "#9db1ff" : (crawler.color || "#75c7ff");
+      ctx.beginPath();
+      ctx.arc(crawler.x, crawler.y, crawler.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,255,255,0.76)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+
+      ctx.fillStyle = "rgba(255,255,255,0.88)";
+      ctx.font = "10px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(crawler.name || "Crawler", crawler.x, crawler.y - 22);
+    }
+  }
+
   ctx.fillStyle = "rgba(0,0,0,0.32)";
   ctx.beginPath();
   ctx.ellipse(player.x, player.y + player.r * 0.72, player.r * 1.05, Math.max(4, player.r * 0.42), 0, 0, Math.PI * 2);

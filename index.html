@@ -100,6 +100,36 @@
 
   <div id="floorSplash"></div>
 
+  <div id="multiplayerPanel" aria-live="polite">
+    <div class="panelEyebrow">Floor 0 Party Staging</div>
+    <div class="panelTitle"><span id="mpStatus">Offline</span><span id="mpCount">1 / 4</span></div>
+    <div id="mpPartyCode" class="partyCode">No party code</div>
+    <div id="mpRuleText" class="mpRuleText">PvP disabled on Floor 0.</div>
+    <div id="mpMemberList" class="mpMemberList"></div>
+    <div class="mpActions">
+      <button id="mpAddMockBtn" type="button">Add Test Crawler</button>
+      <button id="mpFillMockBtn" type="button">Fill 4</button>
+      <button id="mpForceStartBtn" type="button">Start Floor 1 Test</button>
+      <button id="mpCancelBtn" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <div id="titleScreen">
+    <div class="titleBox">
+      <div class="titleEyebrow">dcw_010 multiplayer foundation</div>
+      <h1>Dungeon Crawler World</h1>
+      <p>Choose a run mode. Multiplayer starts on Floor 0 as a no-PvP tutorial and party-up staging floor before all four crawlers spawn together on Floor 1.</p>
+      <div class="titleActions">
+        <button id="startSingleBtn" type="button">Single Player</button>
+        <button id="quickMatchBtn" type="button">Multiplayer Quick Match</button>
+        <button id="createPartyBtn" type="button">Create Party</button>
+        <button id="joinPartyBtn" type="button">Join Party Code</button>
+        <button id="localMultiTestBtn" type="button">Local 4-Crawler Test</button>
+      </div>
+      <div class="titleNote">Local test uses fake party members for now; real WebSocket matchmaking comes next.</div>
+    </div>
+  </div>
+
   <div id="centerMessage">
     <div class="box">
       <h1 id="centerTitle"></h1>
@@ -115,6 +145,7 @@
 <script defer src="./src/dungeon.js"></script>
 <script defer src="./src/simulation.js"></script>
 <script defer src="./src/inventory.js"></script>
+<script defer src="./src/multiplayer.js"></script>
 <script defer src="./src/ui.js"></script>
 <script defer src="./src/rendering.js"></script>
 <script defer src="./src/main.js"></script>

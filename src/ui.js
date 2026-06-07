@@ -310,6 +310,94 @@ function advanceToNextFloor() {
 }
 
 
+function showTitleScreen() {
+  const title = document.getElementById("titleScreen");
+  if (title) title.style.display = "flex";
+  updateModeChrome();
+}
+
+function hideTitleScreen() {
+  const title = document.getElementById("titleScreen");
+  if (title) title.style.display = "none";
+  updateModeChrome();
+}
+
+function showMultiplayerPanel() {
+  const panel = document.getElementById("multiplayerPanel");
+  if (panel) panel.style.display = "block";
+  updateMultiplayerPanel();
+}
+
+function hideMultiplayerPanel() {
+  const panel = document.getElementById("multiplayerPanel");
+  if (panel) panel.style.display = "none";
+}
+
+function updateMultiplayerPanel() {
+  const panel = document.getElementById("multiplayerPanel");
+  if (!panel) return;
+  const count = multiplayer.partyMembers.length || 1;
+  const statusLabel = {
+    offline: "Offline",
+    party: multiplayer.isPartyLeader ? "Party Created" : "In Party",
+    matchmaking: "Finding Crawlers",
+    ready: "Ready for Floor 1",
+    starting: "Starting Floor 1",
+    active: "Floor 1 Active",
+    stasis: "In Stasis"
+  }[multiplayer.status] || multiplayer.status;
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  };
+
+  setText("mpStatus", statusLabel);
+  setText("mpCount", `${count} / ${multiplayer.targetPlayers}`);
+  setText("mpPartyCode", multiplayer.partyCode ? `Party Code: ${multiplayer.partyCode}` : "Quick Match Queue");
+  setText("mpRuleText", currentFloor === 0
+    ? "Floor 0: tutorial, party-up, matchmaking, and no PvP."
+    : "Floor 1 test: four-crawler synchronized start. PvP still disabled for this milestone.");
+
+  const list = document.getElementById("mpMemberList");
+  if (list) {
+    list.innerHTML = "";
+    const members = multiplayer.partyMembers.length ? multiplayer.partyMembers : [{ name: "You", local: true, leader: multiplayer.isPartyLeader }];
+    for (const member of members) {
+      const row = document.createElement("div");
+      row.className = "mpMember";
+      row.innerHTML = `<span>${member.name}${member.local ? " (local)" : ""}</span><span>${member.leader ? "Leader" : "Crawler"}</span>`;
+      list.appendChild(row);
+    }
+  }
+
+  const forceStart = document.getElementById("mpForceStartBtn");
+  if (forceStart) forceStart.disabled = !multiplayer.enabled;
+}
+
+function setupTitleScreenHandlers() {
+  const bind = (id, handler) => {
+    const button = document.getElementById(id);
+    if (button) button.addEventListener("click", handler);
+  };
+
+  bind("startSingleBtn", startSinglePlayer);
+  bind("quickMatchBtn", startQuickMatch);
+  bind("createPartyBtn", createParty);
+  bind("joinPartyBtn", () => {
+    const code = prompt("Enter party code", multiplayer.partyCode || "RUNE-");
+    if (code) joinParty(code);
+  });
+  bind("localMultiTestBtn", () => {
+    startMultiplayerFloor0({ partyCode: "LOCAL-TEST", leader: true, status: "party" });
+    fillMockParty();
+  });
+  bind("mpAddMockBtn", addMockPartyMember);
+  bind("mpFillMockBtn", fillMockParty);
+  bind("mpForceStartBtn", forceLocalMultiplayerStart);
+  bind("mpCancelBtn", returnToTitle);
+}
+
 function updateHUD() {
   const hpNow = Math.max(0, Math.floor(player.hp));
   const hpMax = Math.max(1, player.maxHp);
@@ -375,6 +463,16 @@ function showCenter(title, text, buttonText = "Generate New Floor", buttonHandle
 
 function descendStairwell() {
   if (gameWon || gameLost) return;
+  if (multiplayer.enabled && currentFloor === 0) {
+    showCenter(
+      "Party Staging Floor",
+      "Floor 0 is a no-PvP tutorial and matchmaking floor. Use the party panel to gather four crawlers and start the synchronized Floor 1 test.",
+      "Keep Training",
+      () => { document.getElementById("centerMessage").style.display = "none"; }
+    );
+    return;
+  }
+  if (multiplayer.enabled && currentFloor >= 1 && requestMultiplayerStasis()) return;
 
   stats.exitFinds++;
   changeAudience(10);
@@ -408,7 +506,11 @@ function loseGame() {
   pendingFloorAdvance = false;
   showCenter("You Died", "The dungeon would like to thank you for your brief but educational contribution to slapstick violence.", "Start New Run", restartGame);
 }
-function restartGame() { pendingFloorAdvance = false; resetState(); }
+function restartGame() {
+  pendingFloorAdvance = false;
+  if (multiplayer.enabled) startMultiplayerFloor0({ partyCode: multiplayer.partyCode, leader: multiplayer.isPartyLeader, status: multiplayer.partyCode ? "party" : "matchmaking" });
+  else startSinglePlayer();
+}
 
 
 
