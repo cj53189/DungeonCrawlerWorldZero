@@ -46,7 +46,7 @@ wss.on("connection", (ws) => {
           safeSend(ws, SERVER_MESSAGES.ERROR, { message: `Unsupported message type: ${message.type}` });
       }
     } catch (err) {
-      safeSend(ws, SERVER_MESSAGES.ERROR, { message: err.message || "Lobby request failed." });
+      safeSend(ws, SERVER_MESSAGES.ERROR, { message: err.message || "Floor 0 collapse request failed." });
     }
   });
 
@@ -55,7 +55,7 @@ wss.on("connection", (ws) => {
 });
 
 wss.on("listening", () => {
-  console.log(`Dungeon Crawler World lobby WebSocket server listening on ws://localhost:${PORT}`);
+  console.log(`Dungeon Crawler World Floor 0 collapse WebSocket server listening on ws://localhost:${PORT}`);
 });
 
 process.on("SIGINT", () => {

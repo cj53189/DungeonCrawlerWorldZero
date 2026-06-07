@@ -618,6 +618,7 @@ function updateFloorTimer() {
     if (floorTimeLeft <= 30 && !warnedAt30) { warnedAt30 = true; achievement("NEW ACHIEVEMENT: Time Management Goblin", "You have thirty seconds left and somehow this is still not the worst plan I've seen today.", "thirtySecondWarning"); }
     if (floorTimeLeft <= 0) floorCollapseDeath();
     updateHUD();
+    if (multiplayer.enabled && typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
   }
   if (!collapseStarted && frameCount - lastObservationFrame >= OBSERVATION_INTERVAL_FRAMES) {
     lastObservationFrame = frameCount;

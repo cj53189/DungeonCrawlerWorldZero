@@ -485,11 +485,11 @@ function updateMultiplayerPanel() {
   const count = multiplayer.partyMembers.length || 1;
   const statusLabel = {
     offline: "Offline",
-    party: multiplayer.usingServer ? "Crawler Lobby" : (multiplayer.isPartyLeader ? "Party Created" : "In Party"),
-    matchmaking: "Finding Crawlers",
-    ready: "Ready for Floor 1",
-    starting: "Starting Floor 1",
-    start_pending: "Floor 1 Start Pending",
+    party: "Floor 0 Collapse",
+    matchmaking: "Floor 0 Collapse",
+    ready: "Floor 0 Collapse",
+    starting: "Local Floor 1 Test",
+    start_pending: "Floor 0 Collapsed",
     active: "Floor 1 Active",
     stasis: "In Stasis"
   }[multiplayer.status] || multiplayer.status;
@@ -499,15 +499,15 @@ function updateMultiplayerPanel() {
     if (el) el.textContent = value;
   };
 
-  const countdownText = multiplayer.stagingEndsAt && typeof formatStagingCountdown === "function"
-    ? ` · Floor 0 ${formatStagingCountdown(multiplayer.stagingEndsAt)}`
-    : "";
+  const countdownText = multiplayer.stagingEndsAt && typeof formatFloor0CollapseCountdown === "function"
+    ? ` ${formatFloor0CollapseCountdown(multiplayer.stagingEndsAt)}`
+    : currentFloor === 0 ? ` ${formatTimer(floorTimeLeft)}` : "";
   setText("mpStatus", `${statusLabel}${countdownText}`);
-  setText("mpCount", `${count} / ${multiplayer.targetPlayers}`);
-  setText("mpPartyCode", multiplayer.partyCode ? `Lobby Code: ${multiplayer.partyCode}` : "Quick Match Crawler Lobby");
+  setText("mpCount", `${count} / ${multiplayer.targetPlayers} Crawlers Registered`);
+  setText("mpPartyCode", multiplayer.partyCode ? `Lobby Code: ${multiplayer.partyCode}` : "Quick Match Floor 0 Collapse");
   const serverRule = multiplayer.usingServer
-    ? "Server-owned Crawler Lobby: no host, no ready button. Floor 1 start pending after staging."
-    : "Floor 0: tutorial, party-up, matchmaking, and no PvP.";
+    ? "Server-owned Floor 0 collapse timer. Crawlers Registered only shorten the remaining time. Find the stairs before collapse."
+    : "Floor 0 Collapse: Crawlers Registered shorten the timer. Find the stairs before collapse. No PvP on Floor 0.";
   setText("mpRuleText", currentFloor === 0
     ? serverRule
     : "Floor 1+: PvP enabled outside safe rooms. Attacking from a safe room freezes you for 5 seconds.");
@@ -580,7 +580,11 @@ function updateHUD() {
   setText("audience", audienceScore);
   const weapon = getCurrentWeapon();
   setText("weaponName", weapon.name);
-  setText("timer", isFinalDescentWindow() ? `FINAL ${formatTimer(floorTimeLeft)}` : formatTimer(floorTimeLeft));
+  const displayedFloorTimeLeft = multiplayer.enabled && multiplayer.usingServer && currentFloor === 0 && multiplayer.collapseAt
+    ? Math.max(0, Math.ceil((multiplayer.collapseAt - Date.now()) / 1000))
+    : floorTimeLeft;
+  setText("collapseLabel", currentFloor === 0 ? "Floor 0 Collapse" : "Collapse");
+  setText("timer", displayedFloorTimeLeft <= 60 ? `FINAL ${formatTimer(displayedFloorTimeLeft)}` : formatTimer(displayedFloorTimeLeft));
   setText("roomsSeen", roomsSeen);
   setText("roomTotal", rooms.length);
 
@@ -626,16 +630,7 @@ function showCenter(title, text, buttonText = "Generate New Floor", buttonHandle
 
 function descendStairwell() {
   if (gameWon || gameLost) return;
-  if (multiplayer.enabled && currentFloor === 0) {
-    showCenter(
-      "Party Staging Floor",
-      "Floor 0 is a no-PvP tutorial and matchmaking floor. Use the party panel to gather four crawlers and start the synchronized Floor 1 test.",
-      "Keep Training",
-      () => { document.getElementById("centerMessage").style.display = "none"; }
-    );
-    return;
-  }
-  if (multiplayer.enabled && currentFloor >= 1 && requestMultiplayerStasis()) return;
+  if (multiplayer.enabled && requestMultiplayerStasis()) return;
 
   stats.exitFinds++;
   changeAudience(10);

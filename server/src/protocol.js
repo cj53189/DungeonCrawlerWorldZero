@@ -28,11 +28,11 @@ const LOBBY_STATUS = Object.freeze({
 });
 
 const TARGET_PLAYERS = 4;
-const STAGING_LIMITS_MS = Object.freeze({
+const FLOOR0_COLLAPSE_CAPS_MS = Object.freeze({
   1: 15 * 60 * 1000,
   2: 7 * 60 * 1000,
-  3: 3 * 60 * 1000,
-  4: 30 * 1000
+  3: 5 * 60 * 1000,
+  4: 3 * 60 * 1000
 });
 
 function safeSend(ws, type, payload = {}) {
@@ -62,7 +62,7 @@ module.exports = {
   LOBBY_MODES,
   LOBBY_STATUS,
   TARGET_PLAYERS,
-  STAGING_LIMITS_MS,
+  FLOOR0_COLLAPSE_CAPS_MS,
   parseClientMessage,
   safeSend
 };

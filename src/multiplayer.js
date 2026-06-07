@@ -1,3 +1,22 @@
+const FLOOR0_COLLAPSE_CAP_SECONDS = Object.freeze({
+  1: 15 * 60,
+  2: 7 * 60,
+  3: 5 * 60,
+  4: 3 * 60
+});
+
+function floor0CollapseSecondsForCrawlerCount(count) {
+  const safeCount = Math.max(1, Math.min(MULTIPLAYER_TARGET_PLAYERS, count || 1));
+  return FLOOR0_COLLAPSE_CAP_SECONDS[safeCount] || FLOOR0_COLLAPSE_CAP_SECONDS[MULTIPLAYER_TARGET_PLAYERS];
+}
+
+function capLocalFloor0CollapseTimer() {
+  if (!multiplayer.enabled || multiplayer.usingServer || currentFloor !== 0) return;
+  const cap = floor0CollapseSecondsForCrawlerCount(multiplayer.partyMembers.length || 1);
+  floorTimeLeft = Math.min(floorTimeLeft, cap);
+  updateHUD();
+}
+
 function setGameMode(nextMode) {
   gameMode = nextMode;
   updateModeChrome();
@@ -77,7 +96,8 @@ function startMultiplayerFloor0({ partyCode = null, leader = false, status = "pa
   resetState();
   updateMultiplayerPanel();
   showMultiplayerPanel();
-  announcer("Floor 0 party staging online. PvP is disabled while crawlers gather.");
+  capLocalFloor0CollapseTimer();
+  announcer("Floor 0 Collapse started. Crawlers registered here should find the stairs before collapse.");
 }
 
 function createParty() {
@@ -103,12 +123,14 @@ function addMockPartyMember() {
   const nextNumber = multiplayer.partyMembers.length + 1;
   multiplayer.partyMembers.push({ id: `mock_${nextNumber}`, name: `Crawler ${nextNumber}`, leader: false, local: false });
   multiplayer.status = multiplayer.partyMembers.length >= multiplayer.targetPlayers ? "ready" : multiplayer.status;
+  capLocalFloor0CollapseTimer();
   updateMultiplayerPanel();
 }
 
 function fillMockParty() {
   while (multiplayer.partyMembers.length < multiplayer.targetPlayers) addMockPartyMember();
   multiplayer.status = "ready";
+  capLocalFloor0CollapseTimer();
   updateMultiplayerPanel();
 }
 
@@ -178,7 +200,7 @@ function requestMultiplayerStasis() {
   setGameMode(GAME_MODES.MULTIPLAYER_STASIS);
   gameWon = true;
   pendingFloorAdvance = false;
-  achievement("MULTIPLAYER STASIS REQUESTED", "Floor 1 stairwell stasis is now a client-side test state. A future server will hold you here until all crawlers resolve the floor.", `multiplayerStasis${currentFloor}`);
+  achievement("MULTIPLAYER STASIS REQUESTED", `${getFloorLabel()} stairwell stasis is now a client-side test state. A future server will hold you here until all crawlers resolve the floor.`, `multiplayerStasis${currentFloor}`);
   updateMultiplayerPanel();
   showCenter(
     "Entered Multiplayer Stasis",
