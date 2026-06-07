@@ -288,6 +288,7 @@ window.addEventListener("keydown", e => {
   if (e.key.toLowerCase() === "n" && gameMode !== GAME_MODES.TITLE) restartGame();
   if (e.key.toLowerCase() === "i") toggleInventoryPanel();
   if (e.key.toLowerCase() === "k") toggleLighting();
+  if (e.key === "Escape" && multiplayer.enabled) closeMultiplayerPanel();
   if (e.code === "Space") { e.preventDefault(); attack(); }
   if (["1", "2", "3", "4", "5"].includes(e.key)) setPlayerWeapon(WEAPON_ORDER[Number(e.key) - 1]);
   if (e.key.toLowerCase() === "q") cyclePlayerWeapon(-1);
