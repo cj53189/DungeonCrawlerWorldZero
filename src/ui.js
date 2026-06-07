@@ -322,15 +322,29 @@ function hideTitleScreen() {
   updateModeChrome();
 }
 
-function showMultiplayerPanel() {
+function setMultiplayerPanelOpen(isOpen) {
   const panel = document.getElementById("multiplayerPanel");
-  if (panel) panel.style.display = "block";
+  if (panel) panel.style.display = isOpen ? "block" : "none";
+
+  const openButton = document.getElementById("mpOpenPanelBtn");
+  if (openButton) {
+    const shouldShowOpenButton = multiplayer.enabled && !isOpen;
+    openButton.style.display = shouldShowOpenButton ? "block" : "none";
+  }
+}
+
+function showMultiplayerPanel() {
+  setMultiplayerPanelOpen(true);
   updateMultiplayerPanel();
 }
 
 function hideMultiplayerPanel() {
-  const panel = document.getElementById("multiplayerPanel");
-  if (panel) panel.style.display = "none";
+  setMultiplayerPanelOpen(false);
+}
+
+function closeMultiplayerPanel() {
+  if (!multiplayer.enabled) return;
+  hideMultiplayerPanel();
 }
 
 function updateMultiplayerPanel() {
@@ -396,6 +410,8 @@ function setupTitleScreenHandlers() {
   bind("mpFillMockBtn", fillMockParty);
   bind("mpForceStartBtn", forceLocalMultiplayerStart);
   bind("mpCancelBtn", returnToTitle);
+  bind("closeMultiplayerPanelBtn", closeMultiplayerPanel);
+  bind("mpOpenPanelBtn", showMultiplayerPanel);
 }
 
 function updateHUD() {
