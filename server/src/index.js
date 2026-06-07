@@ -48,6 +48,12 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.FLOOR0_STAIRS_REACHED:
           rooms.markCrawlerAtFloor0Stairs(playerId);
           break;
+        case CLIENT_MESSAGES.FLOOR0_WORLD_EVENT:
+          rooms.handleFloor0WorldEvent(playerId, message.event || message);
+          break;
+        case CLIENT_MESSAGES.FLOOR0_ENEMY_SNAPSHOT:
+          rooms.updateFloor0EnemySnapshot(playerId, message);
+          break;
         default:
           safeSend(ws, SERVER_MESSAGES.ERROR, { message: `Unsupported message type: ${message.type}` });
       }

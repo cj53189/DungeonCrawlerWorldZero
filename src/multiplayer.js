@@ -53,6 +53,7 @@ function resetMultiplayerState() {
   multiplayer.networkError = null;
   multiplayer.floor0Resolved = null;
   multiplayer.localFloor0Status = "exploring";
+  resetFloor0WorldState();
 }
 
 function makePartyCode() {
@@ -97,6 +98,7 @@ function startMultiplayerFloor0({ partyCode = null, leader = false, status = "pa
   multiplayer.networkError = null;
   multiplayer.floor0Resolved = null;
   multiplayer.localFloor0Status = "exploring";
+  resetFloor0WorldState();
   ensureLocalPartyMember();
 
   setGameMode(status === "matchmaking" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);

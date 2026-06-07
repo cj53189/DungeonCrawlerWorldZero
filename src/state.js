@@ -64,7 +64,13 @@ const multiplayer = {
   networkStatus: "offline",
   networkError: null,
   floor0Resolved: null,
-  localFloor0Status: "exploring"
+  localFloor0Status: "exploring",
+  floor0WorldState: {
+    openedDoorIds: new Set(),
+    openedChestIds: new Set(),
+    takenLootIds: new Set(),
+    enemyStates: new Map()
+  }
 };
 
 const MAX_ACTIVE_POPUPS = 2;

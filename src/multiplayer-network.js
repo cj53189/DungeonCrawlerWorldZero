@@ -9,7 +9,8 @@ const multiplayerNetwork = {
   lastError: null,
   reconnectTimer: null,
   countdownTimer: null,
-  lastCrawlerStateSentAt: 0
+  lastCrawlerStateSentAt: 0,
+  lastEnemySnapshotSentAt: 0
 };
 
 function isMultiplayerNetworkReady() {
@@ -143,6 +144,7 @@ function prepareServerLobbyState({ status, partyCode }) {
   multiplayer.networkStatus = "connected";
   multiplayer.floor0Resolved = null;
   multiplayer.localFloor0Status = "exploring";
+  resetFloor0WorldState();
 
   setGameMode(status === "matchmaking" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
   hideTitleScreen();
@@ -195,6 +197,15 @@ function handleMultiplayerServerMessage(message) {
     case "crawler_snapshot":
       applyServerCrawlerSnapshot(message);
       break;
+    case "floor0_world_state":
+      applyFloor0WorldState(message);
+      break;
+    case "floor0_world_event":
+      applyFloor0WorldEventMessage(message);
+      break;
+    case "floor0_enemy_snapshot":
+      applyFloor0EnemySnapshot(message);
+      break;
     case "error":
       handleMultiplayerNetworkError(message.message || "Floor 0 collapse server request failed.");
       break;
@@ -213,7 +224,8 @@ function captureLocalCrawlerNetworkState() {
     maxHp: player.maxHp,
     currentFloor,
     status: gameLost || player.hp <= 0 ? "downed" : (gameMode === GAME_MODES.MULTIPLAYER_STASIS ? "stasis" : "active"),
-    floor0Status: multiplayer.localFloor0Status || "exploring"
+    floor0Status: multiplayer.localFloor0Status || "exploring",
+    currentRoomId: Number.isFinite(Number(player.currentRoomId)) ? Math.trunc(Number(player.currentRoomId)) : undefined
   };
 }
 
@@ -291,6 +303,7 @@ function applyServerLobbyUpdate(update) {
 
   setGameMode(update.mode === "quick_match" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
   ensureServerFloor0Dungeon();
+  applyFloor0WorldState(update.floor0WorldState);
   syncFloor0TimerFromServer();
   if (currentFloor === 0 && multiplayer.remotePlayers?.size) {
     const rosterIds = new Set(multiplayer.partyMembers.map(member => member.id));
@@ -483,3 +496,188 @@ window.addEventListener("load", () => {
   connectMultiplayerNetwork();
   startMultiplayerCountdownTicker();
 });
+
+function resetFloor0WorldState() {
+  multiplayer.floor0WorldState = {
+    openedDoorIds: new Set(),
+    openedChestIds: new Set(),
+    takenLootIds: new Set(),
+    enemyStates: new Map()
+  };
+}
+
+function floor0TileId(kind, x, y) {
+  return `floor0:${kind}:${Math.trunc(x)},${Math.trunc(y)}`;
+}
+
+function floor0EnemyRoomId(enemy) {
+  if (Number.isFinite(Number(enemy?.roomId))) return Math.trunc(Number(enemy.roomId));
+  if (!enemy) return null;
+  const room = typeof roomForTile === "function" ? roomForTile(Math.floor(enemy.x / TILE), Math.floor(enemy.y / TILE)) : null;
+  return room ? room.id : null;
+}
+
+function floor0EnemyPayload(enemy) {
+  if (!enemy?.enemyId) return null;
+  return {
+    enemyId: enemy.enemyId,
+    id: enemy.enemyId,
+    alive: enemy.hp > 0,
+    hp: Math.max(0, enemy.hp || 0),
+    maxHp: Math.max(1, enemy.maxHp || 1),
+    roomId: floor0EnemyRoomId(enemy),
+    x: enemy.x,
+    y: enemy.y,
+    status: enemy.hp > 0 ? "active" : "dead"
+  };
+}
+
+function rememberFloor0EnemyState(payload) {
+  if (!payload?.enemyId) return;
+  const existing = multiplayer.floor0WorldState.enemyStates.get(payload.enemyId) || { enemyId: payload.enemyId };
+  if (existing.alive === false && payload.alive !== false) return;
+  multiplayer.floor0WorldState.enemyStates.set(payload.enemyId, { ...existing, ...payload });
+}
+
+function sendFloor0WorldEvent(event) {
+  if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0) return false;
+  if (!event?.type || !event.id || !isMultiplayerNetworkReady()) return false;
+  return sendMultiplayerMessage("floor0_world_event", { event });
+}
+
+function sendFloor0EnemyEvent(type, enemy) {
+  const payload = floor0EnemyPayload(enemy);
+  if (!payload) return false;
+  rememberFloor0EnemyState(payload);
+  return sendFloor0WorldEvent({ type, id: payload.enemyId, enemy: payload });
+}
+
+function applyFloor0WorldEventMessage(message) {
+  if (!multiplayer.enabled || !multiplayer.usingServer) return;
+  if (message.lobbyCode && multiplayer.roomId && message.lobbyCode !== multiplayer.roomId) return;
+  applyFloor0WorldEvent(message.event || message);
+}
+
+function applyFloor0WorldEvent(event) {
+  if (!event?.type || !event.id) return false;
+  if (!multiplayer.floor0WorldState) resetFloor0WorldState();
+  if (event.type === "door_opened") {
+    multiplayer.floor0WorldState.openedDoorIds.add(event.id);
+    applyFloor0DoorOpened(event.id);
+    return true;
+  }
+  if (event.type === "chest_opened") {
+    multiplayer.floor0WorldState.openedChestIds.add(event.id);
+    applyFloor0ChestOpened(event.id);
+    return true;
+  }
+  if (event.type === "loot_taken") {
+    multiplayer.floor0WorldState.takenLootIds.add(event.id);
+    applyFloor0LootTaken(event.id);
+    return true;
+  }
+  if (event.type === "enemy_damaged" || event.type === "enemy_killed") {
+    const enemyState = event.enemy || event;
+    if (enemyState.enemyId) {
+      rememberFloor0EnemyState(enemyState);
+      applyFloor0EnemyState(enemyState);
+    }
+    return true;
+  }
+  return false;
+}
+
+function parseFloor0TileEventId(id) {
+  const match = String(id || "").match(/^floor0:[^:]+:(-?\d+),(-?\d+)$/);
+  if (!match) return null;
+  return { x: Number(match[1]), y: Number(match[2]) };
+}
+
+function applyFloor0DoorOpened(id) {
+  const spot = parseFloor0TileEventId(id);
+  if (!spot || currentFloor !== 0) return;
+  if (map?.[spot.y]?.[spot.x] === "D") {
+    map[spot.y][spot.x] = ".";
+    minimapDirty = true;
+    visibilityDirty = true;
+  }
+}
+
+function applyFloor0ChestOpened(id) {
+  const spot = parseFloor0TileEventId(id);
+  if (!spot || currentFloor !== 0) return;
+  openedChests.add(`${spot.x},${spot.y}`);
+  if (map?.[spot.y]?.[spot.x] === "C") {
+    map[spot.y][spot.x] = ".";
+    minimapDirty = true;
+    visibilityDirty = true;
+  }
+}
+
+function applyFloor0LootTaken(id) {
+  const corpse = corpses?.find(corpse => corpse.id === id);
+  if (corpse) {
+    corpse.loot = [];
+    corpse.looted = true;
+    if (activeLootCorpseId === corpse.id) closeLootWindow();
+  }
+}
+
+function applyFloor0EnemyState(state) {
+  if (!state?.enemyId || currentFloor !== 0 || !Array.isArray(enemies)) return;
+  const enemy = enemies.find(candidate => candidate.enemyId === state.enemyId);
+  if (!enemy) return;
+  const stored = multiplayer.floor0WorldState?.enemyStates?.get(state.enemyId);
+  if (stored?.alive === false && state.alive !== false) return;
+  if (Number.isFinite(Number(state.hp))) enemy.hp = Math.max(0, Number(state.hp));
+  if (Number.isFinite(Number(state.maxHp))) enemy.maxHp = Math.max(1, Number(state.maxHp));
+  if (state.alive === false || enemy.hp <= 0) {
+    enemy.hp = 0;
+    return;
+  }
+  if (Number.isFinite(Number(state.x)) && Number.isFinite(Number(state.y))) {
+    enemy.x = Number(state.x);
+    enemy.y = Number(state.y);
+  }
+}
+
+function applyFloor0WorldState(messageOrState) {
+  const worldState = messageOrState?.worldState || messageOrState;
+  if (!worldState) return;
+  resetFloor0WorldState();
+  for (const id of worldState.openedDoorIds || []) applyFloor0WorldEvent({ type: "door_opened", id });
+  for (const id of worldState.openedChestIds || []) applyFloor0WorldEvent({ type: "chest_opened", id });
+  for (const id of worldState.takenLootIds || []) applyFloor0WorldEvent({ type: "loot_taken", id });
+  const states = Array.isArray(worldState.enemyStates) ? worldState.enemyStates : Object.values(worldState.enemyStates || {});
+  for (const state of states) {
+    if (!state?.enemyId) continue;
+    rememberFloor0EnemyState(state);
+    applyFloor0EnemyState(state);
+  }
+}
+
+function applyFloor0EnemySnapshot(message) {
+  if (!multiplayer.enabled || !multiplayer.usingServer) return;
+  if (message.lobbyCode && multiplayer.roomId && message.lobbyCode !== multiplayer.roomId) return;
+  if (message.currentFloor !== 0 || currentFloor !== 0) return;
+  for (const state of message.enemies || []) {
+    rememberFloor0EnemyState(state);
+    applyFloor0EnemyState(state);
+  }
+}
+
+function maybeSendFloor0EnemySnapshot(now = Date.now()) {
+  if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0) return false;
+  if (!isMultiplayerNetworkReady()) return false;
+  if (now - multiplayerNetwork.lastEnemySnapshotSentAt < 150) return false;
+  const roomId = Number(player.currentRoomId);
+  if (!Number.isFinite(roomId)) return false;
+  const activeEnemies = enemies
+    .filter(enemy => enemy.hp > 0 && floor0EnemyRoomId(enemy) === roomId)
+    .slice(0, 24)
+    .map(floor0EnemyPayload)
+    .filter(Boolean);
+  if (!activeEnemies.length) return false;
+  multiplayerNetwork.lastEnemySnapshotSentAt = now;
+  return sendMultiplayerMessage("floor0_enemy_snapshot", { roomId, enemies: activeEnemies });
+}
