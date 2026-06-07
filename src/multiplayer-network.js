@@ -1,4 +1,14 @@
-const MULTIPLAYER_WS_URL = window.DCW_WS_URL || `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.hostname || "localhost"}:8080`;
+function getDefaultMultiplayerWsUrl() {
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  const hostname = window.location.hostname || "localhost";
+  const isSecureHost = window.location.protocol === "https:";
+  const port = isSecureHost
+    ? window.location.port ? `:${window.location.port}` : ""
+    : ":8080";
+  return `${protocol}://${hostname}${port}`;
+}
+
+const MULTIPLAYER_WS_URL = window.DCW_WS_URL || getDefaultMultiplayerWsUrl();
 
 const multiplayerNetwork = {
   socket: null,

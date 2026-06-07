@@ -1,11 +1,92 @@
+const http = require("http");
+const path = require("path");
+const fs = require("fs");
 const { WebSocketServer } = require("ws");
 const { randomUUID } = require("crypto");
 const { LobbyManager } = require("./rooms");
 const { CLIENT_MESSAGES, SERVER_MESSAGES, parseClientMessage, safeSend } = require("./protocol");
 
 const PORT = Number(process.env.PORT || 8080);
+const CLIENT_ROOT = path.resolve(__dirname, "../..");
 const rooms = new LobbyManager();
-const wss = new WebSocketServer({ port: PORT });
+
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".webp": "image/webp",
+  ".wav": "audio/wav",
+  ".mp3": "audio/mpeg",
+  ".ogg": "audio/ogg"
+};
+
+function sendResponse(res, statusCode, body, headers = {}) {
+  res.writeHead(statusCode, headers);
+  res.end(body);
+}
+
+function getStaticFilePath(urlPath) {
+  const decodedPath = decodeURIComponent(urlPath.split("?")[0]);
+  const normalizedPath = decodedPath === "/" ? "/index.html" : decodedPath;
+  const pathSegments = normalizedPath.split("/").filter(Boolean);
+
+  if (pathSegments.some((segment) => segment.startsWith(".")) || pathSegments[0] === "server") return null;
+
+  const filePath = path.resolve(CLIENT_ROOT, `.${normalizedPath}`);
+
+  if (!filePath.startsWith(`${CLIENT_ROOT}${path.sep}`) && filePath !== CLIENT_ROOT) return null;
+  return filePath;
+}
+
+function serveStaticFile(req, res) {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    sendResponse(res, 405, "Method Not Allowed", { Allow: "GET, HEAD" });
+    return;
+  }
+
+  let filePath;
+  try {
+    filePath = getStaticFilePath(req.url || "/");
+  } catch {
+    sendResponse(res, 400, "Bad Request");
+    return;
+  }
+
+  if (!filePath) {
+    sendResponse(res, 403, "Forbidden");
+    return;
+  }
+
+  fs.stat(filePath, (statErr, stats) => {
+    if (statErr || !stats.isFile()) {
+      sendResponse(res, 404, "Not Found");
+      return;
+    }
+
+    const headers = {
+      "Content-Type": MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream",
+      "Content-Length": stats.size
+    };
+
+    if (req.method === "HEAD") {
+      sendResponse(res, 200, "", headers);
+      return;
+    }
+
+    res.writeHead(200, headers);
+    fs.createReadStream(filePath).pipe(res);
+  });
+}
+
+const server = http.createServer(serveStaticFile);
+const wss = new WebSocketServer({ server });
 
 rooms.startCleanup();
 
@@ -66,10 +147,13 @@ wss.on("connection", (ws) => {
   ws.on("error", () => rooms.unregisterClient(playerId));
 });
 
-wss.on("listening", () => {
-  console.log(`Dungeon Crawler World Floor 0 collapse WebSocket server listening on ws://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Dungeon Crawler World client and Floor 0 collapse WebSocket server listening on http://localhost:${PORT}`);
 });
 
-process.on("SIGINT", () => {
-  wss.close(() => process.exit(0));
-});
+function shutdown() {
+  server.close(() => process.exit(0));
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
