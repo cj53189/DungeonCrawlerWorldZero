@@ -26,6 +26,10 @@ function resetMultiplayerState() {
   multiplayer.floorStartedAt = null;
   multiplayer.collapseAt = null;
   multiplayer.isPartyLeader = false;
+  multiplayer.adminId = null;
+  multiplayer.stagingEndsAt = null;
+  multiplayer.usingServer = false;
+  multiplayer.networkError = null;
 }
 
 function makePartyCode() {
@@ -62,6 +66,10 @@ function startMultiplayerFloor0({ partyCode = null, leader = false, status = "pa
   multiplayer.floorStartedAt = null;
   multiplayer.collapseAt = null;
   multiplayer.isPartyLeader = leader;
+  multiplayer.adminId = leader ? multiplayer.playerId : null;
+  multiplayer.stagingEndsAt = null;
+  multiplayer.usingServer = false;
+  multiplayer.networkError = null;
   ensureLocalPartyMember();
 
   setGameMode(status === "matchmaking" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
@@ -73,16 +81,19 @@ function startMultiplayerFloor0({ partyCode = null, leader = false, status = "pa
 }
 
 function createParty() {
+  if (typeof requestServerCreateLobby === "function" && requestServerCreateLobby()) return;
   startMultiplayerFloor0({ partyCode: makePartyCode(), leader: true, status: "party" });
 }
 
 function joinParty(code) {
   const cleanedCode = String(code || "").trim().toUpperCase();
   if (!cleanedCode) return;
+  if (typeof requestServerJoinLobby === "function" && requestServerJoinLobby(cleanedCode)) return;
   startMultiplayerFloor0({ partyCode: cleanedCode, leader: false, status: "party" });
 }
 
 function startQuickMatch() {
+  if (typeof requestServerQuickMatch === "function" && requestServerQuickMatch()) return;
   startMultiplayerFloor0({ partyCode: null, leader: false, status: "matchmaking" });
 }
 
@@ -214,6 +225,7 @@ function damageRemoteCrawler(crawler, damage) {
 
 function returnToTitle() {
   pendingFloorAdvance = false;
+  if (typeof requestServerLeaveLobby === "function") requestServerLeaveLobby();
   resetMultiplayerState();
   setGameMode(GAME_MODES.TITLE);
   hideMultiplayerPanel();

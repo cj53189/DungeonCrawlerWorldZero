@@ -485,10 +485,11 @@ function updateMultiplayerPanel() {
   const count = multiplayer.partyMembers.length || 1;
   const statusLabel = {
     offline: "Offline",
-    party: multiplayer.isPartyLeader ? "Party Created" : "In Party",
+    party: multiplayer.usingServer ? "Crawler Lobby" : (multiplayer.isPartyLeader ? "Party Created" : "In Party"),
     matchmaking: "Finding Crawlers",
     ready: "Ready for Floor 1",
     starting: "Starting Floor 1",
+    start_pending: "Floor 1 Start Pending",
     active: "Floor 1 Active",
     stasis: "In Stasis"
   }[multiplayer.status] || multiplayer.status;
@@ -498,11 +499,17 @@ function updateMultiplayerPanel() {
     if (el) el.textContent = value;
   };
 
-  setText("mpStatus", statusLabel);
+  const countdownText = multiplayer.stagingEndsAt && typeof formatStagingCountdown === "function"
+    ? ` · Floor 0 ${formatStagingCountdown(multiplayer.stagingEndsAt)}`
+    : "";
+  setText("mpStatus", `${statusLabel}${countdownText}`);
   setText("mpCount", `${count} / ${multiplayer.targetPlayers}`);
-  setText("mpPartyCode", multiplayer.partyCode ? `Party Code: ${multiplayer.partyCode}` : "Quick Match Queue");
+  setText("mpPartyCode", multiplayer.partyCode ? `Lobby Code: ${multiplayer.partyCode}` : "Quick Match Crawler Lobby");
+  const serverRule = multiplayer.usingServer
+    ? "Server-owned Crawler Lobby: no host, no ready button. Floor 1 start pending after staging."
+    : "Floor 0: tutorial, party-up, matchmaking, and no PvP.";
   setText("mpRuleText", currentFloor === 0
-    ? "Floor 0: tutorial, party-up, matchmaking, and no PvP."
+    ? serverRule
     : "Floor 1+: PvP enabled outside safe rooms. Attacking from a safe room freezes you for 5 seconds.");
 
   const list = document.getElementById("mpMemberList");
@@ -512,13 +519,20 @@ function updateMultiplayerPanel() {
     for (const member of members) {
       const row = document.createElement("div");
       row.className = "mpMember";
-      row.innerHTML = `<span>${member.name}${member.local ? " (local)" : ""}</span><span>${member.leader ? "Leader" : "Crawler"}</span>`;
+      const role = member.admin ? "Admin" : (member.leader && !multiplayer.usingServer ? "Leader" : "Crawler");
+      row.innerHTML = `<span>${member.name}${member.local ? " (local)" : ""}</span><span>${role}</span>`;
       list.appendChild(row);
     }
   }
 
   const forceStart = document.getElementById("mpForceStartBtn");
   if (forceStart) forceStart.disabled = !multiplayer.enabled;
+
+  const mockControlsDisabled = multiplayer.usingServer;
+  for (const id of ["mpAddMockBtn", "mpFillMockBtn", "mpForceStartBtn"]) {
+    const button = document.getElementById(id);
+    if (button) button.disabled = mockControlsDisabled || !multiplayer.enabled;
+  }
 }
 
 function setupTitleScreenHandlers() {
@@ -531,7 +545,7 @@ function setupTitleScreenHandlers() {
   bind("quickMatchBtn", startQuickMatch);
   bind("createPartyBtn", createParty);
   bind("joinPartyBtn", () => {
-    const code = prompt("Enter party code", multiplayer.partyCode || "RUNE-");
+    const code = prompt("Enter lobby code", multiplayer.partyCode || "RUNE-");
     if (code) joinParty(code);
   });
   bind("localMultiTestBtn", () => {
