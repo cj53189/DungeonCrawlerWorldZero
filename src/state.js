@@ -55,7 +55,12 @@ const multiplayer = {
   pvpEnabled: false,
   floorStartedAt: null,
   collapseAt: null,
-  isPartyLeader: false
+  isPartyLeader: false,
+  adminId: null,
+  stagingEndsAt: null,
+  usingServer: false,
+  networkStatus: "offline",
+  networkError: null
 };
 
 const MAX_ACTIVE_POPUPS = 2;

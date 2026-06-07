@@ -102,9 +102,9 @@
 
   <div id="multiplayerPanel" aria-live="polite">
     <button id="closeMultiplayerPanelBtn" class="panelClose" type="button" aria-label="Close party staging panel">×</button>
-    <div class="panelEyebrow">Floor 0 Party Staging</div>
+    <div class="panelEyebrow">Floor 0 Crawler Lobby</div>
     <div class="panelTitle"><span id="mpStatus">Offline</span><span id="mpCount">1 / 4</span></div>
-    <div id="mpPartyCode" class="partyCode">No party code</div>
+    <div id="mpPartyCode" class="partyCode">No lobby code</div>
     <div id="mpRuleText" class="mpRuleText">Floor 0 has no PvP. Floor 1+ enables PvP outside safe rooms.</div>
     <div id="mpMemberList" class="mpMemberList"></div>
     <div class="mpActions">
@@ -125,11 +125,11 @@
       <div class="titleActions">
         <button id="startSingleBtn" type="button">Single Player</button>
         <button id="quickMatchBtn" type="button">Multiplayer Quick Match</button>
-        <button id="createPartyBtn" type="button">Create Party</button>
-        <button id="joinPartyBtn" type="button">Join Party Code</button>
+        <button id="createPartyBtn" type="button">Create Lobby</button>
+        <button id="joinPartyBtn" type="button">Join Lobby Code</button>
         <button id="localMultiTestBtn" type="button">Local 4-Crawler Test</button>
       </div>
-      <div class="titleNote">Local test uses fake party members for now; real WebSocket matchmaking comes next.</div>
+      <div class="titleNote">WebSocket lobbies use server-owned identity and rosters. Local 4-Crawler Test remains available as a dev fallback.</div>
     </div>
   </div>
 
@@ -148,6 +148,7 @@
 <script defer src="./src/dungeon.js"></script>
 <script defer src="./src/simulation.js"></script>
 <script defer src="./src/inventory.js"></script>
+<script defer src="./src/multiplayer-network.js"></script>
 <script defer src="./src/multiplayer.js"></script>
 <script defer src="./src/ui.js"></script>
 <script defer src="./src/rendering.js"></script>
