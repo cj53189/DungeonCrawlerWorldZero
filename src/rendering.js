@@ -689,7 +689,7 @@ for (const enemy of enemies) {
       ctx.ellipse(crawler.x, crawler.y + crawler.r * 0.72, crawler.r * 1.05, Math.max(4, crawler.r * 0.42), 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = crawler.status === "stasis" ? "#9db1ff" : (crawler.color || "#75c7ff");
+      ctx.fillStyle = crawler.status === "stasis" ? "#9db1ff" : crawler.status === "downed" ? "#555" : (crawler.color || "#75c7ff");
       ctx.beginPath();
       ctx.arc(crawler.x, crawler.y, crawler.r, 0, Math.PI * 2);
       ctx.fill();
@@ -699,10 +699,15 @@ for (const enemy of enemies) {
       ctx.stroke();
       ctx.lineWidth = 1;
 
+      if (crawler.maxHp && crawler.status === "active") {
+        ctx.fillStyle = "#75c7ff";
+        ctx.fillRect(crawler.x - 13, crawler.y - 20, 26 * Math.max(0, crawler.hp ?? crawler.maxHp) / crawler.maxHp, 4);
+      }
+
       ctx.fillStyle = "rgba(255,255,255,0.88)";
       ctx.font = "10px Arial";
       ctx.textAlign = "center";
-      ctx.fillText(crawler.name || "Crawler", crawler.x, crawler.y - 22);
+      ctx.fillText(crawler.status === "downed" ? `${crawler.name || "Crawler"} DOWN` : (crawler.name || "Crawler"), crawler.x, crawler.y - 22);
     }
   }
 
@@ -711,7 +716,7 @@ for (const enemy of enemies) {
   ctx.ellipse(player.x, player.y + player.r * 0.72, player.r * 1.05, Math.max(4, player.r * 0.42), 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = player.safe ? "#7be07b" : "#f1f1f1";
+  ctx.fillStyle = player.pvpFreezeFrames > 0 ? "#78b7ff" : player.safe ? "#7be07b" : "#f1f1f1";
   ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
 
   drawAimIndicator();

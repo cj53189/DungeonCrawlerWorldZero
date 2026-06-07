@@ -38,6 +38,8 @@ const GAME_MODES = {
 };
 
 const MULTIPLAYER_TARGET_PLAYERS = 4;
+const PVP_SAFE_ROOM_FREEZE_SECONDS = 5;
+const PVP_SAFE_ROOM_FREEZE_FRAMES = 60 * PVP_SAFE_ROOM_FREEZE_SECONDS;
 
 let gameMode = GAME_MODES.TITLE;
 
@@ -115,7 +117,7 @@ const player = {
   hp: 100, maxHp: 100, coins: 0,
   level: 1, xp: 0, xpToNext: 40, attackDamage: 20,
   baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{},
-  attackCooldown: 0, currentWeaponId: "fists", aimX: 1, aimY: 0,
+  attackCooldown: 0, pvpFreezeFrames: 0, currentWeaponId: "fists", aimX: 1, aimY: 0,
   safe: true, wasSafe: true, currentRoomId:null, lastTileX:0, lastTileY:0
 };
 

@@ -39,6 +39,7 @@ function resetRunProgress() {
   player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
   player.coins = 0;
   player.attackCooldown = 0;
+  player.pvpFreezeFrames = 0;
   player.currentWeaponId = "fists";
   player.aimX = 1;
   player.aimY = 0;
@@ -97,6 +98,7 @@ function resetState(options = {}) {
   lastVisibilityTileY=null;
   roomRevealState = { roomId: null, startFrame: 0, originX: 0, originY: 0, maxDist: 0, complete: false };
   player.attackCooldown = 0;
+  player.pvpFreezeFrames = 0;
   projectiles = [];
   attackTelegraphs = [];
   player.safe = true;

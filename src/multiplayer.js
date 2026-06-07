@@ -122,14 +122,14 @@ function startMockFloorOne() {
   currentFloor = 1;
   setGameMode(GAME_MODES.MULTIPLAYER_ACTIVE);
   multiplayer.status = "active";
-  multiplayer.pvpEnabled = false;
+  multiplayer.pvpEnabled = true;
   multiplayer.floorStartedAt = Date.now();
   multiplayer.collapseAt = multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
   resetState({ preserveRun: true, snapshot });
   placeMockRemoteCrawlers();
   showFloorSplash();
   updateMultiplayerPanel();
-  announcer("Local multiplayer test: Floor 1 synchronized start. Remote crawlers are non-damageable placeholders.");
+  announcer("Local multiplayer test: Floor 1 synchronized start. PvP is enabled outside safe rooms.");
 }
 
 function placeMockRemoteCrawlers() {
@@ -149,6 +149,8 @@ function placeMockRemoteCrawlers() {
       x: (room.cx + 0.5) * TILE,
       y: (room.cy + 0.5) * TILE,
       r: player.r,
+      hp: player.maxHp,
+      maxHp: player.maxHp,
       status: "active",
       color: ["#75c7ff", "#ff9bd1", "#ffd86b"][index % 3]
     });
@@ -169,10 +171,44 @@ function requestMultiplayerStasis() {
   updateMultiplayerPanel();
   showCenter(
     "Entered Multiplayer Stasis",
-    "PvP remains disabled. In the online build, the server will keep you safe here until the other crawlers reach stasis, die, or the shared collapse timer expires.",
+    "PvP is disabled in stasis. In the online build, the server will keep you safe here until the other crawlers reach stasis, die, or the shared collapse timer expires.",
     "Return to Title",
     returnToTitle
   );
+  return true;
+}
+
+function isPvpFloorActive() {
+  return multiplayer.enabled && multiplayer.pvpEnabled && currentFloor >= 1 && gameMode === GAME_MODES.MULTIPLAYER_ACTIVE;
+}
+
+function isCrawlerInSafeRoom(crawler) {
+  if (!crawler) return false;
+  return tileAt(crawler.x, crawler.y) === "S";
+}
+
+function canCrawlerInitiatePvp(crawler) {
+  return isPvpFloorActive() && !isCrawlerInSafeRoom(crawler);
+}
+
+function applySafeRoomPvpFreeze() {
+  player.pvpFreezeFrames = PVP_SAFE_ROOM_FREEZE_FRAMES;
+  player.attackCooldown = Math.max(player.attackCooldown, PVP_SAFE_ROOM_FREEZE_FRAMES);
+  announcer(`Safe room PvP violation: crawler frozen for ${PVP_SAFE_ROOM_FREEZE_SECONDS} seconds.`);
+}
+
+function damageRemoteCrawler(crawler, damage) {
+  if (!crawler || crawler.status !== "active") return false;
+  if (!canCrawlerInitiatePvp(player) || isCrawlerInSafeRoom(crawler)) return false;
+  crawler.hp = Math.max(0, (crawler.hp ?? crawler.maxHp ?? player.maxHp) - Math.max(0, damage));
+  if (crawler.hp <= 0) {
+    crawler.status = "downed";
+    changeAudience(8);
+    achievement("CRAWLER DOWNED", `${crawler.name || "Crawler"} was downed in PvP outside the safe room.`, `pvpDown_${crawler.id}`);
+  } else {
+    changeAudience(2);
+    announcer(`${crawler.name || "Crawler"} took PvP damage. Safe rooms remain off-limits.`);
+  }
   return true;
 }
 
