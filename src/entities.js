@@ -82,7 +82,10 @@ function getCorpseById(id) {
 function closeLootWindow() {
   activeLootCorpseId = null;
   const panel = document.getElementById("lootWindow");
-  if (panel) panel.style.display = "none";
+  if (panel) {
+    panel.style.display = "none";
+    if (document.activeElement && panel.contains(document.activeElement)) document.activeElement.blur();
+  }
 }
 
 function formatLootItem(item) {
@@ -110,6 +113,7 @@ function renderCorpseLootWindow(corpse) {
     }).join("");
   }
   panel.style.display = "block";
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
 }
 
 function openCorpseLootWindow(corpse) {

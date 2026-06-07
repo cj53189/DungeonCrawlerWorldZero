@@ -500,6 +500,18 @@
     .itemActions { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
     .itemBtn { border:1px solid rgba(255,255,255,0.22); border-radius:999px; background:rgba(255,255,255,0.08); color:#fff; padding:5px 9px; font-size:11px; font-weight:800; cursor:pointer; }
     .itemBtn:hover,.weaponCell:hover { filter:brightness(1.14); }
+    #centerMessage button:focus,
+    #titleScreen button:focus,
+    #multiplayerPanel button:focus,
+    #logPanel button:focus,
+    #safeRoomRecap button:focus,
+    #inventoryPanel button:focus,
+    #lootWindow button:focus {
+      outline: 3px solid #7cf7ff;
+      outline-offset: 3px;
+      box-shadow: 0 0 0 2px rgba(0,0,0,0.8), 0 0 18px rgba(124,247,255,0.58);
+      filter: brightness(1.18);
+    }
     .rarityCommon { border-color:rgba(174,174,174,0.45); }
     .rarityCommon .itemName,.rarityCommon .equipName { color:#d9d9d9; }
     .rarityUncommon { border-color:rgba(87,205,112,0.7); box-shadow:0 0 14px rgba(87,205,112,0.12), inset 0 0 18px rgba(87,205,112,0.05); }
