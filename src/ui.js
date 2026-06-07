@@ -371,7 +371,7 @@ function updateMultiplayerPanel() {
   setText("mpPartyCode", multiplayer.partyCode ? `Party Code: ${multiplayer.partyCode}` : "Quick Match Queue");
   setText("mpRuleText", currentFloor === 0
     ? "Floor 0: tutorial, party-up, matchmaking, and no PvP."
-    : "Floor 1 test: four-crawler synchronized start. PvP still disabled for this milestone.");
+    : "Floor 1+: PvP enabled outside safe rooms. Attacking from a safe room freezes you for 5 seconds.");
 
   const list = document.getElementById("mpMemberList");
   if (list) {

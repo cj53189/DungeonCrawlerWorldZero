@@ -66,9 +66,15 @@ function updatePlayer() {
     dy = dy / len * player.speed;
   }
 
-  moveEntity(player, dx, dy);
+  if (player.pvpFreezeFrames > 0) {
+    player.pvpFreezeFrames = Math.max(0, player.pvpFreezeFrames - 1);
+    dx = 0;
+    dy = 0;
+  } else {
+    moveEntity(player, dx, dy);
+  }
   player.attackCooldown = Math.max(0, player.attackCooldown - 1);
-  if (touchState.attackActive) attack();
+  if (touchState.attackActive && player.pvpFreezeFrames <= 0) attack();
 
   const currentTile = tileAt(player.x, player.y);
   player.safe = currentTile === "S";
@@ -243,7 +249,11 @@ function addAttackTelegraph(weapon) {
 }
 
 function attack() {
-  if (player.attackCooldown > 0 || gameWon || gameLost) return;
+  if (player.attackCooldown > 0 || player.pvpFreezeFrames > 0 || gameWon || gameLost) return;
+  if (isPvpFloorActive() && isCrawlerInSafeRoom(player)) {
+    applySafeRoomPvpFreeze();
+    return;
+  }
   const weapon = getCurrentWeapon();
   const shape = weapon.attackShape;
   const damage = getWeaponDamage(weapon);
@@ -261,6 +271,8 @@ function attack() {
       damage,
       color: weapon.telegraphColor,
       hitEnemies: new Set(),
+      hitCrawlers: new Set(),
+      pvpEnabled: canCrawlerInitiatePvp(player),
       hit: false
     });
     return;
@@ -274,6 +286,17 @@ function attack() {
     if (shape.type === "arc") inShape = enemyInArc(enemy, shape.radius, shape.angle);
     if (shape.type === "line") inShape = enemyInLine(enemy, shape.length, shape.width);
     if (inShape) hit = damageEnemy(enemy, damage) || hit;
+  }
+
+  if (canCrawlerInitiatePvp(player) && multiplayer.remotePlayers?.size) {
+    for (const crawler of multiplayer.remotePlayers.values()) {
+      if (crawler.status !== "active") continue;
+      let inShape = false;
+      if (shape.type === "circle") inShape = enemyInCircle(crawler, shape.radius);
+      if (shape.type === "arc") inShape = enemyInArc(crawler, shape.radius, shape.angle);
+      if (shape.type === "line") inShape = enemyInLine(crawler, shape.length, shape.width);
+      if (inShape) hit = damageRemoteCrawler(crawler, damage) || hit;
+    }
   }
 
   if (!hit) stats.missedAttacks++;
@@ -306,6 +329,18 @@ function updateProjectiles() {
         projectile.hit = true;
         hit = true;
         break;
+      }
+    }
+
+    if (!hit && projectile.pvpEnabled && multiplayer.remotePlayers?.size) {
+      for (const crawler of multiplayer.remotePlayers.values()) {
+        if (crawler.status !== "active" || projectile.hitCrawlers?.has(crawler.id)) continue;
+        if (Math.hypot(projectile.x - crawler.x, projectile.y - crawler.y) <= projectile.radius + crawler.r) {
+          projectile.hitCrawlers.add(crawler.id);
+          hit = damageRemoteCrawler(crawler, projectile.damage);
+          projectile.hit = projectile.hit || hit;
+          break;
+        }
       }
     }
     if (hit) projectiles.splice(i, 1);
