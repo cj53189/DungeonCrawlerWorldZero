@@ -169,6 +169,10 @@ for (const enemy of enemies) {
       if (Math.random() < 0.015) enemy.wanderAngle = Math.random() * Math.PI * 2;
     }
     moveEntity(enemy, dx, dy);
+    if (typeof floor0EnemyRoomId === "function") {
+      const roomId = floor0EnemyRoomId(enemy);
+      if (Number.isFinite(Number(roomId))) enemy.roomId = Math.trunc(Number(roomId));
+    }
 
     const newDist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
     if (newDist < player.r + enemy.r + 4 && enemy.damageCooldown <= 0) {
@@ -201,6 +205,7 @@ function damageEnemy(enemy, damage) {
   if (!enemy || enemy.hp <= 0) return false;
   if (enemy.boss) triggerBossAggro("attack");
   enemy.hp -= damage;
+  if (typeof sendFloor0EnemyEvent === "function") sendFloor0EnemyEvent(enemy.hp <= 0 ? "enemy_killed" : "enemy_damaged", enemy);
   if (enemy.hp <= 0) {
     stats.enemiesKilled++;
     changeAudience(enemy.boss ? 10 : 4);
@@ -372,6 +377,7 @@ function interact() {
     }
     if (t === "D") {
       map[spot.y][spot.x] = ".";
+      if (typeof sendFloor0WorldEvent === "function") sendFloor0WorldEvent({ type: "door_opened", id: floor0TileId("door", spot.x, spot.y) });
       stats.doorsOpened++;
       changeAudience(1);
       if (stats.doorsOpened === 1) achievement("NEW ACHIEVEMENT: Suspiciously Door-Shaped Object", "You found a door and immediately made it everybody else's problem.", "firstDoor");
@@ -382,6 +388,7 @@ function interact() {
       const key = `${spot.x},${spot.y}`;
       if (!openedChests.has(key)) {
         openedChests.add(key);
+        if (typeof sendFloor0WorldEvent === "function") sendFloor0WorldEvent({ type: "chest_opened", id: floor0TileId("chest", spot.x, spot.y) });
         stats.chestsOpened++;
         map[spot.y][spot.x] = ".";
         changeAudience(2);

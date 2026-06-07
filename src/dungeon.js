@@ -115,6 +115,7 @@ function generateDungeonLayout() {
   placeObjects("C", Math.min(10, Math.max(4, Math.floor(rooms.length / 5))), [startRoom, exitRoom, bossRoom, spawnRoom]);
   placeEnemies(Math.min(16, Math.max(6, Math.floor(rooms.length / 3))), [startRoom, bossRoom, spawnRoom], spawnRoom);
   placeBossEnemy();
+  assignStableFloor0EnemyIds();
   buildDungeonVisuals();
   stats.floorRooms = rooms.length;
 }
@@ -929,6 +930,7 @@ function placeBossEnemy(){
     damage:10+lvl*4,
     xpReward:75+lvl*24,
     speed:.62+lvl*.025,
+    roomId:bossRoom.id,
     damageCooldown:0,
     wanderAngle:Math.random()*Math.PI*2
   };
@@ -1284,6 +1286,7 @@ function placeEnemies(count, excludedRooms = [], spawnRoom = null) {
         damage: 5 + enemyLevel * 3,
         xpReward: 12 + enemyLevel * 8,
         speed: 0.74 + enemyLevel * 0.045,
+        roomId: room.id,
         damageCooldown: 0,
         wanderAngle: Math.random() * Math.PI * 2
       });
@@ -1292,3 +1295,13 @@ function placeEnemies(count, excludedRooms = [], spawnRoom = null) {
   }
 }
 
+
+
+function assignStableFloor0EnemyIds() {
+  if (!Array.isArray(enemies)) return;
+  enemies.forEach((enemy, index) => {
+    const roomId = Number.isFinite(Number(enemy.roomId)) ? Math.trunc(Number(enemy.roomId)) : (typeof floor0EnemyRoomId === "function" ? floor0EnemyRoomId(enemy) : "unknown");
+    enemy.roomId = Number.isFinite(Number(roomId)) ? Number(roomId) : enemy.roomId;
+    enemy.enemyId = `floor0_enemy_${String(index + 1).padStart(3, "0")}_room_${roomId}`;
+  });
+}

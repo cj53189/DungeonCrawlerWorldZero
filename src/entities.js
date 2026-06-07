@@ -125,6 +125,7 @@ function openCorpseLootWindow(corpse) {
 function finishCorpseLootIfEmpty(corpse) {
   if (!corpse || corpse.loot.length) return;
   corpse.looted = true;
+  if (typeof sendFloor0WorldEvent === "function") sendFloor0WorldEvent({ type: "loot_taken", id: corpse.id });
   changeAudience(corpse.boss ? 8 : 1);
   achievement(
     corpse.boss ? "BOSS CORPSE LOOTED" : "CORPSE LOOTED",
