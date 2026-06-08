@@ -585,6 +585,40 @@ function drawEnvironmentalLightFixtures() {
   }
 }
 
+function drawTutorialSigns() {
+  if (!Array.isArray(tutorialSigns)) return;
+
+  for (const sign of tutorialSigns) {
+    if (!sign || seenTutorialSignIds.has(sign.id)) continue;
+    if (!visible[sign.y]?.[sign.x]) continue;
+
+    const sx = sign.x * TILE + TILE / 2;
+    const sy = sign.y * TILE + TILE / 2;
+    const pulse = 1 + Math.sin(frameCount * 0.08 + sign.x) * 0.08;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.scale(pulse, pulse);
+    ctx.fillStyle = "rgba(0,0,0,0.42)";
+    ctx.beginPath();
+    ctx.ellipse(0, 11, 12, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#5b3a1f";
+    ctx.fillRect(-2, -1, 4, 17);
+    ctx.fillStyle = "#d6b55c";
+    ctx.strokeStyle = "#3f2a18";
+    ctx.lineWidth = 2;
+    ctx.fillRect(-12, -14, 24, 14);
+    ctx.strokeRect(-12, -14, 24, 14);
+    ctx.fillStyle = "#24180e";
+    ctx.font = "900 10px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("?", 0, -7);
+    ctx.restore();
+  }
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const camX = player.x - canvas.width / 2;
@@ -647,6 +681,7 @@ function draw() {
   drawAtmosphericLighting(startX, endX, startY, endY);
   drawEnvironmentalLightFixtures();
   drawEngravedRoomNames(camX, camY);
+  drawTutorialSigns();
 
   for (const corpse of corpses) {
     if (corpse.looted) continue;

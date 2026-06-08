@@ -119,8 +119,128 @@ function generateDungeonLayout() {
   placeEnemies(Math.max(0, Math.min(16, Math.max(6, Math.floor(rooms.length / 3))) - guaranteedEnemies), [startRoom, bossRoom, spawnRoom], spawnRoom);
   placeBossEnemy();
   assignStableFloor0EnemyIds();
+  placeFloor0TutorialSigns(spawnRoom, exitRoom);
   buildDungeonVisuals();
   stats.floorRooms = rooms.length;
+}
+
+
+const FLOOR0_TUTORIAL_SIGN_DEFINITIONS = [
+  { id: "floor0_sign_welcome", title: "Welcome Crawler", body: "Find the stairs before collapse." },
+  { id: "floor0_sign_doors", title: "Doors", body: "Press E to interact." },
+  { id: "floor0_sign_combat", title: "Combat", body: "Attack or become loot." },
+  { id: "floor0_sign_loot", title: "Loot", body: "Better gear means longer survival." },
+  { id: "floor0_sign_stairs", title: "Stairs", body: "Reach these before collapse." }
+];
+
+function placeFloor0TutorialSigns(spawnRoom, exitRoom) {
+  tutorialSigns = [];
+  if (currentFloor !== 0) return;
+
+  ensureFloor0TutorialDoor();
+
+  addTutorialSign(FLOOR0_TUTORIAL_SIGN_DEFINITIONS[0], {
+    x: Math.floor(player.x / TILE),
+    y: Math.floor(player.y / TILE)
+  }, spawnRoom);
+
+  const firstDoor = findNearestMapTile("D", player.x / TILE, player.y / TILE);
+  if (firstDoor) addTutorialSign(FLOOR0_TUTORIAL_SIGN_DEFINITIONS[1], firstDoor, roomForTile(firstDoor.x, firstDoor.y));
+
+  const firstEnemy = findNearestEnemy(player.x, player.y);
+  if (firstEnemy) addTutorialSign(FLOOR0_TUTORIAL_SIGN_DEFINITIONS[2], {
+    x: Math.floor(firstEnemy.x / TILE),
+    y: Math.floor(firstEnemy.y / TILE)
+  }, rooms.find(room => room.id === firstEnemy.roomId) || roomForTile(Math.floor(firstEnemy.x / TILE), Math.floor(firstEnemy.y / TILE)));
+
+  const firstLoot = findNearestMapTile("C", player.x / TILE, player.y / TILE);
+  if (firstLoot) addTutorialSign(FLOOR0_TUTORIAL_SIGN_DEFINITIONS[3], firstLoot, roomForTile(firstLoot.x, firstLoot.y));
+
+  if (stairwellX !== null && stairwellY !== null) {
+    addTutorialSign(FLOOR0_TUTORIAL_SIGN_DEFINITIONS[4], { x: stairwellX, y: stairwellY }, exitRoom);
+  }
+}
+
+
+function ensureFloor0TutorialDoor() {
+  if (findNearestMapTile("D", player.x / TILE, player.y / TILE)) return;
+
+  let best = null;
+  let bestDist = Infinity;
+  for (let y = 1; y < MAP_ROWS - 1; y++) {
+    for (let x = 1; x < MAP_COLS - 1; x++) {
+      if (!isValidDoorSpot(x, y)) continue;
+      const dist = Math.hypot(x - player.x / TILE, y - player.y / TILE);
+      if (dist < bestDist) { best = { x, y }; bestDist = dist; }
+    }
+  }
+
+  if (best) map[best.y][best.x] = "D";
+}
+
+function addTutorialSign(definition, target, room = null) {
+  if (!definition || !target) return;
+  const tile = chooseTutorialSignTile(target, room);
+  if (!tile) return;
+  if (tutorialSigns.some(sign => sign.x === tile.x && sign.y === tile.y)) return;
+  tutorialSigns.push({ ...definition, x: tile.x, y: tile.y, radius: TILE * 1.85 });
+}
+
+function chooseTutorialSignTile(target, room = null) {
+  const tx = Math.max(0, Math.min(MAP_COLS - 1, Math.floor(target.x)));
+  const ty = Math.max(0, Math.min(MAP_ROWS - 1, Math.floor(target.y)));
+  let best = null;
+  let bestScore = Infinity;
+
+  for (let radius = 1; radius <= 5; radius++) {
+    for (let y = ty - radius; y <= ty + radius; y++) {
+      for (let x = tx - radius; x <= tx + radius; x++) {
+        if (Math.abs(x - tx) !== radius && Math.abs(y - ty) !== radius) continue;
+        if (!isValidTutorialSignTile(x, y, room)) continue;
+        const score = Math.hypot(x - tx, y - ty) + Math.hypot(x - player.x / TILE, y - player.y / TILE) * 0.02;
+        if (score < bestScore) { best = { x, y }; bestScore = score; }
+      }
+    }
+    if (best) return best;
+  }
+
+  if (isValidTutorialSignTile(tx, ty, room)) return { x: tx, y: ty };
+  return null;
+}
+
+function isValidTutorialSignTile(x, y, room = null) {
+  if (!isInMapBounds(x, y)) return false;
+  const tile = map[y]?.[x];
+  if (!(tile === "." || tile === "S")) return false;
+  if (room && !roomContainsTile(room, x, y) && roomForTile(x, y) !== room) return false;
+  if (Math.hypot(x + 0.5 - player.x / TILE, y + 0.5 - player.y / TILE) < 0.75) return false;
+  if (enemies.some(enemy => enemy.hp > 0 && Math.hypot(x + 0.5 - enemy.x / TILE, y + 0.5 - enemy.y / TILE) < 1.2)) return false;
+  if (corpses.some(corpse => !corpse.looted && Math.hypot(x + 0.5 - corpse.x / TILE, y + 0.5 - corpse.y / TILE) < 1.2)) return false;
+  return true;
+}
+
+function findNearestMapTile(tileType, fromX, fromY) {
+  let best = null;
+  let bestDist = Infinity;
+  for (let y = 0; y < MAP_ROWS; y++) {
+    for (let x = 0; x < MAP_COLS; x++) {
+      if (map[y]?.[x] !== tileType) continue;
+      const dist = Math.hypot(x - fromX, y - fromY);
+      if (dist < bestDist) { best = { x, y }; bestDist = dist; }
+    }
+  }
+  return best;
+}
+
+function findNearestEnemy(fromX, fromY) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const enemy of enemies) {
+    if (enemy.hp <= 0 || enemy.boss) continue;
+    const dist = Math.hypot(enemy.x - fromX, enemy.y - fromY);
+    if (dist < bestDist) { best = enemy; bestDist = dist; }
+  }
+  return best;
 }
 
 function expandRect(r, a) { return { x: r.x - a, y: r.y - a, w: r.w + a * 2, h: r.h + a * 2 }; }
@@ -798,12 +918,10 @@ function updateCurrentRoom(){
    currentRoomSubtitle=room.subtitle||"";
    if(room.type==="safe"){
      announceRoomIdentity(room);
-     announceRoomTutorial(room);
    }
    if(room.type!=="safe"){
      stats.namedRoomsEntered++;
      announceRoomIdentity(room);
-     announceRoomTutorial(room);
    }
    if(room.type==="boss"&&!room.cleared&&!room.locked)startBossEncounter(room);
    updateHUD();
@@ -817,10 +935,6 @@ function announceRoomIdentity(room) {
   achievement(title, body, `room_identity_${room.id}`);
 }
 
-function announceRoomTutorial(room) {
-  if (!room?.tutorialId || !room.tutorialMessage) return;
-  achievement("DUNGEON AI COMMENTARY", room.tutorialMessage, room.tutorialId);
-}
 function startBossEncounter(room){
   // dcw_010: entering a boss room only announces it.
   // Actual lockdown happens only through triggerBossAggro().

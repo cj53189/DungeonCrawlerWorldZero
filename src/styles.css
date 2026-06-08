@@ -639,6 +639,7 @@
 
 .titleActions {
   display: grid;
+  margin-top: 18px;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 12px;
 }
@@ -663,29 +664,6 @@
 .mpActions button:hover {
   filter: brightness(1.12);
 }
-
-.titleNote {
-  margin-top: 16px;
-  color: #aaa;
-  font-size: 13px;
-}
-
-.firstRunHelp {
-  margin: 0 auto 18px;
-  max-width: 640px;
-  text-align: left;
-  border: 1px solid rgba(157,177,255,0.34);
-  border-radius: 12px;
-  background: rgba(157,177,255,0.10);
-  padding: 12px 14px;
-  color: #e8ecff;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.firstRunHelp strong { color: #ffd86b; }
-.firstRunHelp ul { margin: 7px 0 0 18px; padding: 0; }
-.firstRunHelp li { margin: 4px 0; }
 
 .titleConnectionStatus,
 .mpConnectionStatus {
@@ -846,10 +824,6 @@ body.titleActive #announcer {
     padding: 22px;
   }
 
-  .firstRunHelp {
-    font-size: 12px;
-    padding: 10px 12px;
-  }
 
   #testerDebugLine {
     bottom: 3px;

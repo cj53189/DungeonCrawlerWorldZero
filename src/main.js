@@ -9,6 +9,7 @@ function gameLoop() {
     updateFloorTimer();
     updateVisibility();
     updatePrompt();
+    updateTutorialSigns();
   }
   if (typeof maybeSendLocalCrawlerState === "function") maybeSendLocalCrawlerState();
   if (typeof maybeSendFloor0EnemySnapshot === "function") maybeSendFloor0EnemySnapshot();
