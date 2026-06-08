@@ -392,7 +392,7 @@ function interact() {
         stats.chestsOpened++;
         map[spot.y][spot.x] = ".";
         changeAudience(2);
-        rewardChestLoot();
+        rewardChestLoot(roomForTile(spot.x, spot.y));
         if (!achievements.has("firstChest")) achievement("NEW ACHIEVEMENT: Box Goblin", "You opened a chest. The dungeon has begun the traditional process of bribing you into worse decisions.", "firstChest");
         return;
       }
@@ -687,6 +687,5 @@ function makeDungeonObservation() {
   ][Math.floor(Math.random() * 5)]);
   announcer(obs[Math.floor(Math.random() * obs.length)]);
 }
-
 
 

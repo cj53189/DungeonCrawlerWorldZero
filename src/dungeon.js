@@ -96,15 +96,16 @@ function generateDungeonLayout() {
     return;
   }
 
-  assignRoomNamesAndBoss();
+  assignRoomThemesAndBoss();
 
   const startRoom = rooms[0];
-  startRoom.type="safe"; startRoom.name="Safe Room";
+  startRoom.type="safe"; startRoom.name="Safe Room"; startRoom.themeId="safeRoom"; startRoom.subtitle="A temporary mercy with walls."; startRoom.tutorialId="floor0_movement"; startRoom.tutorialMessage="Move through rooms with WASD, Arrow keys, or the left joystick.";
   carveRoom(startRoom, "S");
 
   cleanupBadDoors();
 
-  const exitRoom = getFarthestRoom(startRoom);
+  const exitRoom = getFarthestRoom(startRoom, [bossRoom]);
+  applyRoomTheme(exitRoom, FLOOR0_ROOM_THEMES.stairwell);
   map[exitRoom.cy][exitRoom.cx] = "E";
   stairwellX = exitRoom.cx;
   stairwellY = exitRoom.cy;
@@ -113,7 +114,9 @@ function generateDungeonLayout() {
   placeCrawlerInRoom(spawnRoom);
 
   placeObjects("C", Math.min(10, Math.max(4, Math.floor(rooms.length / 5))), [startRoom, exitRoom, bossRoom, spawnRoom]);
-  placeEnemies(Math.min(16, Math.max(6, Math.floor(rooms.length / 3))), [startRoom, bossRoom, spawnRoom], spawnRoom);
+  placeFloor0StarterLoot([startRoom, exitRoom, bossRoom, spawnRoom]);
+  const guaranteedEnemies = placeFloor0StarterEnemies([startRoom, bossRoom, spawnRoom], spawnRoom);
+  placeEnemies(Math.max(0, Math.min(16, Math.max(6, Math.floor(rooms.length / 3))) - guaranteedEnemies), [startRoom, bossRoom, spawnRoom], spawnRoom);
   placeBossEnemy();
   assignStableFloor0EnemyIds();
   buildDungeonVisuals();
@@ -140,11 +143,171 @@ function createRoom({ id, x, y, w, h, sizeClass, forcedBossCandidate = false }) 
     seen: false,
     sizeClass,
     name: null,
+    themeId: null,
+    subtitle: "",
+    tutorialId: null,
+    tutorialMessage: "",
     type: "normal",
     locked: false,
     cleared: false,
     forcedBossCandidate
   };
+}
+
+const FLOOR0_ROOM_THEMES = {
+  ratNest: {
+    id: "ratNest",
+    name: "Rat Nest",
+    subtitle: "The scratching never stops.",
+    tutorialId: "floor0_attack",
+    tutorialMessage: "Attack enemies to survive.",
+    sizeWeights: { small: 5, medium: 2, large: 1 },
+    lootBias: 0.8,
+    enemies: [
+      { name: "Small Rat", r: 9, hp: 0.82, damage: 0.78, speed: 1.18, xp: 0.85 },
+      { name: "Hungry Rat", r: 11, hp: 1.0, damage: 1.05, speed: 1.06, xp: 1.0 },
+      { name: "Giant Rat", r: 14, hp: 1.32, damage: 1.18, speed: 0.9, xp: 1.18 }
+    ]
+  },
+  spiderDen: {
+    id: "spiderDen",
+    name: "Spider Den",
+    subtitle: "Every web is load-bearing, apparently.",
+    sizeWeights: { small: 4, medium: 3, large: 1 },
+    lootBias: 0.55,
+    enemies: [
+      { name: "Cave Spider", r: 10, hp: 0.9, damage: 0.9, speed: 1.18, xp: 0.95 },
+      { name: "Venom Spider", r: 11, hp: 1.02, damage: 1.22, speed: 1.08, xp: 1.12 },
+      { name: "Brood Spider", r: 15, hp: 1.42, damage: 1.08, speed: 0.86, xp: 1.24 }
+    ]
+  },
+  supplyCloset: {
+    id: "supplyCloset",
+    name: "Supply Closet",
+    subtitle: "One crawler's trash is another crawler's starter gear.",
+    tutorialId: "floor0_loot",
+    tutorialMessage: "Press E to loot containers.",
+    sizeWeights: { small: 5, medium: 2, large: 0.3 },
+    lootBias: 2.8,
+    enemies: [
+      { name: "Small Rat", r: 9, hp: 0.78, damage: 0.72, speed: 1.12, xp: 0.8 },
+      { name: "Janitor Bot", r: 12, hp: 1.08, damage: 0.88, speed: 0.86, xp: 1.0 }
+    ]
+  },
+  maintenanceTunnel: {
+    id: "maintenanceTunnel",
+    name: "Maintenance Tunnel",
+    subtitle: "The dungeon's plumbing has opinions.",
+    tutorialId: "floor0_doors",
+    tutorialMessage: "Press E near doors to open a path.",
+    sizeWeights: { small: 3, medium: 4, large: 1 },
+    lootBias: 0.9,
+    enemies: [
+      { name: "Janitor Bot", r: 12, hp: 1.0, damage: 0.92, speed: 0.92, xp: 1.0 },
+      { name: "Maintenance Guard", r: 13, hp: 1.16, damage: 1.08, speed: 0.9, xp: 1.12 },
+      { name: "Security Drone", r: 10, hp: 0.9, damage: 1.04, speed: 1.22, xp: 1.06 }
+    ]
+  },
+  armory: {
+    id: "armory",
+    name: "Armory",
+    subtitle: "Everything here has a handle and a grudge.",
+    tutorialId: "floor0_equip",
+    tutorialMessage: "Equip better gear from inventory.",
+    sizeWeights: { small: 1, medium: 4, large: 2 },
+    lootBias: 2.2,
+    enemies: [
+      { name: "Maintenance Guard", r: 13, hp: 1.2, damage: 1.12, speed: 0.92, xp: 1.14 },
+      { name: "Security Drone", r: 10, hp: 0.92, damage: 1.16, speed: 1.2, xp: 1.08 }
+    ]
+  },
+  barracks: {
+    id: "barracks",
+    name: "Barracks",
+    subtitle: "Somebody forgot to tell them the war ended.",
+    sizeWeights: { small: 1, medium: 4, large: 3 },
+    lootBias: 1.1,
+    enemies: [
+      { name: "Security Drone", r: 10, hp: 0.95, damage: 1.12, speed: 1.22, xp: 1.08 },
+      { name: "Janitor Bot", r: 12, hp: 1.06, damage: 0.9, speed: 0.9, xp: 1.0 },
+      { name: "Maintenance Guard", r: 14, hp: 1.28, damage: 1.18, speed: 0.88, xp: 1.2 }
+    ]
+  },
+  storageRoom: {
+    id: "storageRoom",
+    name: "Storage Room",
+    subtitle: "Crates stacked with total disregard for OSHA and destiny.",
+    sizeWeights: { small: 2, medium: 4, large: 2 },
+    lootBias: 1.8,
+    enemies: [
+      { name: "Hungry Rat", r: 11, hp: 1.0, damage: 1.0, speed: 1.06, xp: 1.0 },
+      { name: "Janitor Bot", r: 12, hp: 1.05, damage: 0.92, speed: 0.88, xp: 1.0 }
+    ]
+  },
+  floodedChamber: {
+    id: "floodedChamber",
+    name: "Flooded Chamber",
+    subtitle: "The water is shallow. The consequences may not be.",
+    sizeWeights: { small: 1, medium: 3, large: 4 },
+    lootBias: 0.75,
+    enemies: [
+      { name: "Cave Spider", r: 10, hp: 0.92, damage: 0.92, speed: 1.1, xp: 0.96 },
+      { name: "Hungry Rat", r: 11, hp: 1.0, damage: 1.0, speed: 1.02, xp: 1.0 },
+      { name: "Giant Rat", r: 14, hp: 1.3, damage: 1.16, speed: 0.86, xp: 1.18 }
+    ]
+  },
+  securityOffice: {
+    id: "securityOffice",
+    name: "Security Office",
+    subtitle: "The monitors are dead. The paranoia is not.",
+    sizeWeights: { small: 2, medium: 4, large: 1 },
+    lootBias: 1.25,
+    enemies: [
+      { name: "Security Drone", r: 10, hp: 0.96, damage: 1.18, speed: 1.24, xp: 1.1 },
+      { name: "Maintenance Guard", r: 14, hp: 1.24, damage: 1.12, speed: 0.9, xp: 1.16 }
+    ]
+  },
+  stairwell: {
+    id: "stairwell",
+    name: "Stairwell",
+    subtitle: "Down is the only direction with a future.",
+    tutorialId: "floor0_stairs",
+    tutorialMessage: "The collapse timer is real. Reach the stairs before time expires.",
+    sizeWeights: { small: 1, medium: 2, large: 3 },
+    lootBias: 0.35,
+    enemies: [
+      { name: "Security Drone", r: 10, hp: 0.92, damage: 1.08, speed: 1.2, xp: 1.05 },
+      { name: "Maintenance Guard", r: 13, hp: 1.16, damage: 1.08, speed: 0.9, xp: 1.1 }
+    ]
+  }
+};
+
+const FLOOR0_REQUIRED_THEME_IDS = ["supplyCloset", "ratNest", "maintenanceTunnel", "armory"];
+
+function roomThemeDefinition(room) {
+  return FLOOR0_ROOM_THEMES[room?.themeId] || null;
+}
+
+function weightedThemeForRoom(room, avoidIds = new Set()) {
+  const entries = Object.values(FLOOR0_ROOM_THEMES)
+    .filter(theme => !avoidIds.has(theme.id) && theme.id !== "stairwell")
+    .map(theme => ({ theme, weight: Math.max(0.1, theme.sizeWeights?.[room.sizeClass] ?? 1) }));
+  const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
+  let roll = Math.random() * total;
+  for (const entry of entries) {
+    roll -= entry.weight;
+    if (roll <= 0) return entry.theme;
+  }
+  return entries[entries.length - 1]?.theme || FLOOR0_ROOM_THEMES.storageRoom;
+}
+
+function applyRoomTheme(room, theme) {
+  if (!room || !theme) return;
+  room.themeId = theme.id;
+  room.name = theme.name;
+  room.subtitle = theme.subtitle || "";
+  room.tutorialId = theme.tutorialId || null;
+  room.tutorialMessage = theme.tutorialMessage || "";
 }
 
 function createRoomParts(x, y, w, h, sizeClass, forcedBossCandidate, isSafeRoom) {
@@ -553,10 +716,9 @@ function maybePlaceDoorNear(ax, ay, bx, by) {
 
 
 
-function assignRoomNamesAndBoss(){
+function assignRoomThemesAndBoss(){
  for(const room of rooms){
    room.sizeClass=room.sizeClass||((room.w*room.h>220)?"large":(room.w*room.h>120)?"medium":"small");
-   room.name=choose(ROOM_NAMES[room.sizeClass]||ROOM_NAMES.medium);
  }
 
  const candidates=rooms
@@ -573,8 +735,25 @@ function assignRoomNamesAndBoss(){
  if(bossRoom){
    bossRoom.type="boss";
    bossRoom.name=choose(ROOM_NAMES.boss);
+   bossRoom.themeId="boss";
+   bossRoom.subtitle="The room is larger because the mistake inside it needs space.";
    bossRoom.locked=false;
    bossRoom.cleared=false;
+ }
+
+ const themeableRooms = rooms.filter((room, index) => index !== 0 && room !== bossRoom);
+ const earlyRooms = themeableRooms.slice(0, FLOOR0_REQUIRED_THEME_IDS.length);
+ for (let i = 0; i < earlyRooms.length; i++) {
+   applyRoomTheme(earlyRooms[i], FLOOR0_ROOM_THEMES[FLOOR0_REQUIRED_THEME_IDS[i]]);
+ }
+
+ const recentThemeIds = new Set(earlyRooms.map(room => room.themeId).filter(Boolean));
+ for(const room of themeableRooms){
+   if(room.themeId) continue;
+   const theme = weightedThemeForRoom(room, recentThemeIds.size > 2 ? recentThemeIds : new Set());
+   applyRoomTheme(room, theme);
+   recentThemeIds.add(theme.id);
+   if(recentThemeIds.size > 4) recentThemeIds.delete([...recentThemeIds][0]);
  }
 }
 
@@ -616,10 +795,31 @@ function roomForTile(tx, ty) {
 function updateCurrentRoom(){
  const tx=Math.floor(player.x/TILE),ty=Math.floor(player.y/TILE),room=roomForTile(tx,ty); if(!room)return;
  if(player.currentRoomId!==room.id){player.currentRoomId=room.id; currentRoomName=room.name||"Unknown Chamber";
-   if(room.type!=="safe"){stats.namedRoomsEntered++; announcer(`Room discovered: ${currentRoomName}. Try not to make it historically significant.`);}
+   currentRoomSubtitle=room.subtitle||"";
+   if(room.type==="safe"){
+     announceRoomIdentity(room);
+     announceRoomTutorial(room);
+   }
+   if(room.type!=="safe"){
+     stats.namedRoomsEntered++;
+     announceRoomIdentity(room);
+     announceRoomTutorial(room);
+   }
    if(room.type==="boss"&&!room.cleared&&!room.locked)startBossEncounter(room);
    updateHUD();
  }
+}
+
+function announceRoomIdentity(room) {
+  if (!room) return;
+  const title = room.name || "Unknown Chamber";
+  const body = room.subtitle || "Try not to make it historically significant.";
+  achievement(title, body, `room_identity_${room.id}`);
+}
+
+function announceRoomTutorial(room) {
+  if (!room?.tutorialId || !room.tutorialMessage) return;
+  achievement("DUNGEON AI COMMENTARY", room.tutorialMessage, room.tutorialId);
 }
 function startBossEncounter(room){
   // dcw_010: entering a boss room only announces it.
@@ -942,9 +1142,11 @@ function completeBossEncounter(enemy){
   pendingBossLocks = [];
   clearBossLocks();if(!bossRoom||bossRoom.cleared)return; bossRoom.cleared=true; bossRoom.locked=false; stats.bossesDefeated++; unlockBossDoors(bossRoom); const cx=Math.max(bossRoom.x+1,Math.min(bossRoom.x+bossRoom.w-2,bossRoom.cx+1)),cy=Math.max(bossRoom.y+1,Math.min(bossRoom.y+bossRoom.h-2,bossRoom.cy)); if(map[cy][cx]===".")map[cy][cx]="C"; changeAudience(15); achievement("BOSS DEFEATED",`You defeated ${enemy.name||"the boss"}. The doors unlock. The corpse remains lootable, because dignity is not included in the tutorial.`,"bossDefeated");}
 
-function getFarthestRoom(fromRoom) {
+function getFarthestRoom(fromRoom, excludedRooms = []) {
+  const excluded = new Set(excludedRooms.filter(Boolean));
   let best = rooms[0], bestDist = -1;
   for (const r of rooms) {
+    if (excluded.has(r)) continue;
     const d = Math.hypot(r.cx - fromRoom.cx, r.cy - fromRoom.cy);
     if (d > bestDist) { bestDist = d; best = r; }
   }
@@ -977,6 +1179,12 @@ function visualThemeForRoom(room) {
   const name = (room?.name || "").toLowerCase();
   if (room?.type === "safe") return { density: 0.015, floorBias: "worn", weights: { dust: 0.7, debris: 0.3 } };
   if (room?.type === "boss") return { density: 0.026, floorBias: "stain", weights: { scorch: 0.45, brokenStone: 0.35, debris: 0.2 } };
+  if (room?.themeId === "ratNest") return { density: 0.06, floorBias: "scratch", weights: { debris: 0.36, dust: 0.34, brokenStone: 0.18, marking: 0.12 } };
+  if (room?.themeId === "spiderDen") return { density: 0.052, floorBias: "stain", weights: { dust: 0.42, marking: 0.3, debris: 0.18, brokenStone: 0.1 } };
+  if (["supplyCloset", "storageRoom", "armory"].includes(room?.themeId)) return { density: 0.05, floorBias: "worn", weights: { debris: 0.48, coins: 0.22, dust: 0.2, brokenStone: 0.1 } };
+  if (["maintenanceTunnel", "securityOffice", "barracks"].includes(room?.themeId)) return { density: 0.046, floorBias: "scratch", weights: { debris: 0.38, scorch: 0.28, brokenStone: 0.2, dust: 0.14 } };
+  if (room?.themeId === "floodedChamber") return { density: 0.035, floorBias: "stain", weights: { dust: 0.34, debris: 0.26, brokenStone: 0.22, marking: 0.18 } };
+  if (room?.themeId === "stairwell") return { density: 0.032, floorBias: "worn", weights: { marking: 0.42, dust: 0.3, debris: 0.18, brokenStone: 0.1 } };
   if (name.includes("collapsed") || room?.shape === "alcove") return { density: 0.075, floorBias: "rubble", weights: { debris: 0.42, brokenStone: 0.42, dust: 0.16 } };
   if (name.includes("barracks") || name.includes("guard") || name.includes("armory")) return { density: 0.045, floorBias: "scratch", weights: { debris: 0.55, brokenStone: 0.25, dust: 0.2 } };
   if (name.includes("treasury") || name.includes("feast")) return { density: 0.026, floorBias: "worn", weights: { coins: 0.45, dust: 0.35, debris: 0.2 } };
@@ -1254,12 +1462,83 @@ function placeObjects(tile, count, excludedRooms = []) {
   let placed = 0, guard = 0;
   while (placed < count && guard < 400) {
     guard++;
-    const i = Math.floor(Math.random() * rooms.length);
+    const i = chooseWeightedRoomIndexForLoot(excluded);
     if (excluded.has(i)) continue;
     const room = rooms[i];
     const spot = chooseRandomRoomTile(room, 1);
     if (spot) { map[spot.y][spot.x] = tile; placed++; }
   }
+}
+
+function chooseWeightedRoomIndexForLoot(excluded) {
+  const candidates = rooms.map((room, index) => ({ room, index }))
+    .filter(entry => !excluded.has(entry.index) && entry.room?.type !== "boss");
+  if (!candidates.length) return Math.floor(Math.random() * rooms.length);
+  const total = candidates.reduce((sum, entry) => sum + (roomThemeDefinition(entry.room)?.lootBias || 1), 0);
+  let roll = Math.random() * total;
+  for (const entry of candidates) {
+    roll -= roomThemeDefinition(entry.room)?.lootBias || 1;
+    if (roll <= 0) return entry.index;
+  }
+  return candidates[candidates.length - 1].index;
+}
+
+function placeFloor0StarterLoot(excludedRooms = []) {
+  if (currentFloor !== 0) return;
+  const excluded = new Set(excludedRooms.map(room => room?.id).filter(id => id !== undefined));
+  for (const themeId of ["supplyCloset", "armory"]) {
+    const room = rooms.find(r => r.themeId === themeId && !excluded.has(r.id));
+    const alreadyHasChest = room && roomTileList(room).some(t => map[t.y]?.[t.x] === "C");
+    if (!room || alreadyHasChest) continue;
+    const spot = chooseRandomRoomTile(room, 1);
+    if (spot) map[spot.y][spot.x] = "C";
+  }
+}
+
+function chooseEnemyVariantForRoom(room) {
+  const family = roomThemeDefinition(room)?.enemies;
+  const variants = family?.length ? family : [
+    { name: "Dungeon Lurker", r: 11, hp: 1, damage: 1, speed: 1, xp: 1 },
+    { name: "Restless Crawler", r: 12, hp: 1.05, damage: 1.02, speed: 0.96, xp: 1.02 }
+  ];
+  return variants[Math.floor(Math.random() * variants.length)];
+}
+
+function createEnemyForRoom(room, spot, spawnRoom = null) {
+  const enemyLevel = rollScaledEnemyLevel(room, spawnRoom);
+  const variant = chooseEnemyVariantForRoom(room);
+  const maxHp = Math.max(12, Math.round((24 + enemyLevel * 10) * (variant.hp || 1)));
+  return {
+    x: spot.x * TILE + TILE / 2,
+    y: spot.y * TILE + TILE / 2,
+    r: variant.r || 11,
+    level: enemyLevel,
+    name: variant.name || "Dungeon Lurker",
+    family: room.themeId || "floor0",
+    hp: maxHp,
+    maxHp: maxHp,
+    damage: Math.max(1, Math.round((5 + enemyLevel * 3) * (variant.damage || 1))),
+    xpReward: Math.max(1, Math.round((12 + enemyLevel * 8) * (variant.xp || 1))),
+    speed: (0.74 + enemyLevel * 0.045) * (variant.speed || 1),
+    roomId: room.id,
+    damageCooldown: 0,
+    wanderAngle: Math.random() * Math.PI * 2
+  };
+}
+
+function placeFloor0StarterEnemies(excludedRooms = [], spawnRoom = null) {
+  if (currentFloor !== 0) return 0;
+  const excluded = new Set(excludedRooms.map(room => room?.id).filter(id => id !== undefined));
+  let placed = 0;
+  for (const themeId of ["ratNest", "spiderDen", "barracks"]) {
+    const room = rooms.find(r => r.themeId === themeId && !excluded.has(r.id));
+    if (!room) continue;
+    const spot = chooseRandomRoomTile(room, 1);
+    if (!spot) continue;
+    enemies.push(createEnemyForRoom(room, spot, spawnRoom));
+    placed++;
+  }
+  return placed;
 }
 
 function placeEnemies(count, excludedRooms = [], spawnRoom = null) {
@@ -1272,24 +1551,7 @@ function placeEnemies(count, excludedRooms = [], spawnRoom = null) {
     const room = rooms[i];
     const spot = chooseRandomRoomTile(room, 1);
     if (spot) {
-      const x = spot.x;
-      const y = spot.y;
-      const enemyLevel = rollScaledEnemyLevel(room, spawnRoom);
-      const maxHp = 24 + enemyLevel * 10;
-      enemies.push({
-        x: x * TILE + TILE / 2,
-        y: y * TILE + TILE / 2,
-        r: 11,
-        level: enemyLevel,
-        hp: maxHp,
-        maxHp: maxHp,
-        damage: 5 + enemyLevel * 3,
-        xpReward: 12 + enemyLevel * 8,
-        speed: 0.74 + enemyLevel * 0.045,
-        roomId: room.id,
-        damageCooldown: 0,
-        wanderAngle: Math.random() * Math.PI * 2
-      });
+      enemies.push(createEnemyForRoom(room, spot, spawnRoom));
       placed++;
     }
   }

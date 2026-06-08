@@ -674,6 +674,7 @@ for (const enemy of enemies) {
     ctx.fillStyle = "rgba(255,255,255,0.78)";
     ctx.font = "10px Arial";
     ctx.textAlign = "center";
+    ctx.fillText(enemy.name || `${enemy.boss ? "BOSS " : ""}Lv ${enemy.level || 1}`, enemy.x, enemy.y - 34);
     ctx.fillText(`${enemy.boss ? "BOSS " : ""}Lv ${enemy.level || 1}`, enemy.x, enemy.y - 27);
   }
 
@@ -992,4 +993,3 @@ function drawMobileMinimap(){
   ctx.stroke();
   ctx.lineWidth = 1;
 }
-

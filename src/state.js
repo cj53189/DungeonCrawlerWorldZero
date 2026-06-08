@@ -14,7 +14,7 @@ let dungeonVisuals = { floor: [], decals: [] };
 let environmentalLights = [];
 let lightingEnabled = true;
 let projectiles = [], attackTelegraphs = [];
-let bossRoom=null,bossEnemy=null,currentRoomName="Safe Room";
+let bossRoom=null,bossEnemy=null,currentRoomName="Safe Room",currentRoomSubtitle="";
 let currentFloor = 0, stairwellFound = false, stairwellX = null, stairwellY = null, finalDescentAnnounced = false;
 let bossLockTiles = [];
 let bossAggroed = false;

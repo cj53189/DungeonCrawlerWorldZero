@@ -612,12 +612,13 @@ function updateHUD() {
   if (xpFill) xpFill.style.width = `${Math.max(0, Math.min(100, (xpNow / xpMax) * 100))}%`;
   if (xpText) xpText.textContent = `LV ${player.level} · ${xpNow} / ${xpMax}`;
 
-  const invCount=document.getElementById("inventoryCount"),boxCount=document.getElementById("lootBoxCount"),roomEl=document.getElementById("currentRoomName");
+  const invCount=document.getElementById("inventoryCount"),boxCount=document.getElementById("lootBoxCount"),roomEl=document.getElementById("currentRoomName"),roomSubEl=document.getElementById("currentRoomSubtitle");
   const floorEl=document.getElementById("floorNumber"),stairEl=document.getElementById("stairStatus");
 
   if(invCount)invCount.textContent=player.inventory.length;
   if(boxCount)boxCount.textContent=lootBoxCount();
   if(roomEl)roomEl.textContent=currentRoomName;
+  if(roomSubEl)roomSubEl.textContent=currentRoomSubtitle||"";
   if(floorEl)floorEl.textContent=currentFloor;
   if(stairEl)stairEl.textContent=stairwellFound ? "Marked" : "Unknown";
 
