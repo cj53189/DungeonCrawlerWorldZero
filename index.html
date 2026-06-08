@@ -57,6 +57,7 @@
 
   <div id="announcer"></div>
   <div id="prompt"></div>
+  <div id="testerDebugLine" aria-live="polite">build/source: Render · connection: Connecting</div>
 
   <div id="touchControls" aria-label="Touch controls">
     <div id="stickBase"><div id="stickKnob"></div></div>
@@ -106,12 +107,14 @@
     <div class="panelEyebrow">Floor 0 Collapse</div>
     <div class="panelTitle"><span id="mpStatus">Offline</span><span id="mpCount">1 / 4</span></div>
     <div id="mpPartyCode" class="partyCode">No lobby code</div>
+    <div id="mpConnectionStatus" class="mpConnectionStatus">Connection: Connecting</div>
     <div id="mpRuleText" class="mpRuleText">Find the stairs before collapse. Crawlers Registered shorten the timer.</div>
     <div id="mpMemberList" class="mpMemberList"></div>
     <div class="mpActions">
       <button id="mpAddMockBtn" type="button">Add Test Crawler</button>
       <button id="mpFillMockBtn" type="button">Fill 4</button>
       <button id="mpForceStartBtn" type="button">Local Floor 1 Test</button>
+      <button id="mpCopyInviteBtn" type="button">Copy Invite Link</button>
       <button id="mpCancelBtn" type="button">Cancel</button>
     </div>
   </div>
@@ -123,12 +126,24 @@
       <div class="titleEyebrow">dcw_010 multiplayer foundation</div>
       <h1>Dungeon Crawler World</h1>
       <p>Choose a run mode. Multiplayer starts on playable Floor 0 with a shared collapse timer. Crawlers Registered shorten the maximum remaining time, so find the stairs before collapse.</p>
+      <div class="firstRunHelp" aria-label="New tester quick guide">
+        <div><strong>New tester quick guide</strong></div>
+        <ul>
+          <li>Find the stairs before Floor 0 collapses.</li>
+          <li>Floor 0 is safe from PvP; Floor 1+ enables PvP.</li>
+          <li>Other crawlers may help, race, or betray you.</li>
+          <li>Use <strong>E</strong> / interact to open doors, loot, and use stairs.</li>
+          <li>Inventory and weapons matter. Loot and equip useful gear.</li>
+        </ul>
+      </div>
+      <div id="titleConnectionStatus" class="titleConnectionStatus">Connection: Connecting</div>
       <div class="titleActions">
         <button id="startSingleBtn" type="button">Single Player</button>
         <button id="quickMatchBtn" type="button">Multiplayer Quick Match</button>
         <button id="createPartyBtn" type="button">Create Lobby</button>
         <button id="joinPartyBtn" type="button">Join Lobby Code</button>
         <button id="localMultiTestBtn" type="button">Local 4-Crawler Test</button>
+        <button id="copyGameLinkBtn" type="button">Copy Game Link</button>
       </div>
       <div class="titleNote">WebSocket lobbies use server-owned identity, rosters, and Floor 0 collapse timing. Local 4-Crawler Test remains available as a dev fallback.</div>
     </div>

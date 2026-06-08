@@ -605,6 +605,8 @@
 
 .titleBox {
   max-width: 760px;
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
   border: 2px solid rgba(214,181,92,0.72);
   background: rgba(22,22,24,0.96);
   border-radius: 18px;
@@ -667,6 +669,58 @@
   color: #aaa;
   font-size: 13px;
 }
+
+.firstRunHelp {
+  margin: 0 auto 18px;
+  max-width: 640px;
+  text-align: left;
+  border: 1px solid rgba(157,177,255,0.34);
+  border-radius: 12px;
+  background: rgba(157,177,255,0.10);
+  padding: 12px 14px;
+  color: #e8ecff;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.firstRunHelp strong { color: #ffd86b; }
+.firstRunHelp ul { margin: 7px 0 0 18px; padding: 0; }
+.firstRunHelp li { margin: 4px 0; }
+
+.titleConnectionStatus,
+.mpConnectionStatus {
+  margin: 8px auto 0;
+  color: #9cffb1;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mpConnectionStatus {
+  color: #cbd3ff;
+  text-align: left;
+}
+
+#testerDebugLine {
+  position: fixed;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  z-index: 26;
+  max-width: min(92vw, 760px);
+  padding: 4px 9px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 999px;
+  background: rgba(0,0,0,0.52);
+  color: rgba(255,255,255,0.72);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+  text-align: center;
+}
+
+.copyStatusOk { color: #9cffb1 !important; }
+.copyStatusWarn { color: #ffd86b !important; }
 
 #multiplayerPanel {
   position: fixed;
@@ -790,5 +844,15 @@ body.titleActive #announcer {
 
   .titleBox {
     padding: 22px;
+  }
+
+  .firstRunHelp {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+
+  #testerDebugLine {
+    bottom: 3px;
+    font-size: 9px;
   }
 }
