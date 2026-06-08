@@ -119,7 +119,21 @@ function updateInventoryUI(){
 }
 function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.style.display==="block"){p.style.display="none"; if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur(); return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display="block"; if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
 function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p){p.style.display="none"; if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur();}}
-function rewardChestLoot(){
+function rewardChestLoot(room=null){
+ const themeId=room?.themeId;
+ if(themeId==="armory"){
+  addItem(Math.random()<.68?generateWeapon(true):generateGear(true));
+  achievement("ARMORY CACHE", "The Armory coughs up equipment. Open inventory to equip better gear before the next bad idea.", `armory_cache_${Date.now()}_${Math.random()}`);
+  updateInventoryUI(); updateHUD();
+  return;
+ }
+ if(themeId==="supplyCloset"){
+  if(Math.random()<.55)addItem(generateGear()); else addItem(generateLootBox());
+  achievement("SUPPLY CLOSET LOOT", "Starter supplies acquired. Press I or the INV button to inspect anything wearable.", `supply_cache_${Date.now()}_${Math.random()}`);
+  updateInventoryUI(); updateHUD();
+  return;
+ }
+ if(themeId==="storageRoom"&&Math.random()<.45){addItem(generateLootBox()); updateInventoryUI(); updateHUD(); return;}
  const roll=Math.random();
  if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}
  else if(roll<.68)addItem(generateLootBox());
@@ -194,4 +208,3 @@ function getReputationComment(rep) {
     "Undeclared Menace": "Your brand remains unclear. Try committing to a bit before you die."
   }[rep] || "Your brand remains unclear. Try committing to a bit before you die.";
 }
-

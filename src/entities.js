@@ -66,7 +66,7 @@ function createCorpse(enemy) {
     y: enemy.y,
     r: enemy.boss ? 18 : 11,
     boss: !!enemy.boss,
-    name: enemy.boss ? `${enemy.name || "Boss"} Corpse` : `Level ${enemy.level || 1} Corpse`,
+    name: enemy.boss ? `${enemy.name || "Boss"} Corpse` : `${enemy.name || `Level ${enemy.level || 1}`} Corpse`,
     level: enemy.level || 1,
     loot: rollEnemyLoot(enemy),
     looted: false
@@ -182,4 +182,3 @@ function setupLootWindowHandlers() {
 function lootCorpse(corpse) {
   openCorpseLootWindow(corpse);
 }
-

@@ -91,7 +91,7 @@ function resetState(options = {}) {
   player.currentRoomId = null;
   player.lastTileX = 0;
   player.lastTileY = 0;
-  bossRoom=null; bossEnemy=null; currentRoomName="Safe Room";
+  bossRoom=null; bossEnemy=null; currentRoomName="Safe Room"; currentRoomSubtitle="";
   stairwellFound=false; stairwellX=null; stairwellY=null;
   minimapDirty=true;
   visibilityDirty=true;
