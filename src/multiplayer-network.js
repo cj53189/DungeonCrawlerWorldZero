@@ -20,8 +20,13 @@ const multiplayerNetwork = {
   reconnectTimer: null,
   countdownTimer: null,
   lastCrawlerStateSentAt: 0,
-  lastEnemySnapshotSentAt: 0
+  lastEnemySnapshotSentAt: 0,
+  loggedEnemySyncOwners: new Set()
 };
+
+const FLOOR0_ENEMY_SYNC_SNAP_DISTANCE = TILE * 3;
+const FLOOR0_ENEMY_SYNC_INTERPOLATION = 0.28;
+const FLOOR0_ENEMY_SYNC_TTL_MS = 650;
 
 function isMultiplayerNetworkReady() {
   return !!(multiplayerNetwork.connected && multiplayerNetwork.socket?.readyState === WebSocket.OPEN && multiplayerNetwork.playerId);
@@ -514,6 +519,39 @@ function resetFloor0WorldState() {
     takenLootIds: new Set(),
     enemyStates: new Map()
   };
+  multiplayerNetwork.loggedEnemySyncOwners.clear();
+}
+
+function getServerLobbyCrawlerCount() {
+  if (!multiplayer.enabled || !multiplayer.usingServer) return 0;
+  return Math.max(
+    multiplayer.partyMembers?.length || 0,
+    (multiplayer.remotePlayers?.size || 0) + (multiplayer.playerId ? 1 : 0)
+  );
+}
+
+function logFloor0EnemySyncOwner(ownerId, reason) {
+  if (!ownerId || !multiplayerNetwork.loggedEnemySyncOwners) return;
+  const key = `${ownerId}:${reason}`;
+  if (multiplayerNetwork.loggedEnemySyncOwners.has(key)) return;
+  multiplayerNetwork.loggedEnemySyncOwners.add(key);
+  if (typeof console !== "undefined" && typeof console.debug === "function") {
+    console.debug(`[Floor0EnemySync] ${reason}; owner=${ownerId}; local=${multiplayer.playerId || "unknown"}`);
+  }
+}
+
+function shouldSkipFloor0EnemySnapshot(message) {
+  if (!message) return false;
+  const ownerId = message.ownerPlayerId || message.sourcePlayerId || message.playerId;
+  if (ownerId && ownerId === multiplayer.playerId) {
+    logFloor0EnemySyncOwner(ownerId, "Ignoring local enemy snapshot echo to prevent Floor 0 rubber-banding");
+    return true;
+  }
+  if (getServerLobbyCrawlerCount() <= 1 && ownerId) {
+    logFloor0EnemySyncOwner(ownerId, "Ignoring redundant solo-lobby enemy snapshot");
+    return true;
+  }
+  return false;
 }
 
 function floor0TileId(kind, x, y) {
@@ -590,7 +628,7 @@ function applyFloor0WorldEvent(event) {
     const enemyState = event.enemy || event;
     if (enemyState.enemyId) {
       rememberFloor0EnemyState(enemyState);
-      applyFloor0EnemyState(enemyState);
+      applyFloor0EnemyState(enemyState, { immediate: event.type === "enemy_killed" });
     }
     return true;
   }
@@ -633,7 +671,7 @@ function applyFloor0LootTaken(id) {
   }
 }
 
-function applyFloor0EnemyState(state) {
+function applyFloor0EnemyState(state, { immediate = false } = {}) {
   if (!state?.enemyId || currentFloor !== 0 || !Array.isArray(enemies)) return;
   const enemy = enemies.find(candidate => candidate.enemyId === state.enemyId);
   if (!enemy) return;
@@ -642,13 +680,59 @@ function applyFloor0EnemyState(state) {
   if (Number.isFinite(Number(state.hp))) enemy.hp = Math.max(0, Number(state.hp));
   if (Number.isFinite(Number(state.maxHp))) enemy.maxHp = Math.max(1, Number(state.maxHp));
   if (state.alive === false || enemy.hp <= 0) {
+    // Death and damage events are world events, not movement ownership, so they resolve immediately.
     enemy.hp = 0;
+    enemy.floor0SyncTarget = null;
     return;
   }
-  if (Number.isFinite(Number(state.x)) && Number.isFinite(Number(state.y))) {
-    enemy.x = Number(state.x);
-    enemy.y = Number(state.y);
+
+  const hasPosition = Number.isFinite(Number(state.x)) && Number.isFinite(Number(state.y));
+  if (!hasPosition) return;
+
+  const ownerId = state.ownerPlayerId || state.sourcePlayerId || state.playerId || null;
+  enemy.floor0SyncOwnerId = ownerId;
+  enemy.floor0SyncReceivedAt = Date.now();
+  if (ownerId) logFloor0EnemySyncOwner(ownerId, "Applying remote enemy movement owner");
+
+  const targetX = Number(state.x);
+  const targetY = Number(state.y);
+  const distance = Math.hypot(targetX - enemy.x, targetY - enemy.y);
+  if (immediate || distance > FLOOR0_ENEMY_SYNC_SNAP_DISTANCE) {
+    // Only snap when joining a world state or when a crawler is far enough out of sync that interpolation would look worse.
+    enemy.x = targetX;
+    enemy.y = targetY;
+    enemy.floor0SyncTarget = null;
+    return;
   }
+
+  enemy.floor0SyncTarget = { x: targetX, y: targetY, receivedAt: enemy.floor0SyncReceivedAt };
+}
+
+function shouldUseRemoteFloor0EnemySync(enemy, now = Date.now()) {
+  if (!enemy?.floor0SyncTarget || currentFloor !== 0) return false;
+  if (!multiplayer.enabled || !multiplayer.usingServer || getServerLobbyCrawlerCount() <= 1) return false;
+  if (enemy.floor0SyncOwnerId && enemy.floor0SyncOwnerId === multiplayer.playerId) return false;
+  if (now - (enemy.floor0SyncReceivedAt || 0) > FLOOR0_ENEMY_SYNC_TTL_MS) {
+    enemy.floor0SyncTarget = null;
+    return false;
+  }
+  return true;
+}
+
+function updateFloor0EnemySyncInterpolation(enemy, now = Date.now()) {
+  if (!shouldUseRemoteFloor0EnemySync(enemy, now)) return false;
+  const target = enemy.floor0SyncTarget;
+  const distance = Math.hypot(target.x - enemy.x, target.y - enemy.y);
+  if (distance > FLOOR0_ENEMY_SYNC_SNAP_DISTANCE) {
+    enemy.x = target.x;
+    enemy.y = target.y;
+    enemy.floor0SyncTarget = null;
+    return true;
+  }
+  enemy.x += (target.x - enemy.x) * FLOOR0_ENEMY_SYNC_INTERPOLATION;
+  enemy.y += (target.y - enemy.y) * FLOOR0_ENEMY_SYNC_INTERPOLATION;
+  if (distance < 0.5) enemy.floor0SyncTarget = null;
+  return true;
 }
 
 function applyFloor0WorldState(messageOrState) {
@@ -662,7 +746,7 @@ function applyFloor0WorldState(messageOrState) {
   for (const state of states) {
     if (!state?.enemyId) continue;
     rememberFloor0EnemyState(state);
-    applyFloor0EnemyState(state);
+    applyFloor0EnemyState(state, { immediate: true });
   }
 }
 
@@ -670,9 +754,15 @@ function applyFloor0EnemySnapshot(message) {
   if (!multiplayer.enabled || !multiplayer.usingServer) return;
   if (message.lobbyCode && multiplayer.roomId && message.lobbyCode !== multiplayer.roomId) return;
   if (message.currentFloor !== 0 || currentFloor !== 0) return;
+
+  const snapshotOwnerId = message.ownerPlayerId || message.sourcePlayerId || message.playerId || null;
   for (const state of message.enemies || []) {
-    rememberFloor0EnemyState(state);
-    applyFloor0EnemyState(state);
+    const stateWithOwner = snapshotOwnerId && !state.ownerPlayerId && !state.sourcePlayerId
+      ? { ...state, ownerPlayerId: snapshotOwnerId }
+      : state;
+    if (shouldSkipFloor0EnemySnapshot(stateWithOwner)) continue;
+    rememberFloor0EnemyState(stateWithOwner);
+    applyFloor0EnemyState(stateWithOwner);
   }
 }
 
