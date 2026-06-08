@@ -361,6 +361,21 @@ function updateProjectiles() {
   }
 }
 
+function updateTutorialSigns() {
+  if (!Array.isArray(tutorialSigns) || currentFloor !== 0 || gameWon || gameLost) return;
+
+  for (const sign of tutorialSigns) {
+    if (!sign || seenTutorialSignIds.has(sign.id)) continue;
+    const sx = sign.x * TILE + TILE / 2;
+    const sy = sign.y * TILE + TILE / 2;
+    if (Math.hypot(player.x - sx, player.y - sy) > (sign.radius || TILE * 1.85)) continue;
+
+    seenTutorialSignIds.add(sign.id);
+    achievement(sign.title || "Tutorial Sign", sign.body || "Keep moving.", sign.id);
+    break;
+  }
+}
+
 function interact() {
   if (gameWon || gameLost) return;
 

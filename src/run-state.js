@@ -59,6 +59,7 @@ function resetState(options = {}) {
   enemies = [];
   corpses = [];
   dungeonVisuals = { floor: [], decals: [] };
+  tutorialSigns = [];
   environmentalLights = [];
   projectiles = [];
   attackTelegraphs = [];
