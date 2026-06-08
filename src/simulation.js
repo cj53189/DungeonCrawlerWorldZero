@@ -155,20 +155,24 @@ for (const enemy of enemies) {
     const exTile = Math.floor(enemy.x / TILE), eyTile = Math.floor(enemy.y / TILE);
     if (!seen[eyTile]?.[exTile] && !collapseStarted) continue;
 
-    const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-    const canSeePlayer = dist < 210 && hasLineOfSight(enemy.x, enemy.y, player.x, player.y);
-    if (enemy.boss && !bossAggroed && canSeePlayer) {
-      triggerBossAggro("seen");
+    const remoteSynced = typeof updateFloor0EnemySyncInterpolation === "function" && updateFloor0EnemySyncInterpolation(enemy);
+
+    if (!remoteSynced) {
+      const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+      const canSeePlayer = dist < 210 && hasLineOfSight(enemy.x, enemy.y, player.x, player.y);
+      if (enemy.boss && !bossAggroed && canSeePlayer) {
+        triggerBossAggro("seen");
+      }
+      const bossCanAlwaysTrack = enemy.boss && bossAggroed;
+      let dx = 0, dy = 0;
+      if (canSeePlayer || bossCanAlwaysTrack) { dx = (player.x - enemy.x) / Math.max(1, dist) * enemy.speed; dy = (player.y - enemy.y) / Math.max(1, dist) * enemy.speed; }
+      else {
+        dx = Math.cos(enemy.wanderAngle) * 0.35;
+        dy = Math.sin(enemy.wanderAngle) * 0.35;
+        if (Math.random() < 0.015) enemy.wanderAngle = Math.random() * Math.PI * 2;
+      }
+      moveEntity(enemy, dx, dy);
     }
-    const bossCanAlwaysTrack = enemy.boss && bossAggroed;
-    let dx = 0, dy = 0;
-    if (canSeePlayer || bossCanAlwaysTrack) { dx = (player.x - enemy.x) / Math.max(1, dist) * enemy.speed; dy = (player.y - enemy.y) / Math.max(1, dist) * enemy.speed; }
-    else {
-      dx = Math.cos(enemy.wanderAngle) * 0.35;
-      dy = Math.sin(enemy.wanderAngle) * 0.35;
-      if (Math.random() < 0.015) enemy.wanderAngle = Math.random() * Math.PI * 2;
-    }
-    moveEntity(enemy, dx, dy);
     if (typeof floor0EnemyRoomId === "function") {
       const roomId = floor0EnemyRoomId(enemy);
       if (Number.isFinite(Number(roomId))) enemy.roomId = Math.trunc(Number(roomId));

@@ -414,6 +414,11 @@ class LobbyManager {
     const occupiedRooms = this.occupiedFloor0RoomIds(lobby);
     if (!occupiedRooms.has(roomId)) return false;
 
+    const ownerPlayerId = this.floor0EnemySnapshotOwnerId(lobby, roomId);
+    // Enemy movement is room-owner authoritative: only one crawler's local AI feeds snapshots for a room.
+    // The sender never needs its own snapshot echoed back, which prevents solo-lobby rubber-banding.
+    if (ownerPlayerId && ownerPlayerId !== playerId) return false;
+
     const world = lobby.floor0WorldState || (lobby.floor0WorldState = this.createFloor0WorldState());
     for (const raw of message.enemies || []) {
       const state = this.sanitizeEnemyState(raw);
@@ -421,10 +426,10 @@ class LobbyManager {
       if (Number.isFinite(state.roomId) && state.roomId !== roomId) continue;
       const existing = world.enemyStates.get(state.enemyId) || { enemyId: state.enemyId, alive: true };
       if (existing.alive === false) continue;
-      world.enemyStates.set(state.enemyId, { ...existing, ...state, roomId, updatedAt: Date.now() });
+      world.enemyStates.set(state.enemyId, { ...existing, ...state, roomId, ownerPlayerId: playerId, updatedAt: Date.now() });
     }
 
-    this.broadcastFloor0EnemySnapshot(lobby);
+    this.broadcastFloor0EnemySnapshot(lobby, { ownerPlayerId, sourceRoomId: roomId });
     return true;
   }
 
@@ -463,7 +468,15 @@ class LobbyManager {
     return rooms;
   }
 
-  broadcastFloor0EnemySnapshot(lobby, { force = false } = {}) {
+  floor0EnemySnapshotOwnerId(lobby, roomId) {
+    const normalizedRoomId = Math.trunc(Number(roomId));
+    const occupants = lobby.players
+      .filter(player => player.crawlerState?.currentFloor === 0 && Math.trunc(Number(player.crawlerState.currentRoomId)) === normalizedRoomId)
+      .sort((a, b) => a.joinedAt - b.joinedAt);
+    return occupants[0]?.id || null;
+  }
+
+  broadcastFloor0EnemySnapshot(lobby, { force = false, ownerPlayerId = null, sourceRoomId = null } = {}) {
     if (!lobby || !lobby.players.length) return;
     const now = Date.now();
     const elapsed = now - (lobby.lastEnemySnapshotAt || 0);
@@ -471,7 +484,7 @@ class LobbyManager {
       if (!lobby.enemySnapshotTimer) {
         lobby.enemySnapshotTimer = setTimeout(() => {
           lobby.enemySnapshotTimer = null;
-          this.broadcastFloor0EnemySnapshot(lobby, { force: true });
+          this.broadcastFloor0EnemySnapshot(lobby, { force: true, ownerPlayerId, sourceRoomId });
         }, FLOOR0_ENEMY_SNAPSHOT_MS - elapsed);
       }
       return;
@@ -485,14 +498,20 @@ class LobbyManager {
     if (!occupiedRooms.size) return;
     const enemies = Array.from((lobby.floor0WorldState?.enemyStates || new Map()).values())
       .filter(enemy => enemy.alive !== false && Number.isFinite(Number(enemy.roomId)) && occupiedRooms.has(Math.trunc(Number(enemy.roomId))))
-      .map(enemy => ({ ...enemy }));
+      .map(enemy => ({ ...enemy, ownerPlayerId: enemy.ownerPlayerId || ownerPlayerId || null }));
     if (!enemies.length) return;
-    this.broadcast(lobby, SERVER_MESSAGES.FLOOR0_ENEMY_SNAPSHOT, {
+    const payload = {
       lobbyCode: lobby.code,
       currentFloor: 0,
       activeRoomIds: Array.from(occupiedRooms),
+      ownerPlayerId,
+      sourcePlayerId: ownerPlayerId,
       enemies
-    });
+    };
+    for (const player of lobby.players) {
+      const client = this.clients.get(player.id);
+      if (client) safeSend(client.ws, SERVER_MESSAGES.FLOOR0_ENEMY_SNAPSHOT, payload);
+    }
   }
 
   createFloor0WorldState() {
