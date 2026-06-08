@@ -17,7 +17,9 @@ const multiplayerNetwork = {
   connecting: false,
   playerId: null,
   lastError: null,
+  lastErrorAt: 0,
   reconnectTimer: null,
+  reconnectDelayMs: 3000,
   countdownTimer: null,
   lastCrawlerStateSentAt: 0,
   lastEnemySnapshotSentAt: 0,
@@ -33,10 +35,21 @@ function isMultiplayerNetworkReady() {
 }
 
 function connectMultiplayerNetwork() {
-  if (multiplayerNetwork.connected || multiplayerNetwork.connecting || typeof WebSocket === "undefined") return;
+  if (multiplayerNetwork.connected || multiplayerNetwork.connecting) return;
+  if (typeof WebSocket === "undefined") {
+    multiplayer.networkStatus = "offline";
+    handleMultiplayerNetworkError("WebSocket is not available in this browser. Multiplayer server features are offline.");
+    return;
+  }
 
+  if (multiplayerNetwork.reconnectTimer) {
+    clearTimeout(multiplayerNetwork.reconnectTimer);
+    multiplayerNetwork.reconnectTimer = null;
+  }
   multiplayerNetwork.connecting = true;
+  multiplayer.networkStatus = "connecting";
   multiplayerNetwork.lastError = null;
+  if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
 
   try {
     const socket = new WebSocket(multiplayerNetwork.url);
@@ -46,8 +59,11 @@ function connectMultiplayerNetwork() {
       multiplayerNetwork.connected = true;
       multiplayerNetwork.connecting = false;
       multiplayerNetwork.lastError = null;
+      multiplayer.networkStatus = "connected";
+      multiplayer.networkError = null;
       sendMultiplayerMessage("hello");
       if (typeof announcer === "function") announcer("Floor 0 collapse server connected.");
+      if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
     });
 
     socket.addEventListener("message", (event) => {
@@ -64,24 +80,39 @@ function connectMultiplayerNetwork() {
     socket.addEventListener("close", () => {
       multiplayerNetwork.connected = false;
       multiplayerNetwork.connecting = false;
-      if (multiplayer.usingServer) {
-        multiplayer.status = "offline";
-        multiplayer.networkStatus = "disconnected";
-        handleMultiplayerNetworkError("Floor 0 collapse server disconnected. Local 4-Crawler Test is still available.");
-        if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
-      }
+      multiplayerNetwork.socket = null;
+      if (multiplayer.usingServer) multiplayer.status = "offline";
+      multiplayer.networkStatus = "offline";
+      handleMultiplayerNetworkError("Disconnected from the multiplayer server. Reconnecting; Single Player and Local 4-Crawler Test are still available.");
+      scheduleMultiplayerReconnect();
+      if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+      if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
     });
 
     socket.addEventListener("error", () => {
       multiplayerNetwork.connected = false;
       multiplayerNetwork.connecting = false;
-      handleMultiplayerNetworkError("Could not reach the Floor 0 collapse server. Using local fallback when needed.");
+      multiplayer.networkStatus = "offline";
+      handleMultiplayerNetworkError("Failed WebSocket connection to the multiplayer server. You can keep testing with Single Player or Local 4-Crawler Test.");
+      if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
     });
   } catch (err) {
     multiplayerNetwork.connected = false;
     multiplayerNetwork.connecting = false;
+    multiplayer.networkStatus = "offline";
     handleMultiplayerNetworkError(err.message || "Could not create Floor 0 collapse server connection.");
+    scheduleMultiplayerReconnect();
   }
+}
+
+function scheduleMultiplayerReconnect() {
+  if (multiplayerNetwork.connected || multiplayerNetwork.connecting || multiplayerNetwork.reconnectTimer) return;
+  multiplayer.networkStatus = "reconnecting";
+  multiplayerNetwork.reconnectTimer = setTimeout(() => {
+    multiplayerNetwork.reconnectTimer = null;
+    connectMultiplayerNetwork();
+  }, multiplayerNetwork.reconnectDelayMs);
+  if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
 }
 
 function sendMultiplayerMessage(type, payload = {}) {
@@ -222,7 +253,7 @@ function handleMultiplayerServerMessage(message) {
       applyFloor0EnemySnapshot(message);
       break;
     case "error":
-      handleMultiplayerNetworkError(message.message || "Floor 0 collapse server request failed.");
+      handleMultiplayerNetworkError(formatServerErrorMessage(message.message || "Floor 0 collapse server request failed."));
       break;
   }
 
@@ -475,11 +506,24 @@ function translateServerLobbyStatus(status, mode) {
   return "party";
 }
 
+function formatServerErrorMessage(message) {
+  const text = String(message || "Multiplayer request failed.");
+  if (/lobby code|not found|invalid/i.test(text)) return "That lobby code was not found. Check the code and try again, or create a new lobby.";
+  if (/disconnect/i.test(text)) return "Disconnected from the multiplayer server. Reconnecting; Single Player and Local 4-Crawler Test are still available.";
+  if (/websocket|server|reach|connection/i.test(text)) return "Failed WebSocket connection to the multiplayer server. You can keep testing with Single Player or Local 4-Crawler Test.";
+  return text;
+}
+
 function handleMultiplayerNetworkError(message) {
-  multiplayerNetwork.lastError = message;
-  multiplayer.networkError = message;
-  if (typeof announcer === "function") announcer(message);
-  if (typeof addLog === "function") addLog(`Multiplayer: ${message}`);
+  const friendly = formatServerErrorMessage(message);
+  const shouldAnnounce = multiplayerNetwork.lastError !== friendly || Date.now() - multiplayerNetwork.lastErrorAt > 10000;
+  multiplayerNetwork.lastError = friendly;
+  multiplayerNetwork.lastErrorAt = Date.now();
+  multiplayer.networkError = friendly;
+  if (shouldAnnounce && typeof showFriendlyMultiplayerError === "function") showFriendlyMultiplayerError(friendly);
+  else if (shouldAnnounce && typeof announcer === "function") announcer(friendly);
+  if (typeof addLog === "function") addLog(`Multiplayer: ${friendly}`);
+  if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
 }
 
 function syncFloor0TimerFromServer() {

@@ -12,6 +12,7 @@ function gameLoop() {
   }
   if (typeof maybeSendLocalCrawlerState === "function") maybeSendLocalCrawlerState();
   if (typeof maybeSendFloor0EnemySnapshot === "function") maybeSendFloor0EnemySnapshot();
+  if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
   draw();
   requestAnimationFrame(gameLoop);
 }
