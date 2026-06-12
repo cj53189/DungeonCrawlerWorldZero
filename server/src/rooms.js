@@ -53,11 +53,11 @@ class LobbyManager {
     this.leaveLobby(playerId, { silent: true });
 
     const code = this.generatePrivateCode();
-    const lobby = this.createLobby({ code, mode: LOBBY_MODES.PRIVATE, adminId: playerId });
-    this.addPlayerToLobby(lobby, client);
+    const lobby = this.createLobby({ code, mode: LOBBY_MODES.PRIVATE });
+    this.addPlayerToLobby(lobby, client, { partyId: this.privatePartyId(code), isPartyLeader: true });
 
-    safeSend(client.ws, SERVER_MESSAGES.LOBBY_CREATED, { lobbyCode: code, adminId: playerId });
-    safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: code, mode: lobby.mode });
+    safeSend(client.ws, SERVER_MESSAGES.LOBBY_CREATED, { lobbyCode: code, partyId: this.privatePartyId(code), isPartyLeader: true });
+    safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: code, mode: lobby.mode, partyId: this.privatePartyId(code), isPartyLeader: true });
     this.broadcastLobbyUpdate(lobby);
     return lobby;
   }
@@ -73,8 +73,8 @@ class LobbyManager {
     if (lobby.players.length >= TARGET_PLAYERS) throw new Error("That crawler lobby is full.");
 
     this.leaveLobby(playerId, { silent: true });
-    this.addPlayerToLobby(lobby, client);
-    safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: lobby.code, mode: lobby.mode });
+    this.addPlayerToLobby(lobby, client, { partyId: this.privatePartyId(lobby.code), isPartyLeader: false });
+    safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: lobby.code, mode: lobby.mode, partyId: this.privatePartyId(lobby.code), isPartyLeader: false });
     this.broadcastLobbyUpdate(lobby);
     return lobby;
   }
@@ -91,16 +91,16 @@ class LobbyManager {
 
     if (!lobby) {
       const code = `QUICK-${String(this.quickLobbyCounter++).padStart(4, "0")}`;
-      lobby = this.createLobby({ code, mode: LOBBY_MODES.QUICK_MATCH, adminId: null });
+      lobby = this.createLobby({ code, mode: LOBBY_MODES.QUICK_MATCH });
     }
 
-    this.addPlayerToLobby(lobby, client);
+    this.addPlayerToLobby(lobby, client, { partyId: null, isPartyLeader: false });
     safeSend(client.ws, SERVER_MESSAGES.MATCHMAKING_UPDATE, {
       lobbyCode: lobby.code,
       players: lobby.players.length,
       targetPlayers: TARGET_PLAYERS
     });
-    safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: lobby.code, mode: lobby.mode });
+    safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: lobby.code, mode: lobby.mode, partyId: null, isPartyLeader: false });
     this.broadcastLobbyUpdate(lobby);
     return lobby;
   }
@@ -121,9 +121,6 @@ class LobbyManager {
       return true;
     }
 
-    if (lobby.mode === LOBBY_MODES.PRIVATE && lobby.adminId === playerId && lobby.status === LOBBY_STATUS.STAGING) {
-      lobby.adminId = lobby.players[0].id;
-    }
 
     if (!silent && leavingPlayer) {
       this.broadcast(lobby, SERVER_MESSAGES.PLAYER_LEFT, {
@@ -137,13 +134,12 @@ class LobbyManager {
     return true;
   }
 
-  createLobby({ code, mode, adminId }) {
+  createLobby({ code, mode }) {
     const now = Date.now();
     const lobby = {
       code,
       mode,
-      adminId,
-      players: [],
+          players: [],
       status: LOBBY_STATUS.STAGING,
       createdAt: now,
       floor0CollapseAt: now + FLOOR0_COLLAPSE_CAPS_MS[1],
@@ -159,7 +155,11 @@ class LobbyManager {
     return lobby;
   }
 
-  addPlayerToLobby(lobby, client) {
+  privatePartyId(code) {
+    return `party:${code}`;
+  }
+
+  addPlayerToLobby(lobby, client, { partyId = null, isPartyLeader = false } = {}) {
     if (lobby.players.some(player => player.id === client.playerId)) return;
     client.lobbyCode = lobby.code;
     lobby.players.push({
@@ -167,6 +167,8 @@ class LobbyManager {
       name: client.name,
       joinedAt: Date.now(),
       color: PLAYER_COLORS[(lobby.players.length) % PLAYER_COLORS.length],
+      partyId,
+      isPartyLeader: !!isPartyLeader,
       crawlerState: null,
       floor0Status: FLOOR0_ADVANCE_STATUSES.EXPLORING,
       floor0ReachedStairsAt: null
@@ -200,7 +202,6 @@ class LobbyManager {
     const lobby = this.lobbies.get(code);
     if (!lobby || lobby.status !== LOBBY_STATUS.STAGING) return;
     lobby.status = LOBBY_STATUS.START_PENDING;
-    lobby.adminId = null;
     lobby.floor0CollapseAt = Date.now();
 
     const advancingPlayers = [];
@@ -552,7 +553,8 @@ class LobbyManager {
         name: player.name,
         color: player.color,
         joinedAt: player.joinedAt,
-        admin: lobby.mode === LOBBY_MODES.PRIVATE && player.id === lobby.adminId,
+        partyId: player.partyId || null,
+        isPartyLeader: !!player.isPartyLeader,
         floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING
       })),
       targetPlayers: TARGET_PLAYERS,
@@ -563,7 +565,6 @@ class LobbyManager {
       floor0WorldState: this.floor0WorldStatePayload(lobby)
     };
 
-    if (lobby.mode === LOBBY_MODES.PRIVATE && lobby.adminId) payload.adminId = lobby.adminId;
     return payload;
   }
 
@@ -573,6 +574,8 @@ class LobbyManager {
       id: player.id,
       name: player.name,
       color: player.color,
+      partyId: player.partyId || null,
+      isPartyLeader: !!player.isPartyLeader,
       floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING,
       reachedStairsAt: player.floor0ReachedStairsAt ? new Date(player.floor0ReachedStairsAt).toISOString() : null
     };

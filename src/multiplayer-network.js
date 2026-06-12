@@ -123,7 +123,7 @@ function sendMultiplayerMessage(type, payload = {}) {
 
 function requestServerCreateLobby() {
   if (!isMultiplayerNetworkReady()) return false;
-  prepareServerLobbyState({ status: "party", partyCode: null });
+  prepareServerLobbyState({ status: "party", lobbyCode: null, partyId: null });
   return sendMultiplayerMessage("create_lobby");
 }
 
@@ -131,13 +131,13 @@ function requestServerJoinLobby(code) {
   if (!isMultiplayerNetworkReady()) return false;
   const cleanedCode = String(code || "").trim().toUpperCase();
   if (!cleanedCode) return false;
-  prepareServerLobbyState({ status: "party", partyCode: cleanedCode });
+  prepareServerLobbyState({ status: "party", lobbyCode: cleanedCode, partyId: `party:${cleanedCode}` });
   return sendMultiplayerMessage("join_lobby", { lobbyCode: cleanedCode });
 }
 
 function requestServerQuickMatch() {
   if (!isMultiplayerNetworkReady()) return false;
-  prepareServerLobbyState({ status: "matchmaking", partyCode: null });
+  prepareServerLobbyState({ status: "matchmaking", lobbyCode: null, partyId: null });
   return sendMultiplayerMessage("quick_match");
 }
 
@@ -171,13 +171,16 @@ function requestServerFloor0StairsReached() {
   return true;
 }
 
-function prepareServerLobbyState({ status, partyCode }) {
+function prepareServerLobbyState({ status, lobbyCode = null, partyId = null }) {
   multiplayer.enabled = true;
   multiplayer.usingServer = true;
   multiplayer.targetPlayers = MULTIPLAYER_TARGET_PLAYERS;
-  multiplayer.partyCode = partyCode;
-  multiplayer.roomId = partyCode || "QUICK-MATCH";
+  multiplayer.lobbyCode = lobbyCode;
+  multiplayer.partyCode = lobbyCode;
+  multiplayer.roomId = lobbyCode || "QUICK-MATCH";
   multiplayer.status = status;
+  multiplayer.partyId = partyId;
+  multiplayer.lobbyMembers = [];
   multiplayer.partyMembers = [];
   multiplayer.remotePlayers = new Map();
   multiplayer.pvpEnabled = false;
@@ -209,15 +212,21 @@ function handleMultiplayerServerMessage(message) {
       multiplayer.networkStatus = "connected";
       break;
     case "lobby_created":
+      multiplayer.lobbyCode = message.lobbyCode;
       multiplayer.partyCode = message.lobbyCode;
+      multiplayer.partyId = message.partyId || multiplayer.partyId;
+      multiplayer.isPartyLeader = !!message.isPartyLeader;
       multiplayer.roomId = message.lobbyCode;
-      if (typeof announcer === "function") announcer(`Crawlers Registered for Floor 0 Collapse: ${message.lobbyCode}.`);
+      if (typeof announcer === "function") announcer(`Crawler Lobby created for Floor 0 Collapse: ${message.lobbyCode}. Party: Connected.`);
       break;
     case "lobby_joined":
-      multiplayer.partyCode = message.mode === "quick_match" ? null : message.lobbyCode;
+      multiplayer.lobbyCode = message.mode === "quick_match" ? null : message.lobbyCode;
+      multiplayer.partyCode = multiplayer.lobbyCode;
+      multiplayer.partyId = message.partyId || null;
+      multiplayer.isPartyLeader = !!message.isPartyLeader;
       multiplayer.roomId = message.lobbyCode;
       multiplayer.usingServer = true;
-      if (typeof announcer === "function") announcer(message.mode === "quick_match" ? "Joined Quick Match Floor 0 Collapse." : `Joined Floor 0 Collapse ${message.lobbyCode}.`);
+      if (typeof announcer === "function") announcer(message.mode === "quick_match" ? "Joined Quick Match Floor 0 Collapse as a Solo Crawler." : `Joined Crawler Lobby ${message.lobbyCode}. Party: Connected.`);
       break;
     case "matchmaking_update":
       multiplayer.roomId = message.lobbyCode;
@@ -294,7 +303,7 @@ function applyServerCrawlerSnapshot(snapshot) {
     return;
   }
 
-  const rosterById = new Map(multiplayer.partyMembers.map(member => [member.id, member]));
+  const rosterById = new Map((multiplayer.lobbyMembers?.length ? multiplayer.lobbyMembers : multiplayer.partyMembers).map(member => [member.id, member]));
   const nextRemotePlayers = new Map();
 
   for (const crawler of snapshot.players || []) {
@@ -334,29 +343,33 @@ function applyServerLobbyUpdate(update) {
   multiplayer.usingServer = true;
   multiplayer.targetPlayers = update.targetPlayers || MULTIPLAYER_TARGET_PLAYERS;
   multiplayer.roomId = update.lobbyCode;
-  multiplayer.partyCode = update.mode === "quick_match" ? null : update.lobbyCode;
+  multiplayer.lobbyCode = update.mode === "quick_match" ? null : update.lobbyCode;
+  multiplayer.partyCode = multiplayer.lobbyCode;
   multiplayer.status = translateServerLobbyStatus(update.status, update.mode);
-  multiplayer.adminId = update.adminId || null;
-  multiplayer.isPartyLeader = !!(update.adminId && update.adminId === multiplayer.playerId);
   multiplayer.floor0Metadata = normalizeFloor0Metadata(update.floor0, update.floor0CollapseAt || update.stagingEndsAt);
   multiplayer.stagingEndsAt = multiplayer.floor0Metadata?.collapseAtMs || (update.floor0CollapseAt ? Date.parse(update.floor0CollapseAt) : (update.stagingEndsAt ? Date.parse(update.stagingEndsAt) : null));
   multiplayer.collapseAt = multiplayer.stagingEndsAt;
-  multiplayer.partyMembers = (update.players || []).map((player, index) => ({
+  multiplayer.lobbyMembers = (update.players || []).map((player, index) => ({
     id: player.id,
     name: player.id === multiplayer.playerId ? "You" : (player.name || `Crawler ${index + 1}`),
-    leader: !!player.admin,
-    admin: !!player.admin,
+    leader: !!player.isPartyLeader,
+    isPartyLeader: !!player.isPartyLeader,
     local: player.id === multiplayer.playerId,
+    partyId: player.partyId || null,
     color: player.color,
     floor0Status: normalizeFloor0StatusValue(player.floor0Status)
   }));
+  const localMember = multiplayer.lobbyMembers.find(member => member.local || member.id === multiplayer.playerId);
+  multiplayer.partyId = localMember?.partyId || null;
+  multiplayer.isPartyLeader = !!localMember?.isPartyLeader;
+  multiplayer.partyMembers = multiplayer.lobbyMembers.filter(member => member.partyId && member.partyId === multiplayer.partyId);
 
   setGameMode(update.mode === "quick_match" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
   ensureServerFloor0Dungeon();
   applyFloor0WorldState(update.floor0WorldState);
   syncFloor0TimerFromServer();
   if (currentFloor === 0 && multiplayer.remotePlayers?.size) {
-    const rosterIds = new Set(multiplayer.partyMembers.map(member => member.id));
+    const rosterIds = new Set((multiplayer.lobbyMembers?.length ? multiplayer.lobbyMembers : multiplayer.partyMembers).map(member => member.id));
     multiplayer.remotePlayers = new Map(Array.from(multiplayer.remotePlayers).filter(([id]) => rosterIds.has(id)));
   }
 }
@@ -369,14 +382,21 @@ function normalizeFloor0StatusValue(status) {
 function applyLocalFloor0Status(status) {
   const normalized = normalizeFloor0StatusValue(status);
   multiplayer.localFloor0Status = normalized;
-  for (const member of multiplayer.partyMembers) {
+  for (const member of multiplayer.lobbyMembers || []) {
+    if (member.local || member.id === multiplayer.playerId) member.floor0Status = normalized;
+  }
+  for (const member of multiplayer.partyMembers || []) {
     if (member.local || member.id === multiplayer.playerId) member.floor0Status = normalized;
   }
 }
 
 function applyServerFloor0Statuses(players = []) {
   const statuses = new Map((players || []).map(player => [player.id, normalizeFloor0StatusValue(player.floor0Status)]));
-  multiplayer.partyMembers = multiplayer.partyMembers.map(member => ({
+  multiplayer.lobbyMembers = (multiplayer.lobbyMembers || []).map(member => ({
+    ...member,
+    floor0Status: statuses.get(member.id) || normalizeFloor0StatusValue(member.floor0Status)
+  }));
+  multiplayer.partyMembers = (multiplayer.partyMembers || []).map(member => ({
     ...member,
     floor0Status: statuses.get(member.id) || normalizeFloor0StatusValue(member.floor0Status)
   }));
@@ -479,7 +499,7 @@ function ensureServerFloor0Dungeon() {
 }
 
 function getLocalFloor0SpawnIndex() {
-  const localIndex = multiplayer.partyMembers.findIndex(member => member.local || member.id === multiplayer.playerId);
+  const localIndex = (multiplayer.lobbyMembers?.length ? multiplayer.lobbyMembers : multiplayer.partyMembers).findIndex(member => member.local || member.id === multiplayer.playerId);
   return Math.max(0, localIndex);
 }
 
@@ -573,7 +593,7 @@ function resetFloor0WorldState() {
 function getServerLobbyCrawlerCount() {
   if (!multiplayer.enabled || !multiplayer.usingServer) return 0;
   return Math.max(
-    multiplayer.partyMembers?.length || 0,
+    multiplayer.lobbyMembers?.length || multiplayer.partyMembers?.length || 0,
     (multiplayer.remotePlayers?.size || 0) + (multiplayer.playerId ? 1 : 0)
   );
 }

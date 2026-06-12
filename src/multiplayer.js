@@ -12,7 +12,7 @@ function floor0CollapseSecondsForCrawlerCount(count) {
 
 function capLocalFloor0CollapseTimer() {
   if (!multiplayer.enabled || multiplayer.usingServer || currentFloor !== 0) return;
-  const cap = floor0CollapseSecondsForCrawlerCount(multiplayer.partyMembers.length || 1);
+  const cap = floor0CollapseSecondsForCrawlerCount(getLobbyMembers().length || 1);
   floorTimeLeft = Math.min(floorTimeLeft, cap);
   updateHUD();
 }
@@ -36,16 +36,18 @@ function isGameplayUpdatePaused() {
 
 function resetMultiplayerState() {
   multiplayer.enabled = false;
+  multiplayer.lobbyCode = null;
   multiplayer.partyCode = null;
   multiplayer.roomId = null;
   multiplayer.status = "offline";
+  multiplayer.partyId = null;
+  multiplayer.lobbyMembers = [];
   multiplayer.partyMembers = [];
   multiplayer.remotePlayers = new Map();
   multiplayer.pvpEnabled = false;
   multiplayer.floorStartedAt = null;
   multiplayer.collapseAt = null;
   multiplayer.isPartyLeader = false;
-  multiplayer.adminId = null;
   multiplayer.stagingEndsAt = null;
   multiplayer.floor0Metadata = null;
   multiplayer.activeFloor0Seed = null;
@@ -56,18 +58,36 @@ function resetMultiplayerState() {
   resetFloor0WorldState();
 }
 
-function makePartyCode() {
+function getLobbyMembers() {
+  return multiplayer.lobbyMembers?.length ? multiplayer.lobbyMembers : (multiplayer.partyMembers || []);
+}
+
+function syncLocalPartyMembersFromLobby() {
+  multiplayer.partyMembers = (multiplayer.lobbyMembers || []).filter(member => member.partyId && member.partyId === multiplayer.partyId);
+}
+
+function makeLobbyCode() {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let suffix = "";
   for (let i = 0; i < 4; i++) suffix += alphabet[Math.floor(Math.random() * alphabet.length)];
   return `RUNE-${suffix}`;
 }
 
-function ensureLocalPartyMember() {
-  if (!multiplayer.partyMembers.some(member => member.id === multiplayer.playerId)) {
-    multiplayer.partyMembers.unshift({ id: multiplayer.playerId, name: "You", leader: multiplayer.isPartyLeader, local: true, floor0Status: multiplayer.localFloor0Status || "exploring" });
+function ensureLocalLobbyCrawler() {
+  if (!multiplayer.lobbyMembers.some(member => member.id === multiplayer.playerId)) {
+    multiplayer.lobbyMembers.unshift({
+      id: multiplayer.playerId,
+      name: "You",
+      leader: multiplayer.isPartyLeader,
+      isPartyLeader: multiplayer.isPartyLeader,
+      local: true,
+      partyId: multiplayer.partyId,
+      floor0Status: multiplayer.localFloor0Status || "exploring"
+    });
   }
+  syncLocalPartyMembersFromLobby();
 }
+
 
 function startSinglePlayer() {
   resetMultiplayerState();
@@ -78,19 +98,21 @@ function startSinglePlayer() {
   announcer("Single-player run started. Floor 0 is live.");
 }
 
-function startMultiplayerFloor0({ partyCode = null, leader = false, status = "party" } = {}) {
+function startMultiplayerFloor0({ lobbyCode = null, leader = false, status = "party" } = {}) {
   multiplayer.enabled = true;
   multiplayer.targetPlayers = MULTIPLAYER_TARGET_PLAYERS;
-  multiplayer.partyCode = partyCode;
-  multiplayer.roomId = partyCode || "QUICK-MATCH";
+  multiplayer.lobbyCode = lobbyCode;
+  multiplayer.partyCode = lobbyCode;
+  multiplayer.roomId = lobbyCode || "QUICK-MATCH";
   multiplayer.status = status;
+  multiplayer.partyId = lobbyCode ? `party:${lobbyCode}` : null;
+  multiplayer.lobbyMembers = [];
   multiplayer.partyMembers = [];
   multiplayer.remotePlayers = new Map();
   multiplayer.pvpEnabled = false;
   multiplayer.floorStartedAt = null;
   multiplayer.collapseAt = null;
   multiplayer.isPartyLeader = leader;
-  multiplayer.adminId = leader ? multiplayer.playerId : null;
   multiplayer.stagingEndsAt = null;
   multiplayer.floor0Metadata = null;
   multiplayer.activeFloor0Seed = null;
@@ -99,7 +121,7 @@ function startMultiplayerFloor0({ partyCode = null, leader = false, status = "pa
   multiplayer.floor0Resolved = null;
   multiplayer.localFloor0Status = "exploring";
   resetFloor0WorldState();
-  ensureLocalPartyMember();
+  ensureLocalLobbyCrawler();
 
   setGameMode(status === "matchmaking" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
   hideTitleScreen();
@@ -110,50 +132,55 @@ function startMultiplayerFloor0({ partyCode = null, leader = false, status = "pa
   announcer("Floor 0 Collapse started. Crawlers registered here should find the stairs before collapse.");
 }
 
-function createParty() {
+function createLobby() {
   if (typeof requestServerCreateLobby === "function" && requestServerCreateLobby()) return;
-  startMultiplayerFloor0({ partyCode: makePartyCode(), leader: true, status: "party" });
+  startMultiplayerFloor0({ lobbyCode: makeLobbyCode(), leader: true, status: "party" });
 }
 
-function joinParty(code) {
+function joinLobby(code) {
   const cleanedCode = String(code || "").trim().toUpperCase();
   if (!cleanedCode) return;
   if (typeof requestServerJoinLobby === "function" && requestServerJoinLobby(cleanedCode)) return;
-  startMultiplayerFloor0({ partyCode: cleanedCode, leader: false, status: "party" });
+  startMultiplayerFloor0({ lobbyCode: cleanedCode, leader: false, status: "party" });
 }
 
 function startQuickMatch() {
   if (typeof requestServerQuickMatch === "function" && requestServerQuickMatch()) return;
-  startMultiplayerFloor0({ partyCode: null, leader: false, status: "matchmaking" });
+  startMultiplayerFloor0({ lobbyCode: null, leader: false, status: "matchmaking" });
 }
 
-function addMockPartyMember() {
+function addMockLobbyCrawler() {
   if (!multiplayer.enabled) return;
-  if (multiplayer.partyMembers.length >= multiplayer.targetPlayers) return;
-  const nextNumber = multiplayer.partyMembers.length + 1;
-  multiplayer.partyMembers.push({ id: `mock_${nextNumber}`, name: `Crawler ${nextNumber}`, leader: false, local: false });
-  multiplayer.status = multiplayer.partyMembers.length >= multiplayer.targetPlayers ? "ready" : multiplayer.status;
+  if (getLobbyMembers().length >= multiplayer.targetPlayers) return;
+  const nextNumber = getLobbyMembers().length + 1;
+  const mockMember = { id: `mock_${nextNumber}`, name: `Crawler ${nextNumber}`, leader: false, isPartyLeader: false, local: false, partyId: multiplayer.partyId, floor0Status: "exploring" };
+  multiplayer.lobbyMembers.push(mockMember);
+  syncLocalPartyMembersFromLobby();
+  multiplayer.status = getLobbyMembers().length >= multiplayer.targetPlayers ? "ready" : multiplayer.status;
   capLocalFloor0CollapseTimer();
   updateMultiplayerPanel();
 }
 
-function fillMockParty() {
-  while (multiplayer.partyMembers.length < multiplayer.targetPlayers) addMockPartyMember();
+function fillMockLobby() {
+  while (getLobbyMembers().length < multiplayer.targetPlayers) addMockLobbyCrawler();
   multiplayer.status = "ready";
   capLocalFloor0CollapseTimer();
   updateMultiplayerPanel();
 }
 
-function clearMockPartyMembers() {
+function clearMockLobbyCrawlers() {
   if (!multiplayer.enabled) return;
-  multiplayer.partyMembers = multiplayer.partyMembers.filter(member => member.local);
-  multiplayer.status = multiplayer.partyCode ? "party" : "matchmaking";
+  multiplayer.lobbyMembers = multiplayer.lobbyMembers.filter(member => member.local);
+  syncLocalPartyMembersFromLobby();
+  multiplayer.status = multiplayer.lobbyCode ? "party" : "matchmaking";
   updateMultiplayerPanel();
 }
 
+
+
 function forceLocalMultiplayerStart() {
   if (!multiplayer.enabled) return;
-  fillMockParty();
+  fillMockLobby();
   multiplayer.status = "starting";
   updateMultiplayerPanel();
   setTimeout(startMockFloorOne, 450);
