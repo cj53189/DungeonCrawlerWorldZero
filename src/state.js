@@ -9,6 +9,7 @@ const VIEW_RADIUS = 9;
 const MEMORY_RADIUS = 12;
 
 let map, seen, visible, rooms, enemies, corpses, openedChests, achievements, achievementHistory, activePopups, floatingFeedbackTexts;
+let dodgeAfterimages = [], dodgePuffs = [];
 let tutorialSigns = [], seenTutorialSignIds = new Set();
 let activeLootCorpseId = null;
 let dungeonVisuals = { floor: [], decals: [] };
@@ -134,7 +135,9 @@ const player = {
   level: 1, xp: 0, xpToNext: 40, attackDamage: 20,
   baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{},
   attackCooldown: 0, pvpFreezeFrames: 0, currentWeaponId: "fists", aimX: 1, aimY: 0,
-  safe: true, wasSafe: true, currentRoomId:null, lastTileX:0, lastTileY:0
+  safe: true, wasSafe: true, currentRoomId:null, lastTileX:0, lastTileY:0,
+  dodgeCooldown: 0, dodgeFrames: 0, dodgeMaxFrames: 0, dodgeInvulnFrames: 0,
+  dodgeDirX: 0, dodgeDirY: 0, dodgeVisualFrame: 0, dodgeFlashFrames: 0
 };
 
 const stats = {

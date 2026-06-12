@@ -1,3 +1,130 @@
+
+const DODGE_DURATION_FRAMES = 16;
+const DODGE_INVULN_FRAMES = 11;
+const DODGE_COOLDOWN_FRAMES = 42;
+const DODGE_SPEED = 6.4;
+const DODGE_EFFECT_MAX_LIFE = 18;
+
+function resetPlayerDodgeState() {
+  player.dodgeCooldown = 0;
+  player.dodgeFrames = 0;
+  player.dodgeMaxFrames = 0;
+  player.dodgeInvulnFrames = 0;
+  player.dodgeDirX = 0;
+  player.dodgeDirY = 0;
+  player.dodgeVisualFrame = 0;
+  player.dodgeFlashFrames = 0;
+}
+
+function isPlayerDodging() {
+  return player.dodgeFrames > 0;
+}
+
+function isPlayerDodgeInvulnerable() {
+  return player.dodgeInvulnFrames > 0;
+}
+
+function isMajorUiOpen() {
+  return typeof getActiveControllerWindow === "function" && !!getActiveControllerWindow();
+}
+
+function spawnDodgePuff(x, y, dirX, dirY, phase = "start") {
+  dodgePuffs.push({
+    x,
+    y,
+    dirX,
+    dirY,
+    phase,
+    life: 18,
+    maxLife: 18,
+    size: phase === "start" ? 8 : 10
+  });
+}
+
+function spawnDodgeAfterimage() {
+  if (dodgeAfterimages.length > 8) dodgeAfterimages.shift();
+  dodgeAfterimages.push({
+    x: player.x,
+    y: player.y,
+    aimX: player.aimX,
+    aimY: player.aimY,
+    frame: player.dodgeVisualFrame || 0,
+    life: DODGE_EFFECT_MAX_LIFE,
+    maxLife: DODGE_EFFECT_MAX_LIFE
+  });
+}
+
+function triggerDodge() {
+  if (gameWon || gameLost || player.pvpFreezeFrames > 0 || isMajorUiOpen()) return false;
+  if (player.dodgeCooldown > 0 || isPlayerDodging()) return false;
+
+  const keyboardX = (keys["d"] || keys["arrowright"] ? 1 : 0) - (keys["a"] || keys["arrowleft"] ? 1 : 0);
+  const keyboardY = (keys["s"] || keys["arrowdown"] ? 1 : 0) - (keys["w"] || keys["arrowup"] ? 1 : 0);
+  let dirX = keyboardX + (gamepadState.moveX || 0) + (touchState.moveX || 0);
+  let dirY = keyboardY + (gamepadState.moveY || 0) + (touchState.moveY || 0);
+  if (Math.hypot(dirX, dirY) <= 0.18) {
+    dirX = Number.isFinite(player.aimX) ? player.aimX : 1;
+    dirY = Number.isFinite(player.aimY) ? player.aimY : 0;
+  }
+  const len = Math.hypot(dirX, dirY) || 1;
+  player.dodgeDirX = dirX / len;
+  player.dodgeDirY = dirY / len;
+  updatePlayerAim(player.dodgeDirX, player.dodgeDirY);
+  player.dodgeFrames = DODGE_DURATION_FRAMES;
+  player.dodgeMaxFrames = DODGE_DURATION_FRAMES;
+  player.dodgeInvulnFrames = DODGE_INVULN_FRAMES;
+  player.dodgeCooldown = DODGE_COOLDOWN_FRAMES;
+  player.dodgeVisualFrame = 0;
+  player.dodgeFlashFrames = 7;
+  spawnDodgeAfterimage();
+  spawnDodgePuff(player.x, player.y, -player.dodgeDirX, -player.dodgeDirY, "start");
+  updateDodgeButtonCooldown();
+  return true;
+}
+
+function updateDodgeButtonCooldown() {
+  const btn = document.getElementById("btnDodge");
+  if (!btn) return;
+  const pct = player.dodgeCooldown > 0 ? Math.max(0, Math.min(1, player.dodgeCooldown / DODGE_COOLDOWN_FRAMES)) : 0;
+  btn.style.setProperty("--cooldown", pct.toFixed(3));
+  btn.classList.toggle("cooling", pct > 0);
+}
+
+function updateDodgeEffects() {
+  for (let i = dodgeAfterimages.length - 1; i >= 0; i--) {
+    dodgeAfterimages[i].life--;
+    if (dodgeAfterimages[i].life <= 0) dodgeAfterimages.splice(i, 1);
+  }
+  for (let i = dodgePuffs.length - 1; i >= 0; i--) {
+    dodgePuffs[i].life--;
+    if (dodgePuffs[i].life <= 0) dodgePuffs.splice(i, 1);
+  }
+}
+
+function updateDodgeMovement() {
+  if (!isPlayerDodging()) return false;
+  const beforeX = player.x;
+  const beforeY = player.y;
+  const progress = 1 - (player.dodgeFrames / Math.max(1, player.dodgeMaxFrames));
+  const ease = 0.72 + Math.sin(progress * Math.PI) * 0.5;
+  const step = DODGE_SPEED * ease;
+  moveEntity(player, player.dodgeDirX * step, player.dodgeDirY * step, { countWallBump: false });
+  player.dodgeFrames = Math.max(0, player.dodgeFrames - 1);
+  player.dodgeInvulnFrames = Math.max(0, player.dodgeInvulnFrames - 1);
+  player.dodgeVisualFrame++;
+  if (player.dodgeFlashFrames > 0) player.dodgeFlashFrames--;
+  if (player.dodgeVisualFrame === 5 || player.dodgeVisualFrame === 10) spawnDodgeAfterimage();
+  const blockedEarly = Math.hypot(player.x - beforeX, player.y - beforeY) < step * 0.35;
+  if (blockedEarly) {
+    player.dodgeFrames = 0;
+    player.dodgeInvulnFrames = 0;
+  }
+  if (player.dodgeFrames === 0) {
+    spawnDodgePuff(player.x, player.y, player.dodgeDirX, player.dodgeDirY, "end");
+  }
+  return true;
+}
+
 function tileAt(px, py) {
   const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
   if (tx < 0 || tx >= MAP_COLS || ty < 0 || ty >= MAP_ROWS) return "#";
@@ -86,11 +213,14 @@ function updatePlayer() {
     player.pvpFreezeFrames = Math.max(0, player.pvpFreezeFrames - 1);
     dx = 0;
     dy = 0;
-  } else {
+  } else if (!updateDodgeMovement()) {
     moveEntity(player, dx, dy);
   }
   player.attackCooldown = Math.max(0, player.attackCooldown - 1);
-  if (touchState.attackActive && player.pvpFreezeFrames <= 0) attack();
+  player.dodgeCooldown = Math.max(0, player.dodgeCooldown - 1);
+  updateDodgeEffects();
+  updateDodgeButtonCooldown();
+  if (touchState.attackActive && player.pvpFreezeFrames <= 0 && !isPlayerDodging()) attack();
 
   const currentTile = tileAt(player.x, player.y);
   player.safe = currentTile === "S";
@@ -195,7 +325,7 @@ for (const enemy of enemies) {
     }
 
     const newDist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-    if (newDist < player.r + enemy.r + 4 && enemy.damageCooldown <= 0) {
+    if (newDist < player.r + enemy.r + 4 && enemy.damageCooldown <= 0 && !isPlayerDodgeInvulnerable()) {
       const rawDmg = enemy.damage || 8;
       const dmg = Math.max(1, rawDmg - player.defense);
       player.hp -= dmg;
@@ -279,7 +409,7 @@ function addAttackTelegraph(weapon) {
 }
 
 function attack() {
-  if (player.attackCooldown > 0 || player.pvpFreezeFrames > 0 || gameWon || gameLost) return;
+  if (player.attackCooldown > 0 || player.pvpFreezeFrames > 0 || isPlayerDodging() || gameWon || gameLost) return;
   if (isPvpFloorActive() && isCrawlerInSafeRoom(player)) {
     applySafeRoomPvpFreeze();
     return;
@@ -398,7 +528,7 @@ function updateTutorialSigns() {
 }
 
 function interact() {
-  if (gameWon || gameLost) return;
+  if (gameWon || gameLost || isPlayerDodging()) return;
 
   for (const corpse of corpses) {
     if (corpse.looted) continue;

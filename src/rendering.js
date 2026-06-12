@@ -4,8 +4,11 @@ const WALL_RISE = 18;
 const ENTITY_RISE = 10;
 
 const PLAYER_SPRITE_PATH = "./assets/sprites/player_base.png";
+const PLAYER_DODGE_SPRITE_PATH = "./assets/sprites/player_dodge_roll.png";
 const PLAYER_SPRITE_SHEET = new Image();
 PLAYER_SPRITE_SHEET.src = PLAYER_SPRITE_PATH;
+const PLAYER_DODGE_SPRITE_SHEET = new Image();
+PLAYER_DODGE_SPRITE_SHEET.src = PLAYER_DODGE_SPRITE_PATH;
 
 const PLAYER_SPRITE_FRAME_WIDTH = 32;
 const PLAYER_SPRITE_FRAME_HEIGHT = 32;
@@ -163,10 +166,17 @@ function playerSpriteRowForAim() {
   return aimY < 0 ? 1 : 0;
 }
 
-function isPlayerSpriteLoaded() {
-  return PLAYER_SPRITE_SHEET.complete &&
-    PLAYER_SPRITE_SHEET.naturalWidth >= PLAYER_SPRITE_FRAME_WIDTH * 3 &&
-    PLAYER_SPRITE_SHEET.naturalHeight >= PLAYER_SPRITE_FRAME_HEIGHT * 4;
+function isPlayerSpriteLoaded(sheet = PLAYER_SPRITE_SHEET) {
+  return sheet.complete &&
+    sheet.naturalWidth >= PLAYER_SPRITE_FRAME_WIDTH * 3 &&
+    sheet.naturalHeight >= PLAYER_SPRITE_FRAME_HEIGHT * 4;
+}
+
+function getEntitySpriteRowForAim(entity) {
+  const aimX = Number.isFinite(entity?.aimX) ? entity.aimX : 0;
+  const aimY = Number.isFinite(entity?.aimY) ? entity.aimY : 1;
+  if (Math.abs(aimX) > Math.abs(aimY)) return aimX < 0 ? 2 : 3;
+  return aimY < 0 ? 1 : 0;
 }
 
 function drawPlayerSpriteStatusRing() {
@@ -186,10 +196,15 @@ function drawPlayerSprite() {
     return;
   }
 
+  const dodging = typeof isPlayerDodging === "function" && isPlayerDodging();
+  const dodgeSheetReady = dodging && isPlayerSpriteLoaded(PLAYER_DODGE_SPRITE_SHEET);
+  const sheet = dodgeSheetReady ? PLAYER_DODGE_SPRITE_SHEET : PLAYER_SPRITE_SHEET;
   const moving = isPlayerTryingToMove();
-  const frame = moving
-    ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
-    : 0;
+  const frame = dodgeSheetReady
+    ? Math.floor((player.dodgeVisualFrame || 0) / 4) % 3
+    : moving || dodging
+      ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor((dodging ? (player.dodgeVisualFrame || frameCount) : frameCount) / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
+      : 0;
   const row = playerSpriteRowForAim();
   const sx = frame * PLAYER_SPRITE_FRAME_WIDTH;
   const sy = row * PLAYER_SPRITE_FRAME_HEIGHT;
@@ -205,8 +220,17 @@ function drawPlayerSprite() {
   drawPlayerSpriteStatusRing();
 
   ctx.imageSmoothingEnabled = false;
+  if (dodging && !dodgeSheetReady) {
+    const squash = 1.12 + Math.sin((player.dodgeVisualFrame || 0) * 0.55) * 0.05;
+    const stretch = 0.86;
+    ctx.translate(player.x, player.y - 10);
+    ctx.rotate(Math.sin((player.dodgeVisualFrame || 0) * 0.7) * 0.18);
+    ctx.scale(squash, stretch);
+    ctx.translate(-player.x, -(player.y - 10));
+  }
+
   ctx.drawImage(
-    PLAYER_SPRITE_SHEET,
+    sheet,
     sx,
     sy,
     PLAYER_SPRITE_FRAME_WIDTH,
@@ -216,7 +240,77 @@ function drawPlayerSprite() {
     PLAYER_SPRITE_RENDER_WIDTH,
     PLAYER_SPRITE_RENDER_HEIGHT
   );
+  if (player.dodgeFlashFrames > 0) {
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.fillStyle = `rgba(255,255,255,${Math.min(0.62, player.dodgeFlashFrames / 9)})`;
+    ctx.fillRect(dx - 2, dy - 2, PLAYER_SPRITE_RENDER_WIDTH + 4, PLAYER_SPRITE_RENDER_HEIGHT + 4);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.strokeStyle = "rgba(255,255,255,0.86)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(dx - 1, dy - 1, PLAYER_SPRITE_RENDER_WIDTH + 2, PLAYER_SPRITE_RENDER_HEIGHT + 2);
+  }
   ctx.restore();
+}
+
+function drawPlayerSpriteAt(entity, alpha = 1, tint = null) {
+  if (!isPlayerSpriteLoaded()) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawStandingFigure(entity, { color: tint || entity.color || "#75c7ff", outline: "rgba(255,255,255,0.55)", height: 22 });
+    ctx.restore();
+    return;
+  }
+  const frame = entity.frame ?? 0;
+  const row = getEntitySpriteRowForAim(entity);
+  const dx = entity.x - PLAYER_SPRITE_RENDER_WIDTH / 2;
+  const dy = entity.y + (entity.r || player.r) - PLAYER_SPRITE_RENDER_HEIGHT;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(PLAYER_SPRITE_SHEET, frame * PLAYER_SPRITE_FRAME_WIDTH, row * PLAYER_SPRITE_FRAME_HEIGHT, PLAYER_SPRITE_FRAME_WIDTH, PLAYER_SPRITE_FRAME_HEIGHT, dx, dy, PLAYER_SPRITE_RENDER_WIDTH, PLAYER_SPRITE_RENDER_HEIGHT);
+  if (tint) {
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.fillStyle = tint;
+    ctx.fillRect(dx, dy, PLAYER_SPRITE_RENDER_WIDTH, PLAYER_SPRITE_RENDER_HEIGHT);
+  }
+  ctx.restore();
+}
+
+function drawDodgeEffects() {
+  for (const puff of dodgePuffs) {
+    const t = 1 - puff.life / Math.max(1, puff.maxLife);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - t) * 0.65;
+    ctx.fillStyle = puff.phase === "start" ? "rgba(210,190,145,0.58)" : "rgba(235,222,188,0.68)";
+    for (let i = 0; i < 4; i++) {
+      const side = i - 1.5;
+      ctx.beginPath();
+      ctx.ellipse(
+        puff.x + puff.dirX * t * 22 + -puff.dirY * side * 4,
+        puff.y + puff.dirY * t * 12 + puff.dirX * side * 3 + 5,
+        puff.size * (0.6 + t) * (1 - i * 0.05),
+        puff.size * 0.38 * (1 + t),
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  for (const ghost of dodgeAfterimages) {
+    const alpha = Math.max(0, ghost.life / Math.max(1, ghost.maxLife)) * 0.42;
+    drawPlayerSpriteAt({ ...ghost, r: player.r }, alpha, "rgba(130,210,255,0.45)");
+  }
+}
+
+function drawRemoteDodgeEffects(crawler) {
+  if (!crawler?.isDodging) return;
+  const dirX = Number.isFinite(crawler.aimX) ? crawler.aimX : 1;
+  const dirY = Number.isFinite(crawler.aimY) ? crawler.aimY : 0;
+  for (let i = 1; i <= 2; i++) {
+    drawPlayerSpriteAt({ ...crawler, x: crawler.x - dirX * i * 12, y: crawler.y - dirY * i * 12, frame: i }, 0.2 / i, "rgba(117,199,255,0.42)");
+  }
 }
 
 function wrapRoomLabel(label, maxCharsPerLine = 12) {
@@ -968,6 +1062,7 @@ function draw() {
       const tx = Math.floor(crawler.x / TILE), ty = Math.floor(crawler.y / TILE);
       if (!visible[ty]?.[tx]) continue;
 
+      drawRemoteDodgeEffects(crawler);
       drawStandingFigure(crawler, {
         color: crawler.status === "stasis" ? "#9db1ff" : crawler.status === "downed" ? "#555" : (crawler.color || "#75c7ff"),
         outline: "rgba(255,255,255,0.76)",
@@ -986,6 +1081,7 @@ function draw() {
     }
   }
 
+  drawDodgeEffects();
   drawPlayerSprite();
 
   drawAimIndicator();

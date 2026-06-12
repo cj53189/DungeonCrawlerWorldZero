@@ -56,6 +56,7 @@ function setupTouchControls() {
   const btnAttack = document.getElementById("btnAttack");
   const attackBase = document.getElementById("attackStickBase");
   const btnInteract = document.getElementById("btnInteract");
+  const btnDodge = document.getElementById("btnDodge");
   const btnLog = document.getElementById("btnLog");
   const btnRecap = document.getElementById("btnRecap");
   const btnNew = document.getElementById("btnNew");
@@ -220,6 +221,7 @@ function setupTouchControls() {
 
   bindAttackStick();
   bindButton(btnInteract, interact);
+  bindButton(btnDodge, triggerDodge);
   bindButton(btnLog, toggleLogPanelMobile);
   bindButton(btnRecap, toggleRecapPanelMobile);
   bindButton(btnNew, restartGame);
@@ -329,7 +331,7 @@ window.addEventListener("keydown", e => {
   if (e.key.toLowerCase() === "i") toggleInventoryPanel();
   if (e.key.toLowerCase() === "k") toggleLighting();
   if (e.key === "Escape" && multiplayer.enabled) closeMultiplayerPanel();
-  if (e.code === "Space") { e.preventDefault(); attack(); }
+  if (e.code === "Space") { e.preventDefault(); triggerDodge(); }
   if (["1", "2", "3", "4", "5"].includes(e.key)) setPlayerWeapon(WEAPON_ORDER[Number(e.key) - 1]);
   if (e.key.toLowerCase() === "q") cyclePlayerWeapon(-1);
   if (e.key.toLowerCase() === "z") cyclePlayerWeapon(1);
@@ -409,10 +411,11 @@ function pollGamepad() {
     if (uiConfirmPressed && typeof activateControllerWindowSelection === "function") activateControllerWindowSelection();
   } else {
     if (justPressed(0)) interact();                    // A / Cross
+    if (justPressed(1)) triggerDodge();                 // B / Circle
     if (justPressed(2) || justPressed(5) || justPressed(7)) attack(); // X/Square, RB, RT
     if (justPressed(8)) toggleLog();                   // View/Select
     if (justPressed(3)) toggleSafeRoomRecap();         // Y/Triangle
-    if (justPressed(1)) toggleInventoryPanel();        // B/Circle
+    if (justPressed(11)) toggleInventoryPanel();       // Right stick
     if (justPressed(4)) cyclePlayerWeapon(-1);         // LB/L1
     if (justPressed(6)) cyclePlayerWeapon(1);          // LT/L2
     if (justPressed(9) && gameMode !== GAME_MODES.TITLE) restartGame();                 // Menu/Start

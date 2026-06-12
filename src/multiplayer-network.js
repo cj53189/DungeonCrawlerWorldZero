@@ -271,6 +271,8 @@ function captureLocalCrawlerNetworkState() {
     currentFloor,
     status: gameLost || player.hp <= 0 ? "downed" : (gameMode === GAME_MODES.MULTIPLAYER_STASIS ? "stasis" : "active"),
     floor0Status: multiplayer.localFloor0Status || "exploring",
+    isDodging: typeof isPlayerDodging === "function" ? isPlayerDodging() : false,
+    dodgeProgress: player.dodgeMaxFrames > 0 ? 1 - (player.dodgeFrames / player.dodgeMaxFrames) : 0,
     currentRoomId: Number.isFinite(Number(player.currentRoomId)) ? Math.trunc(Number(player.currentRoomId)) : undefined
   };
 }
@@ -317,6 +319,8 @@ function applyServerCrawlerSnapshot(snapshot) {
       currentFloor: 0,
       status: crawler.status || "active",
       floor0Status: normalizeFloor0StatusValue(crawler.floor0Status || member?.floor0Status),
+      isDodging: !!crawler.isDodging,
+      dodgeProgress: Math.max(0, Math.min(1, Number(crawler.dodgeProgress) || 0)),
       color: member?.color || crawler.color || "#75c7ff",
       updatedAt: crawler.updatedAt || Date.now()
     });
