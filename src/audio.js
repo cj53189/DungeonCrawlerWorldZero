@@ -282,8 +282,8 @@ function createDungeonMusicManager() {
   function getStateForGameState() {
     if (gameMode === GAME_MODES.TITLE) return MUSIC_STATES.TITLE;
     if (gameMode === GAME_MODES.MULTIPLAYER_STASIS || gameWon || gameLost) return null;
-    if (isBossMusicAppropriate()) return MUSIC_STATES.BOSS;
     if (isCollapseMusicAppropriate()) return MUSIC_STATES.COLLAPSE;
+    if (isBossMusicAppropriate()) return MUSIC_STATES.BOSS;
     return MUSIC_STATES.EXPLORATION;
   }
 

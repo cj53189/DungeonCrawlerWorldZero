@@ -28,6 +28,10 @@ function isMajorUiOpen() {
   return typeof getActiveControllerWindow === "function" && !!getActiveControllerWindow();
 }
 
+function isDodgeBlockedByGameState() {
+  return gameWon || gameLost || pendingFloorAdvance || isGameplayUpdatePaused() || player.pvpFreezeFrames > 0 || isMajorUiOpen();
+}
+
 function spawnDodgePuff(x, y, dirX, dirY, phase = "start") {
   dodgePuffs.push({
     x,
@@ -55,7 +59,7 @@ function spawnDodgeAfterimage() {
 }
 
 function triggerDodge() {
-  if (gameWon || gameLost || player.pvpFreezeFrames > 0 || isMajorUiOpen()) return false;
+  if (isDodgeBlockedByGameState()) return false;
   if (player.dodgeCooldown > 0 || isPlayerDodging()) return false;
 
   const keyboardX = (keys["d"] || keys["arrowright"] ? 1 : 0) - (keys["a"] || keys["arrowleft"] ? 1 : 0);
@@ -103,6 +107,11 @@ function updateDodgeEffects() {
 
 function updateDodgeMovement() {
   if (!isPlayerDodging()) return false;
+  if (isDodgeBlockedByGameState()) {
+    resetPlayerDodgeState();
+    updateDodgeButtonCooldown();
+    return false;
+  }
   const beforeX = player.x;
   const beforeY = player.y;
   const progress = 1 - (player.dodgeFrames / Math.max(1, player.dodgeMaxFrames));
@@ -153,6 +162,7 @@ function moveEntity(entity, dx, dy, options = {}) {
 
 function applyKnockback(entity, fromX, fromY, distance) {
   if (!entity || !Number.isFinite(distance) || distance <= 0) return;
+  if (entity === player && isPlayerDodging()) return;
   const dx = entity.x - fromX;
   const dy = entity.y - fromY;
   const len = Math.hypot(dx, dy) || 1;
