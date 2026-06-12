@@ -436,6 +436,7 @@ function advanceToNextFloor() {
   currentFloor++;
   pendingFloorAdvance = false;
   resetState({ preserveRun: true, snapshot });
+  if (typeof syncMusicToGameState === "function") syncMusicToGameState();
   showFloorSplash();
 }
 

@@ -941,6 +941,7 @@ function startBossEncounter(room){
   if (!room || room.encounterAnnounced) return;
   room.encounterAnnounced = true;
   achievement("BOSS ENCOUNTER",`${room.name}. Something large and legally distinct from your comfort zone is nearby.`,"bossEncounter");
+  if (typeof setMusicState === "function") setMusicState(MUSIC_STATES.BOSS);
   announcer("Entering unusually large rooms remains a leading cause of crawler-shaped stains.");
 }
 
@@ -1161,6 +1162,8 @@ function triggerBossAggro(reason = "seen") {
   bossAggroed = true;
   lockBossDoors(bossRoom);
 
+  if (typeof setMusicState === "function") setMusicState(MUSIC_STATES.BOSS);
+
   achievement(
     "BOSS AGGRO",
     reason === "attack"
@@ -1254,7 +1257,18 @@ function completeBossEncounter(enemy){
   bossAggroed = false;
   bossDoorsLocked = false;
   pendingBossLocks = [];
-  clearBossLocks();if(!bossRoom||bossRoom.cleared)return; bossRoom.cleared=true; bossRoom.locked=false; stats.bossesDefeated++; unlockBossDoors(bossRoom); const cx=Math.max(bossRoom.x+1,Math.min(bossRoom.x+bossRoom.w-2,bossRoom.cx+1)),cy=Math.max(bossRoom.y+1,Math.min(bossRoom.y+bossRoom.h-2,bossRoom.cy)); if(map[cy][cx]===".")map[cy][cx]="C"; changeAudience(15); achievement("BOSS DEFEATED",`You defeated ${enemy.name||"the boss"}. The doors unlock. The corpse remains lootable, because dignity is not included in the tutorial.`,"bossDefeated");}
+  clearBossLocks();
+  if(!bossRoom||bossRoom.cleared)return;
+  bossRoom.cleared=true;
+  bossRoom.locked=false;
+  stats.bossesDefeated++;
+  unlockBossDoors(bossRoom);
+  const cx=Math.max(bossRoom.x+1,Math.min(bossRoom.x+bossRoom.w-2,bossRoom.cx+1)),cy=Math.max(bossRoom.y+1,Math.min(bossRoom.y+bossRoom.h-2,bossRoom.cy));
+  if(map[cy][cx]===".")map[cy][cx]="C";
+  changeAudience(15);
+  achievement("BOSS DEFEATED",`You defeated ${enemy.name||"the boss"}. The doors unlock. The corpse remains lootable, because dignity is not included in the tutorial.`,"bossDefeated");
+  if (typeof syncMusicToGameState === "function") syncMusicToGameState();
+}
 
 function getFarthestRoom(fromRoom, excludedRooms = []) {
   const excluded = new Set(excludedRooms.filter(Boolean));
