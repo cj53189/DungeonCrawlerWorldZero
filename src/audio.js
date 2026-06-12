@@ -12,12 +12,32 @@ const MUSIC_TRACKS = Object.freeze({
   [MUSIC_STATES.BOSS]: "./assets/audio/music/crown_of_the_fallen_boss_battle.mp3"
 });
 
+// These per-track targets keep perceived loudness easy to rebalance without
+// recompressing, normalizing, or otherwise rewriting the uploaded source files.
+const MUSIC_TRACK_TARGET_VOLUMES = Object.freeze({
+  [MUSIC_STATES.TITLE]: 0.30,
+  [MUSIC_STATES.EXPLORATION]: 0.35,
+  [MUSIC_STATES.COLLAPSE]: 0.32,
+  [MUSIC_STATES.BOSS]: 0.34
+});
+
 const MUSIC_MUTED_STORAGE_KEY = "dcw.musicMuted";
 const DEFAULT_MUSIC_VOLUME = 0.35;
-const MUSIC_FADE_STEP_MS = 40;
-const MUSIC_FADE_STEP_VOLUME = 0.02;
+const MUSIC_CROSSFADE_MS = 1200;
 const MUSIC_PLAY_RETRY_MS = 1000;
 const COLLAPSE_MUSIC_WARNING_SECONDS = 60;
+const MUSIC_DEBUG = false;
+
+function clampMusicVolume(value) {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  return Math.max(0, Math.min(1, numericValue));
+}
+
+function musicDebug(event, details = {}) {
+  if (!MUSIC_DEBUG) return;
+  console.debug(`[music] ${event}`, details);
+}
 
 function readSavedMusicMuted() {
   try {
@@ -44,11 +64,20 @@ function createDungeonMusicManager() {
   let volume = DEFAULT_MUSIC_VOLUME;
   let userInteracted = false;
   let wantsPlayback = false;
-  let fadeTimer = null;
+  let fadeAnimationFrame = null;
+  let fadeToken = 0;
   let lastPlayAttemptAt = 0;
+  let lastPlayAttemptState = null;
+
+  function getTrackTargetVolume(state, baseVolume = volume) {
+    const trackTarget = MUSIC_TRACK_TARGET_VOLUMES[state] ?? DEFAULT_MUSIC_VOLUME;
+    const trackGain = DEFAULT_MUSIC_VOLUME > 0 ? trackTarget / DEFAULT_MUSIC_VOLUME : 1;
+    return clampMusicVolume(clampMusicVolume(baseVolume) * trackGain);
+  }
 
   function getTrackInfo(state) {
-    const src = MUSIC_TRACKS[state] || MUSIC_TRACKS[MUSIC_STATES.EXPLORATION];
+    const src = MUSIC_TRACKS[state];
+    if (!src) return null;
     if (tracks.has(state)) return tracks.get(state);
 
     const audio = new Audio(src);
@@ -59,6 +88,7 @@ function createDungeonMusicManager() {
     audio.addEventListener("error", () => {
       info.loaded = false;
       info.unavailable = true;
+      musicDebug("failed playback", { requestedState: state, src });
       if (currentAudio === audio) {
         audio.pause();
         currentAudio = null;
@@ -69,10 +99,15 @@ function createDungeonMusicManager() {
     return info;
   }
 
+  function preloadAllTracks() {
+    for (const state of Object.values(MUSIC_STATES)) loadState(state);
+  }
+
   function stopFade() {
-    if (!fadeTimer) return;
-    clearInterval(fadeTimer);
-    fadeTimer = null;
+    if (!fadeAnimationFrame) return;
+    cancelAnimationFrame(fadeAnimationFrame);
+    fadeAnimationFrame = null;
+    fadeToken++;
   }
 
   function setButtonLabel() {
@@ -83,76 +118,100 @@ function createDungeonMusicManager() {
   }
 
   function setAudioVolume(nextVolume = volume) {
-    volume = Math.max(0, Math.min(1, nextVolume));
-    if (currentAudio) currentAudio.volume = muted ? 0 : volume;
+    volume = clampMusicVolume(nextVolume);
+    if (currentAudio && currentState) currentAudio.volume = muted ? 0 : getTrackTargetVolume(currentState);
   }
 
   function loadState(state = desiredState) {
     const info = getTrackInfo(state);
-    if (info.unavailable || info.loaded) return info;
+    if (!info || info.unavailable || info.loaded) return info;
     try {
       info.audio.load();
       info.loaded = true;
     } catch (error) {
       info.unavailable = true;
+      musicDebug("failed playback", { requestedState: state, src: info.src });
     }
     return info;
   }
 
-  function fadeBetween(fromAudio, toAudio, targetVolume = volume, { pauseFrom = true } = {}) {
+  function fadeBetween(fromAudio, toAudio, targetVolume = volume, { pauseFrom = true, toState = desiredState } = {}) {
     stopFade();
-    const safeTarget = Math.max(0, Math.min(1, muted ? 0 : targetVolume));
+    const token = fadeToken;
+    const safeTarget = muted ? 0 : getTrackTargetVolume(toState, targetVolume);
+    const fromStartVolume = clampMusicVolume(fromAudio?.volume ?? 0);
+    const startAt = performance.now();
 
-    fadeTimer = setInterval(() => {
-      let done = true;
-
-      if (fromAudio && !fromAudio.paused) {
-        const nextVolume = Math.max(0, fromAudio.volume - MUSIC_FADE_STEP_VOLUME);
-        fromAudio.volume = nextVolume;
-        if (nextVolume > 0) done = false;
-        else if (pauseFrom) {
-          fromAudio.pause();
-          fromAudio.currentTime = 0;
-        }
+    function finishFade() {
+      if (fromAudio && pauseFrom) {
+        fromAudio.volume = 0;
+        fromAudio.pause();
+        fromAudio.currentTime = 0;
       }
+      if (toAudio) toAudio.volume = safeTarget;
+      fadeAnimationFrame = null;
+    }
 
-      if (toAudio && !muted) {
-        const nextVolume = Math.min(safeTarget, toAudio.volume + MUSIC_FADE_STEP_VOLUME);
-        toAudio.volume = nextVolume;
-        if (nextVolume < safeTarget) done = false;
+    function tick(now) {
+      if (token !== fadeToken) return;
+      const progress = Math.min(1, (now - startAt) / MUSIC_CROSSFADE_MS);
+      const fromVolume = clampMusicVolume(fromStartVolume * (1 - progress));
+      const toVolume = clampMusicVolume(safeTarget * progress);
+
+      if (fromAudio && !fromAudio.paused) fromAudio.volume = fromVolume;
+      if (toAudio) toAudio.volume = muted ? 0 : toVolume;
+
+      if (progress >= 1) {
+        finishFade();
+        return;
       }
+      fadeAnimationFrame = requestAnimationFrame(tick);
+    }
 
-      if (done) stopFade();
-    }, MUSIC_FADE_STEP_MS);
+    fadeAnimationFrame = requestAnimationFrame(tick);
   }
 
   async function startState(state, { fadeIn = true, force = false } = {}) {
+    if (!MUSIC_TRACKS[state]) return false;
+
+    const wasDesiredState = desiredState;
     desiredState = state;
     wantsPlayback = true;
+    musicDebug("requested music state", { requestedState: state, currentState, wasDesiredState });
 
     if (muted || !userInteracted) return false;
-    if (!force && currentState === state && currentAudio && !currentAudio.paused) return true;
+    if (!force && currentState === state && currentAudio && !currentAudio.paused) {
+      musicDebug("ignored duplicate state change", { requestedState: state, currentState });
+      return true;
+    }
 
     const now = performance.now();
-    if (!force && now - lastPlayAttemptAt < MUSIC_PLAY_RETRY_MS) return false;
+    if (!force && lastPlayAttemptState === state && now - lastPlayAttemptAt < MUSIC_PLAY_RETRY_MS) return false;
     lastPlayAttemptAt = now;
+    lastPlayAttemptState = state;
 
     const info = loadState(state);
-    if (info.unavailable) return false;
+    if (!info || info.unavailable) return false;
 
     const nextAudio = info.audio;
     const previousAudio = currentAudio && currentAudio !== nextAudio ? currentAudio : null;
-    currentState = state;
-    currentAudio = nextAudio;
+    const targetVolume = getTrackTargetVolume(state);
 
     try {
       if (nextAudio.paused) {
-        nextAudio.volume = fadeIn ? 0 : (muted ? 0 : volume);
+        nextAudio.volume = fadeIn ? 0 : targetVolume;
         await nextAudio.play();
       }
-      if (fadeIn) fadeBetween(previousAudio, nextAudio, volume);
+
+      currentState = state;
+      currentAudio = nextAudio;
+      musicDebug("current music state", { currentState, volume: targetVolume });
+
+      if (fadeIn) fadeBetween(previousAudio, nextAudio, volume, { toState: state });
       else {
+        stopFade();
         if (previousAudio) {
+          previousAudio.volume = 0;
           previousAudio.pause();
           previousAudio.currentTime = 0;
         }
@@ -160,7 +219,7 @@ function createDungeonMusicManager() {
       }
       return true;
     } catch (error) {
-      // Browser autoplay policies can still block playback; keep gameplay quiet and error-free.
+      musicDebug("failed playback", { requestedState: state, src: info.src, reason: error?.name || "play rejected" });
       return false;
     }
   }
@@ -204,8 +263,9 @@ function createDungeonMusicManager() {
   }
 
   function markUserInteraction() {
+    if (userInteracted) return;
     userInteracted = true;
-    loadState(desiredState);
+    preloadAllTracks();
     if (wantsPlayback && !muted) startState(desiredState, { fadeIn: true, force: true });
   }
 
@@ -216,7 +276,7 @@ function createDungeonMusicManager() {
   }
 
   function isCollapseMusicAppropriate() {
-    return Number.isFinite(floorTimeLeft) && floorTimeLeft <= COLLAPSE_MUSIC_WARNING_SECONDS;
+    return !collapseStarted && Number.isFinite(floorTimeLeft) && floorTimeLeft <= COLLAPSE_MUSIC_WARNING_SECONDS;
   }
 
   function getStateForGameState() {
@@ -230,7 +290,7 @@ function createDungeonMusicManager() {
   function syncToGameState() {
     const nextState = getStateForGameState();
     if (!nextState) {
-      if (currentAudio && !currentAudio.paused) pause({ fadeOut: true });
+      if (wantsPlayback && currentAudio && !currentAudio.paused) pause({ fadeOut: true });
       else wantsPlayback = false;
       return;
     }
@@ -238,10 +298,12 @@ function createDungeonMusicManager() {
     wantsPlayback = true;
     if (desiredState !== nextState || currentState !== nextState) setState(nextState, { fadeIn: true });
     else if (!muted && userInteracted && currentAudio?.paused) startState(nextState, { fadeIn: true });
+    else musicDebug("ignored duplicate state change", { requestedState: nextState, currentState });
   }
 
   return {
     load: loadState,
+    preloadAll: preloadAllTracks,
     play: startState,
     pause,
     resume: startState,
