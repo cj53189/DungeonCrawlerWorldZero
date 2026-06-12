@@ -23,6 +23,23 @@ function updateInputVisibility() {
   document.body.classList.toggle("showTouchControls", lastInputMethod === "touch");
 }
 
+function resetTransientInputState() {
+  for (const key of Object.keys(keys)) delete keys[key];
+  gamepadState.moveX = 0;
+  gamepadState.moveY = 0;
+  gamepadState.aimX = 0;
+  gamepadState.aimY = 0;
+  gamepadState.hasAimInput = false;
+  gamepadState.previousButtons = [];
+  touchState.moveX = 0;
+  touchState.moveY = 0;
+  touchState.attackActive = false;
+  touchState.attackX = 0;
+  touchState.attackY = 0;
+  touchState.activeTouchId = null;
+  touchState.attackTouchId = null;
+}
+
 function setupAdaptiveInputDetection() {
   if (document.body.dataset.adaptiveInputDetectionInitialized === "true") return;
   document.body.dataset.adaptiveInputDetectionInitialized = "true";

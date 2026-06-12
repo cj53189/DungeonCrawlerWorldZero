@@ -285,6 +285,8 @@ function damageRemoteCrawler(crawler, damage) {
 
 function returnToTitle() {
   pendingFloorAdvance = false;
+  if (typeof resetTransientInputState === "function") resetTransientInputState();
+  if (typeof resetPlayerDodgeState === "function") resetPlayerDodgeState();
   if (typeof requestServerLeaveLobby === "function") requestServerLeaveLobby();
   resetMultiplayerState();
   setGameMode(GAME_MODES.TITLE);

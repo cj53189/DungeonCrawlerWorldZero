@@ -51,6 +51,8 @@ function resetRunProgress() {
 
 
 function resetState(options = {}) {
+  if (typeof resetTransientInputState === "function") resetTransientInputState();
+  if (typeof setActiveInventoryCategory === "function") setActiveInventoryCategory("gear");
   const preserveRun = !!options.preserveRun;
   const snapshot = options.snapshot || null;
 

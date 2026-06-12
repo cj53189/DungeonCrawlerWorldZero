@@ -73,7 +73,7 @@ function setupInventoryActionHandlers(){
  panel.dataset.actionsBound="true";
  panel.addEventListener("click",e=>{
   const tab=e.target.closest("button[data-inventory-category]");
-  if(tab){activeInventoryCategory=tab.dataset.inventoryCategory;updateInventoryUI();return;}
+  if(tab){setActiveInventoryCategory(tab.dataset.inventoryCategory);updateInventoryUI();return;}
   const weaponButton=e.target.closest("button[data-weapon-id]");
   if(weaponButton){setPlayerWeapon(weaponButton.dataset.weaponId);updateInventoryUI();return;}
   const unequipButton=e.target.closest("button[data-action='unequip'][data-slot]");
@@ -101,6 +101,10 @@ function inventoryCategoryFor(item){
  if(item.type==="lootbox")return"lootboxes";
  if(item.type==="gear"||item.type==="light"||item.type==="weapon")return"gear";
  return"items";
+}
+function setActiveInventoryCategory(category){
+ activeInventoryCategory=Object.prototype.hasOwnProperty.call(INVENTORY_CATEGORIES,category)?category:"gear";
+ return activeInventoryCategory;
 }
 function gearComparisonText(item){
  if(!item||!(item.type==="gear"||item.type==="light"||item.type==="weapon"))return"";
@@ -142,7 +146,7 @@ function updateInventoryUI(){
  eq.innerHTML=`<div class="inventoryHeader"><div><div class="inventoryTitle">Pinned Equipment</div><div class="inventorySubTitle">Equipped gear stays visible while your pack scrolls.</div></div><div class="inventoryPower">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · AUD +${player.audienceBonus}</div></div><div class="weaponGrid">${renderWeaponGrid()}</div><div class="equipGrid">${equippedSlotKeys().map(renderEquipmentSlot).join("")}</div>`;
  const counts={gear:0,items:0,lootboxes:0};
  for(const item of player.inventory)counts[inventoryCategoryFor(item)]++;
- if(!INVENTORY_CATEGORIES[activeInventoryCategory])activeInventoryCategory="gear";
+ setActiveInventoryCategory(activeInventoryCategory);
  const sorted=[...player.inventory].filter(item=>inventoryCategoryFor(item)===activeInventoryCategory).sort((a,b)=>(rarityPower(b.rarity)-rarityPower(a.rarity))||String(a.type).localeCompare(String(b.type))||String(a.slot||"").localeCompare(String(b.slot||""))||String(a.name).localeCompare(String(b.name)));
  const emptyText=activeInventoryCategory==="lootboxes"?"No loot boxes. The cardboard economy slumbers.":activeInventoryCategory==="items"?"No consumables or normal items yet.":"No spare gear. Loot corpses or chests to restock.";
  list.innerHTML=`${renderInventoryTabs(counts)}<div class="inventoryContentTitle">${escapeHtml(INVENTORY_CATEGORIES[activeInventoryCategory])}</div><div class="inventoryGrid">${sorted.length?sorted.map(item=>renderItemCard(item,activeInventoryCategory==="lootboxes"?"lootBoxCard":"")).join(""):`<div class="invItem empty"><div class="itemIcon">□</div><div class="itemName">Empty Category</div><div class="itemMeta">${escapeHtml(emptyText)}</div></div>`}</div>`;

@@ -199,19 +199,42 @@ function finishCorpseLootIfEmpty(corpse) {
   markCorpseLooted(corpse);
 }
 
-function takeCorpseLootItem(corpse, index) {
-  if (!corpse || corpse.looted || hasFloor0LootAlreadyTaken(corpse) || index < 0 || index >= corpse.loot.length) return;
-  const [item] = corpse.loot.splice(index, 1);
+function isServerFloor0LootShared() {
+  return multiplayer.enabled && multiplayer.usingServer && currentFloor === 0;
+}
+
+function awardCorpseLootItem(corpse, item) {
+  if (!corpse || !item) return false;
   if (item.type === "coins") {
-    player.coins += item.amount;
-    addPlayerFeedbackText(`+${item.amount} gold`, { color: "#ffd86b", size: 15 });
-    announcer(`You took ${item.amount} coins from ${corpse.name}. Brave accounting.`);
+    const amount = Math.max(0, Number(item.amount) || 0);
+    player.coins += amount;
+    addPlayerFeedbackText(`+${amount} gold`, { color: "#ffd86b", size: 15 });
+    announcer(`You took ${amount} coins from ${corpse.name}. Brave accounting.`);
   } else {
     player.inventory.push(item);
     if (item.type === "lootbox") stats.lootBoxesFound++;
     if (item.type === "gear") stats.gearFound++;
     achievement(item.type === "weapon" ? "WEAPON LOOTED" : "CORPSE LOOT", `You took ${item.name} from ${corpse.name}. ${itemDescription(item)}`, `corpse_take_${corpse.id}_${item.id}`);
   }
+  return true;
+}
+
+function takeCorpseLootItem(corpse, index) {
+  if (!corpse || corpse.looted || hasFloor0LootAlreadyTaken(corpse) || index < 0 || index >= corpse.loot.length) return;
+
+  if (isServerFloor0LootShared()) {
+    // Floor 0 corpses are server-shared containers. Claim the entire corpse on
+    // first take so two crawlers cannot race individual items into duplicate loot.
+    const claimedLoot = corpse.loot.splice(0);
+    for (const item of claimedLoot) awardCorpseLootItem(corpse, item);
+    markCorpseLooted(corpse);
+    updateInventoryUI();
+    updateHUD();
+    return;
+  }
+
+  const [item] = corpse.loot.splice(index, 1);
+  awardCorpseLootItem(corpse, item);
   updateInventoryUI();
   updateHUD();
   finishCorpseLootIfEmpty(corpse);

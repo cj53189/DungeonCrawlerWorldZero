@@ -22,7 +22,9 @@ const multiplayerNetwork = {
   reconnectDelayMs: 3000,
   countdownTimer: null,
   lastCrawlerStateSentAt: 0,
+  lastCrawlerStateSignature: null,
   lastEnemySnapshotSentAt: 0,
+  lastEnemySnapshotSignature: null,
   loggedEnemySyncOwners: new Set()
 };
 
@@ -269,6 +271,27 @@ function handleMultiplayerServerMessage(message) {
   if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
 }
 
+function networkNumberSignature(value, precision = 1) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "";
+  return number.toFixed(precision);
+}
+
+function crawlerStateSignature(state) {
+  return [
+    networkNumberSignature(state.x),
+    networkNumberSignature(state.y),
+    networkNumberSignature(state.aimX, 2),
+    networkNumberSignature(state.aimY, 2),
+    Math.round(state.hp || 0),
+    state.status || "",
+    state.floor0Status || "",
+    state.isDodging ? "dodge" : "still",
+    networkNumberSignature(state.dodgeProgress, 2),
+    state.currentRoomId ?? ""
+  ].join("|");
+}
+
 function captureLocalCrawlerNetworkState() {
   return {
     x: player.x,
@@ -289,10 +312,16 @@ function captureLocalCrawlerNetworkState() {
 function maybeSendLocalCrawlerState(now = Date.now()) {
   if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0) return false;
   if (!isMultiplayerNetworkReady()) return false;
-  if (now - multiplayerNetwork.lastCrawlerStateSentAt < 100) return false;
+
+  const state = captureLocalCrawlerNetworkState();
+  const signature = crawlerStateSignature(state);
+  const timeSinceLastSend = now - multiplayerNetwork.lastCrawlerStateSentAt;
+  if (signature === multiplayerNetwork.lastCrawlerStateSignature && timeSinceLastSend < 1000) return false;
+  if (timeSinceLastSend < 100) return false;
 
   multiplayerNetwork.lastCrawlerStateSentAt = now;
-  return sendMultiplayerMessage("crawler_state", { state: captureLocalCrawlerNetworkState() });
+  multiplayerNetwork.lastCrawlerStateSignature = signature;
+  return sendMultiplayerMessage("crawler_state", { state });
 }
 
 function applyServerCrawlerSnapshot(snapshot) {
@@ -588,6 +617,8 @@ function resetFloor0WorldState() {
     enemyStates: new Map()
   };
   multiplayerNetwork.loggedEnemySyncOwners.clear();
+  multiplayerNetwork.lastCrawlerStateSignature = null;
+  multiplayerNetwork.lastEnemySnapshotSignature = null;
 }
 
 function getServerLobbyCrawlerCount() {
@@ -849,6 +880,13 @@ function maybeSendFloor0EnemySnapshot(now = Date.now()) {
     .map(floor0EnemyPayload)
     .filter(Boolean);
   if (!activeEnemies.length) return false;
+
+  const signature = activeEnemies
+    .map(enemy => `${enemy.enemyId}:${Math.round(enemy.hp)}:${networkNumberSignature(enemy.x)}:${networkNumberSignature(enemy.y)}`)
+    .join("|");
+  if (signature === multiplayerNetwork.lastEnemySnapshotSignature && now - multiplayerNetwork.lastEnemySnapshotSentAt < 1000) return false;
+
   multiplayerNetwork.lastEnemySnapshotSentAt = now;
+  multiplayerNetwork.lastEnemySnapshotSignature = signature;
   return sendMultiplayerMessage("floor0_enemy_snapshot", { roomId, enemies: activeEnemies });
 }
