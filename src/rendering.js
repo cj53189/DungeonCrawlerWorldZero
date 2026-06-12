@@ -3,6 +3,17 @@ const CAMERA_TILT_SCALE = 0.72;
 const WALL_RISE = 18;
 const ENTITY_RISE = 10;
 
+const PLAYER_SPRITE_PATH = "./assets/sprites/player_base.png";
+const PLAYER_SPRITE_SHEET = new Image();
+PLAYER_SPRITE_SHEET.src = PLAYER_SPRITE_PATH;
+
+const PLAYER_SPRITE_FRAME_WIDTH = 32;
+const PLAYER_SPRITE_FRAME_HEIGHT = 32;
+const PLAYER_SPRITE_RENDER_WIDTH = 34;
+const PLAYER_SPRITE_RENDER_HEIGHT = 42;
+const PLAYER_SPRITE_ANIMATION_SEQUENCE = [0, 1, 2, 1];
+const PLAYER_SPRITE_MOVEMENT_THRESHOLD = 0.12;
+
 function applyDungeonCameraTransform(camX) {
   const tiltedPlayerY = player.y * CAMERA_TILT_SCALE;
   const camOffsetY = canvas.height / 2 - tiltedPlayerY;
@@ -121,6 +132,87 @@ function drawStandingFigure(entity, options = {}) {
     ctx.stroke();
   }
 
+  ctx.restore();
+}
+
+function drawPlayerFallbackFigure() {
+  drawStandingFigure(player, {
+    color: player.pvpFreezeFrames > 0 ? "#78b7ff" : player.safe ? "#7be07b" : "#f1f1f1",
+    outline: player.safe ? "rgba(190,255,190,0.82)" : "rgba(255,255,255,0.82)",
+    height: 24
+  });
+}
+
+function isPlayerTryingToMove() {
+  if (player.pvpFreezeFrames > 0) return false;
+
+  const keyboardX = (keys["d"] || keys["arrowright"] ? 1 : 0) - (keys["a"] || keys["arrowleft"] ? 1 : 0);
+  const keyboardY = (keys["s"] || keys["arrowdown"] ? 1 : 0) - (keys["w"] || keys["arrowup"] ? 1 : 0);
+  const movementX = keyboardX + (gamepadState.moveX || 0) + (touchState.moveX || 0);
+  const movementY = keyboardY + (gamepadState.moveY || 0) + (touchState.moveY || 0);
+
+  return Math.hypot(movementX, movementY) > PLAYER_SPRITE_MOVEMENT_THRESHOLD;
+}
+
+function playerSpriteRowForAim() {
+  const aimX = Number.isFinite(player.aimX) ? player.aimX : 0;
+  const aimY = Number.isFinite(player.aimY) ? player.aimY : 1;
+
+  if (Math.abs(aimX) > Math.abs(aimY)) return aimX < 0 ? 2 : 3;
+  return aimY < 0 ? 1 : 0;
+}
+
+function isPlayerSpriteLoaded() {
+  return PLAYER_SPRITE_SHEET.complete &&
+    PLAYER_SPRITE_SHEET.naturalWidth >= PLAYER_SPRITE_FRAME_WIDTH * 3 &&
+    PLAYER_SPRITE_SHEET.naturalHeight >= PLAYER_SPRITE_FRAME_HEIGHT * 4;
+}
+
+function drawPlayerSpriteStatusRing() {
+  if (!player.safe && player.pvpFreezeFrames <= 0) return;
+
+  const pulse = 1 + Math.sin(frameCount * 0.12) * 0.04;
+  ctx.strokeStyle = player.pvpFreezeFrames > 0 ? "rgba(120,183,255,0.82)" : "rgba(190,255,190,0.82)";
+  ctx.lineWidth = player.pvpFreezeFrames > 0 ? 3 : 2;
+  ctx.beginPath();
+  ctx.ellipse(player.x, player.y + player.r * 0.18, (player.r + 6) * pulse, (player.r + 3) * pulse, 0, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+function drawPlayerSprite() {
+  if (!isPlayerSpriteLoaded()) {
+    drawPlayerFallbackFigure();
+    return;
+  }
+
+  const moving = isPlayerTryingToMove();
+  const frame = moving ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / 8) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length] : 0;
+  const row = playerSpriteRowForAim();
+  const sx = frame * PLAYER_SPRITE_FRAME_WIDTH;
+  const sy = row * PLAYER_SPRITE_FRAME_HEIGHT;
+  const dx = player.x - PLAYER_SPRITE_RENDER_WIDTH / 2;
+  const dy = player.y + player.r - PLAYER_SPRITE_RENDER_HEIGHT;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath();
+  ctx.ellipse(player.x, player.y + player.r * 0.72, player.r * 1.08, Math.max(4, player.r * 0.42), 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  drawPlayerSpriteStatusRing();
+
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(
+    PLAYER_SPRITE_SHEET,
+    sx,
+    sy,
+    PLAYER_SPRITE_FRAME_WIDTH,
+    PLAYER_SPRITE_FRAME_HEIGHT,
+    dx,
+    dy,
+    PLAYER_SPRITE_RENDER_WIDTH,
+    PLAYER_SPRITE_RENDER_HEIGHT
+  );
   ctx.restore();
 }
 
@@ -862,11 +954,7 @@ function draw() {
     }
   }
 
-  drawStandingFigure(player, {
-    color: player.pvpFreezeFrames > 0 ? "#78b7ff" : player.safe ? "#7be07b" : "#f1f1f1",
-    outline: player.safe ? "rgba(190,255,190,0.82)" : "rgba(255,255,255,0.82)",
-    height: 24
-  });
+  drawPlayerSprite();
 
   drawAimIndicator();
 
