@@ -1,3 +1,129 @@
+
+const CAMERA_TILT_SCALE = 0.72;
+const WALL_RISE = 18;
+const ENTITY_RISE = 10;
+
+function applyDungeonCameraTransform(camX) {
+  const tiltedPlayerY = player.y * CAMERA_TILT_SCALE;
+  const camOffsetY = canvas.height / 2 - tiltedPlayerY;
+  ctx.translate(-camX, camOffsetY);
+  ctx.scale(1, CAMERA_TILT_SCALE);
+  return camOffsetY;
+}
+
+function visibleWorldYBounds(camOffsetY) {
+  return {
+    top: (0 - camOffsetY) / CAMERA_TILT_SCALE,
+    bottom: (canvas.height - camOffsetY) / CAMERA_TILT_SCALE
+  };
+}
+
+function drawDungeonTileBase(px, py, color, strokeColor = null) {
+  ctx.fillStyle = color;
+  ctx.fillRect(px, py, TILE, TILE);
+  if (strokeColor) {
+    ctx.strokeStyle = strokeColor;
+    ctx.strokeRect(px, py, TILE, TILE);
+  }
+}
+
+function drawRaisedWallTile(px, py, isVisible) {
+  const topColor = isVisible ? "#3d3d3d" : "#242424";
+  const frontColor = isVisible ? "#252525" : "#171717";
+  const sideColor = isVisible ? "#2c2c2c" : "#1b1b1b";
+  const edgeColor = isVisible ? "rgba(90,90,90,0.65)" : "rgba(48,48,48,0.65)";
+
+  ctx.fillStyle = sideColor;
+  ctx.beginPath();
+  ctx.moveTo(px + TILE, py);
+  ctx.lineTo(px + TILE, py + TILE);
+  ctx.lineTo(px + TILE, py + TILE - WALL_RISE);
+  ctx.lineTo(px + TILE, py - WALL_RISE);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = frontColor;
+  ctx.beginPath();
+  ctx.moveTo(px, py + TILE);
+  ctx.lineTo(px + TILE, py + TILE);
+  ctx.lineTo(px + TILE, py + TILE - WALL_RISE);
+  ctx.lineTo(px, py + TILE - WALL_RISE);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = topColor;
+  ctx.fillRect(px, py - WALL_RISE, TILE, TILE);
+  ctx.strokeStyle = edgeColor;
+  ctx.strokeRect(px, py - WALL_RISE, TILE, TILE);
+  drawWallAmbientShadow(px, py, isVisible);
+}
+
+function drawChestTile(px, py, isVisible) {
+  const chestY = py + 7;
+  ctx.fillStyle = isVisible ? "#a36a21" : "#553916";
+  ctx.fillRect(px + 7, chestY + 6, TILE - 14, TILE - 16);
+  ctx.fillStyle = isVisible ? "#7a4819" : "#392411";
+  ctx.fillRect(px + 7, chestY, TILE - 14, 9);
+  ctx.strokeStyle = isVisible ? "#e0b14a" : "#735826";
+  ctx.strokeRect(px + 7, chestY, TILE - 14, TILE - 10);
+  ctx.fillStyle = isVisible ? "#e0b14a" : "#806727";
+  ctx.fillRect(px + 13, chestY + 11, 7, 7);
+}
+
+function drawPortalTile(px, py, isVisible) {
+  ctx.save();
+  ctx.translate(px + TILE / 2, py + TILE / 2 - 4);
+  ctx.scale(1, 0.68);
+  ctx.fillStyle = "#3f63ff";
+  ctx.beginPath();
+  ctx.arc(0, 0, 16, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = isVisible ? "#c6d0ff" : "#7788ff";
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.restore();
+  ctx.lineWidth = 1;
+}
+
+function drawStandingFigure(entity, options = {}) {
+  const radius = entity.r || 10;
+  const color = options.color || "#f1f1f1";
+  const outline = options.outline || "rgba(255,255,255,0.72)";
+  const height = (options.height || radius * 1.75) + ENTITY_RISE;
+
+  ctx.save();
+  ctx.translate(entity.x, entity.y);
+
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.72, radius * 1.08, Math.max(4, radius * 0.42), 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.ellipse(0, -height * 0.28, radius * 0.82, height * 0.46, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = options.lineWidth || 2;
+  ctx.stroke();
+
+  ctx.fillStyle = options.headColor || color;
+  ctx.beginPath();
+  ctx.arc(0, -height * 0.78, radius * 0.58, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  if (options.boss) {
+    ctx.strokeStyle = "#ffd86b";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, -height * 0.35, radius + 4, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 function wrapRoomLabel(label, maxCharsPerLine = 12) {
   const words = label.toUpperCase().split(/\s+/).filter(Boolean);
   const lines = [];
@@ -145,7 +271,7 @@ function drawEngravedRoomNames(camX, camY) {
     const cy = placement.cy;
     const centerTile = placement.centerTile;
 
-    if (cx < camX - 260 || cx > camX + canvas.width + 260 || cy < camY - 200 || cy > camY + canvas.height + 200) continue;
+    if (cx < camX - 260 || cx > camX + canvas.width + 260 || cy < camY - 200 || cy > camY + canvas.height / CAMERA_TILT_SCALE + 200) continue;
 
     const isRevealingThisRoom = roomRevealState?.roomId === room.id && !roomRevealState.complete;
     const revealFrames = 28;
@@ -443,7 +569,7 @@ function drawEnvironmentalDecals(camX, camY) {
   for (const decal of dungeonVisuals.decals) {
     const px = decal.x * TILE;
     const py = decal.y * TILE;
-    if (px < camX - TILE || px > camX + canvas.width + TILE || py < camY - TILE || py > camY + canvas.height + TILE) continue;
+    if (px < camX - TILE || px > camX + canvas.width + TILE || py < camY - TILE || py > camY + canvas.height / CAMERA_TILT_SCALE + TILE) continue;
     if (!seen[decal.y]?.[decal.x]) continue;
     drawVisualDecal(decal, visible[decal.y]?.[decal.x]);
   }
@@ -622,40 +748,41 @@ function drawTutorialSigns() {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const camX = player.x - canvas.width / 2;
-  const camY = player.y - canvas.height / 2;
 
   ctx.save();
-  ctx.translate(-camX, -camY);
+  const camOffsetY = applyDungeonCameraTransform(camX);
+  const worldY = visibleWorldYBounds(camOffsetY);
+  const camY = worldY.top;
+  const viewWorldHeight = worldY.bottom - worldY.top;
 
-  const startX = Math.max(0, Math.floor(camX / TILE) - 2);
-  const endX = Math.min(MAP_COLS - 1, Math.floor((camX + canvas.width) / TILE) + 2);
-  const startY = Math.max(0, Math.floor(camY / TILE) - 2);
-  const endY = Math.min(MAP_ROWS - 1, Math.floor((camY + canvas.height) / TILE) + 2);
+  const startX = Math.max(0, Math.floor(camX / TILE) - 3);
+  const endX = Math.min(MAP_COLS - 1, Math.floor((camX + canvas.width) / TILE) + 3);
+  const startY = Math.max(0, Math.floor(worldY.top / TILE) - 4);
+  const endY = Math.min(MAP_ROWS - 1, Math.floor(worldY.bottom / TILE) + 4);
 
   for (let y = startY; y <= endY; y++) {
     for (let x = startX; x <= endX; x++) {
       const px = x * TILE, py = y * TILE;
-      if (!seen[y][x]) { ctx.fillStyle = "#080808"; ctx.fillRect(px, py, TILE, TILE); continue; }
+      if (!seen[y][x]) { drawDungeonTileBase(px, py, "#080808"); continue; }
       const t = map[y][x], isVisible = visible[y][x];
 
       if (t === "#") {
-        ctx.fillStyle = isVisible ? "#333" : "#1e1e1e";
-        ctx.fillRect(px, py, TILE, TILE);
-        ctx.strokeStyle = isVisible ? "#444" : "#262626";
-        ctx.strokeRect(px, py, TILE, TILE);
-        drawWallAmbientShadow(px, py, isVisible);
+        drawRaisedWallTile(px, py, isVisible);
       } else if (t === "S") {
-        ctx.fillStyle = isVisible ? "#203522" : "#172418";
-        ctx.fillRect(px, py, TILE, TILE);
+        drawDungeonTileBase(px, py, isVisible ? "#203522" : "#172418");
       } else {
-        ctx.fillStyle = collapseStarted ? (isVisible ? "#2b1c1c" : "#1d1515") : (isVisible ? "#202020" : "#161616");
-        ctx.fillRect(px, py, TILE, TILE);
+        drawDungeonTileBase(px, py, collapseStarted ? (isVisible ? "#2b1c1c" : "#1d1515") : (isVisible ? "#202020" : "#161616"));
       }
 
       drawWallFloorShadow(x, y, px, py, isVisible);
       drawFloorDetail(dungeonVisuals?.floor?.[y]?.[x], px, py, isVisible);
 
-      if (t === "D") { ctx.fillStyle = isVisible ? "#7b4a22" : "#3f2a18"; ctx.fillRect(px + 5, py + 5, TILE - 10, TILE - 10); }
+      if (t === "D") {
+        ctx.fillStyle = isVisible ? "#7b4a22" : "#3f2a18";
+        ctx.fillRect(px + 5, py + 5, TILE - 10, TILE - 10);
+        ctx.fillStyle = isVisible ? "rgba(35,20,12,0.55)" : "rgba(0,0,0,0.38)";
+        ctx.fillRect(px + 5, py + 5, TILE - 10, 6);
+      }
       if (t === "L") {
         ctx.fillStyle = isVisible ? "#4b1111" : "#241010";
         ctx.fillRect(px + 4, py + 4, TILE - 8, TILE - 8);
@@ -664,15 +791,8 @@ function draw() {
           ctx.strokeRect(px + 7, py + 7, TILE - 14, TILE - 14);
         }
       }
-      if (t === "C" && isVisible) {
-        ctx.fillStyle = "#a36a21"; ctx.fillRect(px + 7, py + 10, TILE - 14, TILE - 15);
-        ctx.fillStyle = "#e0b14a"; ctx.fillRect(px + 13, py + 15, 7, 7);
-      }
-      if (t === "E" && (isVisible || stairwellFound)) {
-        ctx.fillStyle = "#3f63ff";
-        ctx.beginPath(); ctx.arc(px + TILE / 2, py + TILE / 2, 13, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = "#9db1ff"; ctx.lineWidth = 3; ctx.stroke(); ctx.lineWidth = 1;
-      }
+      if (t === "C" && isVisible) drawChestTile(px, py, isVisible);
+      if (t === "E" && (isVisible || stairwellFound)) drawPortalTile(px, py, isVisible);
       if (!isVisible) { ctx.fillStyle = "rgba(0,0,0,0.38)"; ctx.fillRect(px, py, TILE, TILE); }
     }
   }
@@ -698,19 +818,23 @@ function draw() {
     ctx.stroke();
     ctx.lineWidth = 1;
   }
-for (const enemy of enemies) {
+  for (const enemy of enemies) {
     if (enemy.hp <= 0) continue;
     const tx = Math.floor(enemy.x / TILE), ty = Math.floor(enemy.y / TILE);
     if (!visible[ty]?.[tx]) continue;
-    ctx.fillStyle = enemy.boss ? "#8f38ff" : (collapseStarted ? "#d13b3b" : "#9b3131");
-    ctx.beginPath(); ctx.arc(enemy.x, enemy.y, enemy.r, 0, Math.PI * 2); ctx.fill();
-    if(enemy.boss){ctx.strokeStyle="#ffd86b";ctx.lineWidth=3;ctx.stroke();ctx.lineWidth=1;}
-    ctx.fillStyle = "#ffbaba"; ctx.fillRect(enemy.x - 13, enemy.y - 22, 26 * (enemy.hp / enemy.maxHp), 4);
+    drawStandingFigure(enemy, {
+      color: enemy.boss ? "#8f38ff" : (collapseStarted ? "#d13b3b" : "#9b3131"),
+      outline: enemy.boss ? "#ffd86b" : "rgba(255,185,185,0.72)",
+      boss: enemy.boss,
+      height: enemy.boss ? 32 : 22,
+      lineWidth: enemy.boss ? 3 : 2
+    });
+    ctx.fillStyle = "#ffbaba"; ctx.fillRect(enemy.x - 13, enemy.y - 35, 26 * (enemy.hp / enemy.maxHp), 4);
     ctx.fillStyle = "rgba(255,255,255,0.78)";
     ctx.font = "10px Arial";
     ctx.textAlign = "center";
-    ctx.fillText(enemy.name || `${enemy.boss ? "BOSS " : ""}Lv ${enemy.level || 1}`, enemy.x, enemy.y - 34);
-    ctx.fillText(`${enemy.boss ? "BOSS " : ""}Lv ${enemy.level || 1}`, enemy.x, enemy.y - 27);
+    ctx.fillText(enemy.name || `${enemy.boss ? "BOSS " : ""}Lv ${enemy.level || 1}`, enemy.x, enemy.y - 52);
+    ctx.fillText(`${enemy.boss ? "BOSS " : ""}Lv ${enemy.level || 1}`, enemy.x, enemy.y - 45);
   }
 
   drawCombatVisuals();
@@ -720,46 +844,35 @@ for (const enemy of enemies) {
       const tx = Math.floor(crawler.x / TILE), ty = Math.floor(crawler.y / TILE);
       if (!visible[ty]?.[tx]) continue;
 
-      ctx.fillStyle = "rgba(0,0,0,0.28)";
-      ctx.beginPath();
-      ctx.ellipse(crawler.x, crawler.y + crawler.r * 0.72, crawler.r * 1.05, Math.max(4, crawler.r * 0.42), 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = crawler.status === "stasis" ? "#9db1ff" : crawler.status === "downed" ? "#555" : (crawler.color || "#75c7ff");
-      ctx.beginPath();
-      ctx.arc(crawler.x, crawler.y, crawler.r, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = "rgba(255,255,255,0.76)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      ctx.lineWidth = 1;
+      drawStandingFigure(crawler, {
+        color: crawler.status === "stasis" ? "#9db1ff" : crawler.status === "downed" ? "#555" : (crawler.color || "#75c7ff"),
+        outline: "rgba(255,255,255,0.76)",
+        height: 22
+      });
 
       if (crawler.maxHp && crawler.status === "active") {
         ctx.fillStyle = "#75c7ff";
-        ctx.fillRect(crawler.x - 13, crawler.y - 20, 26 * Math.max(0, crawler.hp ?? crawler.maxHp) / crawler.maxHp, 4);
+        ctx.fillRect(crawler.x - 13, crawler.y - 34, 26 * Math.max(0, crawler.hp ?? crawler.maxHp) / crawler.maxHp, 4);
       }
 
       ctx.fillStyle = "rgba(255,255,255,0.88)";
       ctx.font = "10px Arial";
       ctx.textAlign = "center";
-      ctx.fillText(crawler.status === "downed" ? `${crawler.name || "Crawler"} DOWN` : (crawler.name || "Crawler"), crawler.x, crawler.y - 22);
+      ctx.fillText(crawler.status === "downed" ? `${crawler.name || "Crawler"} DOWN` : (crawler.name || "Crawler"), crawler.x, crawler.y - 43);
     }
   }
 
-  ctx.fillStyle = "rgba(0,0,0,0.32)";
-  ctx.beginPath();
-  ctx.ellipse(player.x, player.y + player.r * 0.72, player.r * 1.05, Math.max(4, player.r * 0.42), 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = player.pvpFreezeFrames > 0 ? "#78b7ff" : player.safe ? "#7be07b" : "#f1f1f1";
-  ctx.beginPath(); ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2); ctx.fill();
+  drawStandingFigure(player, {
+    color: player.pvpFreezeFrames > 0 ? "#78b7ff" : player.safe ? "#7be07b" : "#f1f1f1",
+    outline: player.safe ? "rgba(190,255,190,0.82)" : "rgba(255,255,255,0.82)",
+    height: 24
+  });
 
   drawAimIndicator();
 
   if (collapseStarted && frameCount % 30 < 15) {
     ctx.fillStyle = "rgba(150, 20, 20, 0.08)";
-    ctx.fillRect(camX, camY, canvas.width, canvas.height);
+    ctx.fillRect(camX, camY, canvas.width, viewWorldHeight);
   }
 
   ctx.restore();
