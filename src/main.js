@@ -1,4 +1,5 @@
 function gameLoop() {
+  if (typeof syncMusicToGameState === "function") syncMusicToGameState();
   pollGamepad();
   updatePanelScrollFromController();
   if (!isGameplayUpdatePaused() && !gameWon && !gameLost) {
@@ -19,6 +20,7 @@ function gameLoop() {
 }
 
 initInputControls();
+setupMusicControls();
 setupLootWindowHandlers();
 setupTitleScreenHandlers();
 resetState();

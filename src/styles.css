@@ -851,3 +851,29 @@ body.titleActive #announcer {
     font-size: 9px;
   }
 }
+
+.musicToggle {
+  position: fixed;
+  top: 52px;
+  right: 14px;
+  z-index: 75;
+  border: 1px solid rgba(255,216,107,0.42);
+  border-radius: 999px;
+  background: rgba(12, 12, 12, 0.72);
+  color: #ffe49a;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 8px 11px;
+  box-shadow: 0 0 14px rgba(0,0,0,0.32);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.musicToggle:hover,
+.musicToggle:focus-visible {
+  background: rgba(44, 34, 13, 0.86);
+  outline: none;
+  border-color: rgba(255,216,107,0.7);
+}
