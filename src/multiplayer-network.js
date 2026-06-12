@@ -709,9 +709,12 @@ function applyFloor0ChestOpened(id) {
 function applyFloor0LootTaken(id) {
   const corpse = corpses?.find(corpse => corpse.id === id);
   if (corpse) {
-    corpse.loot = [];
-    corpse.looted = true;
-    if (activeLootCorpseId === corpse.id) closeLootWindow();
+    if (typeof markCorpseLooted === "function") markCorpseLooted(corpse, { sync: false, announce: false });
+    else {
+      corpse.loot = [];
+      corpse.looted = true;
+      if (activeLootCorpseId === corpse.id) closeLootWindow();
+    }
   }
 }
 

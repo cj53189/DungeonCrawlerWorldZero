@@ -63,6 +63,7 @@ function resetState(options = {}) {
   environmentalLights = [];
   projectiles = [];
   attackTelegraphs = [];
+  floatingFeedbackTexts = [];
   openedChests = new Set();
   if (!preserveRun) {
     achievements = new Set();
@@ -103,6 +104,7 @@ function resetState(options = {}) {
   player.pvpFreezeFrames = 0;
   projectiles = [];
   attackTelegraphs = [];
+  floatingFeedbackTexts = [];
   player.safe = true;
   player.wasSafe = true;
 

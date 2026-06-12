@@ -8,7 +8,7 @@ const MAP_COLS = 110;
 const VIEW_RADIUS = 9;
 const MEMORY_RADIUS = 12;
 
-let map, seen, visible, rooms, enemies, corpses, openedChests, achievements, achievementHistory, activePopups;
+let map, seen, visible, rooms, enemies, corpses, openedChests, achievements, achievementHistory, activePopups, floatingFeedbackTexts;
 let tutorialSigns = [], seenTutorialSignIds = new Set();
 let activeLootCorpseId = null;
 let dungeonVisuals = { floor: [], decals: [] };

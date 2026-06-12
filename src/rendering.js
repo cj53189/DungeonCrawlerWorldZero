@@ -521,6 +521,35 @@ function drawAimIndicator() {
   ctx.restore();
 }
 
+
+function drawFloatingFeedbackTexts() {
+  if (!Array.isArray(floatingFeedbackTexts) || !floatingFeedbackTexts.length) return;
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineJoin = "round";
+  for (const feedback of floatingFeedbackTexts) {
+    if (feedback.anchor) {
+      feedback.x = feedback.anchor.x;
+      feedback.y = feedback.anchor.y - (feedback.anchor.r || 0);
+    }
+    const age = feedback.maxLife - feedback.life;
+    const alpha = Math.max(0, Math.min(1, feedback.life / Math.max(1, feedback.maxLife)));
+    const x = feedback.x + feedback.offsetX;
+    const y = feedback.y + feedback.offsetY + feedback.vy * age;
+    ctx.globalAlpha = Math.min(1, alpha * 1.25);
+    ctx.font = `900 ${feedback.size || 14}px Arial`;
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = feedback.stroke || "rgba(0,0,0,0.82)";
+    ctx.fillStyle = feedback.color || "#fff";
+    ctx.strokeText(feedback.text, x, y);
+    ctx.fillText(feedback.text, x, y);
+    feedback.life--;
+  }
+  ctx.restore();
+  floatingFeedbackTexts = floatingFeedbackTexts.filter(feedback => feedback.life > 0);
+}
+
 function drawCombatVisuals() {
   for (const telegraph of attackTelegraphs) drawAttackTelegraph(telegraph);
 
@@ -960,6 +989,7 @@ function draw() {
   drawPlayerSprite();
 
   drawAimIndicator();
+  drawFloatingFeedbackTexts();
 
   if (collapseStarted && frameCount % 30 < 15) {
     ctx.fillStyle = "rgba(150, 20, 20, 0.08)";

@@ -479,6 +479,10 @@
       box-shadow: 0 0 0 1px rgba(255,210,116,0.12) inset, 0 18px 42px rgba(0,0,0,0.58), 0 0 28px rgba(168,84,30,0.16);
     }
     #inventoryPanel h3, #lootWindow h3 { margin: 0 0 10px 0; color: #f6d07a; font-size: 16px; text-transform: uppercase; letter-spacing: 0.15em; }
+    #inventoryPanel { overflow:hidden; }
+    #equipmentStats { float:left; width:320px; max-width:38%; padding-right:14px; margin-right:14px; border-right:1px solid rgba(255,216,107,0.18); }
+    #inventoryList { max-height:calc(min(78vh, 640px) - 88px); overflow-y:auto; padding-right:6px; }
+    #inventoryHelp { clear:both; }
     #lootWindow { width:min(620px, calc(100vw - 32px)); max-height:min(58vh, 460px); z-index:130; }
     #lootWindowGrid { max-height:320px; overflow-y:auto; padding-right:4px; }
     .lootWindowFooter { display:flex; justify-content:flex-end; margin-top:12px; padding-top:10px; border-top:1px solid rgba(255,216,107,0.16); }
@@ -552,6 +556,9 @@
       #inventoryPanel h3, #lootWindow h3 { font-size:11px; }
       #inventoryPanel h3 { margin-bottom:6px; letter-spacing:0.08em; }
       #inventoryPanel .panelClose { width:20px; height:20px; font-size:14px; line-height:16px; }
+      #inventoryPanel { overflow-y:auto; }
+      #equipmentStats { float:none; width:auto; max-width:none; padding-right:0; margin-right:0; border-right:none; }
+      #inventoryList { max-height:none; overflow:visible; padding-right:0; }
       #inventoryPanel .inventoryHeader { flex-direction:column; gap:3px; padding:6px; margin-bottom:7px; border-radius:8px; }
       #inventoryPanel .inventoryTitle { font-size:10px; }
       #inventoryPanel .inventorySubTitle { display:none; }

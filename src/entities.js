@@ -60,8 +60,12 @@ function rollEnemyLoot(enemy) {
 }
 
 function createCorpse(enemy) {
+  const id = enemy?.enemyId ? `corpse_${enemy.enemyId}` : makeId("corpse");
+  if (multiplayer.floor0WorldState?.takenLootIds?.has(id)) return null;
+  const existing = getCorpseById(id);
+  if (existing) return existing;
   const corpse = {
-    id: makeId("corpse"),
+    id,
     x: enemy.x,
     y: enemy.y,
     r: enemy.boss ? 18 : 11,
@@ -77,6 +81,71 @@ function createCorpse(enemy) {
 
 function getCorpseById(id) {
   return corpses.find(corpse => corpse.id === id) || null;
+}
+
+function addFloatingFeedbackText(text, x, y, options = {}) {
+  if (!Array.isArray(floatingFeedbackTexts)) floatingFeedbackTexts = [];
+  const anchor = options.anchor || null;
+  const jitter = Number.isFinite(options.jitter) ? options.jitter : 10;
+  floatingFeedbackTexts.push({
+    text: String(text || ""),
+    x: Number.isFinite(Number(x)) ? Number(x) : player.x,
+    y: Number.isFinite(Number(y)) ? Number(y) : player.y,
+    offsetX: (Math.random() - 0.5) * jitter,
+    offsetY: Number.isFinite(options.offsetY) ? options.offsetY : -22,
+    vy: Number.isFinite(options.vy) ? options.vy : -0.42,
+    life: Number.isFinite(options.life) ? options.life : 54,
+    maxLife: Number.isFinite(options.life) ? options.life : 54,
+    color: options.color || "#ffffff",
+    stroke: options.stroke || "rgba(0,0,0,0.82)",
+    size: Number.isFinite(options.size) ? options.size : 14,
+    anchor
+  });
+  if (floatingFeedbackTexts.length > 36) floatingFeedbackTexts.splice(0, floatingFeedbackTexts.length - 36);
+}
+
+function addPlayerFeedbackText(text, options = {}) {
+  addFloatingFeedbackText(text, player.x, player.y - player.r, { anchor: player, ...options });
+}
+
+function isCorpseGoldOnly(corpse) {
+  return !!corpse && !corpse.looted && corpse.loot.length === 1 && corpse.loot[0]?.type === "coins";
+}
+
+function hasFloor0LootAlreadyTaken(corpse) {
+  return !!corpse?.id && !!multiplayer.floor0WorldState?.takenLootIds?.has(corpse.id);
+}
+
+function rememberFloor0LootTaken(corpse) {
+  if (corpse?.id && multiplayer.floor0WorldState?.takenLootIds) multiplayer.floor0WorldState.takenLootIds.add(corpse.id);
+}
+
+function removeCorpseFromMap(corpse) {
+  if (!corpse) return;
+  if (activeLootCorpseId === corpse.id) closeLootWindow();
+  const before = corpses.length;
+  corpses = corpses.filter(candidate => candidate !== corpse && candidate.id !== corpse.id);
+  if (corpses.length !== before) minimapDirty = true;
+}
+
+function markCorpseLooted(corpse, { sync = true, announce = true } = {}) {
+  if (!corpse) return false;
+  const wasLooted = !!corpse.looted;
+  corpse.loot = [];
+  corpse.looted = true;
+  rememberFloor0LootTaken(corpse);
+  if (sync && typeof sendFloor0WorldEvent === "function") sendFloor0WorldEvent({ type: "loot_taken", id: corpse.id });
+  if (!wasLooted && announce) {
+    changeAudience(corpse.boss ? 8 : 1);
+    achievement(
+      corpse.boss ? "BOSS CORPSE LOOTED" : "CORPSE LOOTED",
+      `You finished looting ${corpse.name}. The dungeon reminds you this is technically recycling.`,
+      `loot_${corpse.id}`
+    );
+  }
+  removeCorpseFromMap(corpse);
+  updateHUD();
+  return true;
 }
 
 function closeLootWindow() {
@@ -117,30 +186,25 @@ function renderCorpseLootWindow(corpse) {
 }
 
 function openCorpseLootWindow(corpse) {
-  if (!corpse || corpse.looted) return;
+  if (!corpse || corpse.looted || hasFloor0LootAlreadyTaken(corpse)) {
+    if (corpse && hasFloor0LootAlreadyTaken(corpse)) markCorpseLooted(corpse, { sync: false, announce: false });
+    return;
+  }
   activeLootCorpseId = corpse.id;
   renderCorpseLootWindow(corpse);
 }
 
 function finishCorpseLootIfEmpty(corpse) {
   if (!corpse || corpse.loot.length) return;
-  corpse.looted = true;
-  if (typeof sendFloor0WorldEvent === "function") sendFloor0WorldEvent({ type: "loot_taken", id: corpse.id });
-  changeAudience(corpse.boss ? 8 : 1);
-  achievement(
-    corpse.boss ? "BOSS CORPSE LOOTED" : "CORPSE LOOTED",
-    `You finished looting ${corpse.name}. The dungeon reminds you this is technically recycling.`,
-    `loot_${corpse.id}`
-  );
-  closeLootWindow();
-  updateHUD();
+  markCorpseLooted(corpse);
 }
 
 function takeCorpseLootItem(corpse, index) {
-  if (!corpse || corpse.looted || index < 0 || index >= corpse.loot.length) return;
+  if (!corpse || corpse.looted || hasFloor0LootAlreadyTaken(corpse) || index < 0 || index >= corpse.loot.length) return;
   const [item] = corpse.loot.splice(index, 1);
   if (item.type === "coins") {
     player.coins += item.amount;
+    addPlayerFeedbackText(`+${item.amount} gold`, { color: "#ffd86b", size: 15 });
     announcer(`You took ${item.amount} coins from ${corpse.name}. Brave accounting.`);
   } else {
     player.inventory.push(item);
@@ -155,7 +219,7 @@ function takeCorpseLootItem(corpse, index) {
 }
 
 function takeAllCorpseLoot(corpse) {
-  if (!corpse || corpse.looted) return;
+  if (!corpse || corpse.looted || hasFloor0LootAlreadyTaken(corpse)) return;
   if (!corpse.loot.length) {
     announcer(`You searched ${corpse.name}. It contained disappointment and several fluids best left unidentified.`);
     finishCorpseLootIfEmpty(corpse);
@@ -179,6 +243,27 @@ function setupLootWindowHandlers() {
   });
 }
 
+function autoLootGoldOnlyCorpse(corpse) {
+  if (hasFloor0LootAlreadyTaken(corpse)) {
+    markCorpseLooted(corpse, { sync: false, announce: false });
+    return true;
+  }
+  if (!isCorpseGoldOnly(corpse)) return false;
+  rememberFloor0LootTaken(corpse);
+  const gold = Math.max(0, Number(corpse.loot[0].amount) || 0);
+  if (gold > 0) {
+    player.coins += gold;
+    addPlayerFeedbackText(`+${gold} gold`, { color: "#ffd86b", size: 16 });
+    announcer(`You scooped ${gold} coins from ${corpse.name}. The accounting department applauds quietly.`);
+  }
+  markCorpseLooted(corpse);
+  updateInventoryUI();
+  updateHUD();
+  return true;
+}
+
 function lootCorpse(corpse) {
+  if (!corpse || corpse.looted) return;
+  if (autoLootGoldOnlyCorpse(corpse)) return;
   openCorpseLootWindow(corpse);
 }
