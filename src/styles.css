@@ -290,6 +290,27 @@
       transition: box-shadow 0.08s ease-out, background 0.08s ease-out;
     }
     #btnInteract { right: 116px; bottom: 100px; width: 64px; height: 64px; }
+    #btnDodge {
+      right: 146px;
+      bottom: 26px;
+      width: 66px;
+      height: 66px;
+      font-size: 10px;
+      overflow: hidden;
+      --cooldown: 0;
+    }
+    #btnDodge::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: conic-gradient(from -90deg, rgba(25,25,25,0.72) calc(var(--cooldown) * 1turn), transparent 0);
+      opacity: 0;
+      transition: opacity 0.08s linear;
+      pointer-events: none;
+    }
+    #btnDodge.cooling::after { opacity: 1; }
+    #btnDodge.cooling { border-color: rgba(255,255,255,0.32); color: rgba(255,255,255,0.72); }
     #btnLog { right: 24px; top: 74px; width: 52px; height: 52px; font-size: 12px; }
     #btnRecap { right: 84px; top: 74px; width: 52px; height: 52px; font-size: 11px; }
     #btnNew { right: 144px; top: 74px; width: 52px; height: 52px; font-size: 11px; }

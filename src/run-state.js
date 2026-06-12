@@ -41,6 +41,7 @@ function resetRunProgress() {
   player.coins = 0;
   player.attackCooldown = 0;
   player.pvpFreezeFrames = 0;
+  resetPlayerDodgeState();
   player.currentWeaponId = "fists";
   player.aimX = 1;
   player.aimY = 0;
@@ -64,6 +65,8 @@ function resetState(options = {}) {
   projectiles = [];
   attackTelegraphs = [];
   floatingFeedbackTexts = [];
+  dodgeAfterimages = [];
+  dodgePuffs = [];
   openedChests = new Set();
   if (!preserveRun) {
     achievements = new Set();
@@ -102,9 +105,12 @@ function resetState(options = {}) {
   roomRevealState = { roomId: null, startFrame: 0, originX: 0, originY: 0, maxDist: 0, complete: false };
   player.attackCooldown = 0;
   player.pvpFreezeFrames = 0;
+  resetPlayerDodgeState();
   projectiles = [];
   attackTelegraphs = [];
   floatingFeedbackTexts = [];
+  dodgeAfterimages = [];
+  dodgePuffs = [];
   player.safe = true;
   player.wasSafe = true;
 

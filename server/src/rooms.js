@@ -305,6 +305,7 @@ class LobbyManager {
     const aimY = finiteNumber(state.aimY);
     const status = CRAWLER_STATUS_VALUES.has(state.status) ? state.status : "active";
     const currentRoomId = finiteNumber(state.currentRoomId);
+    const dodgeProgress = finiteNumber(state.dodgeProgress);
 
     return {
       x,
@@ -314,6 +315,8 @@ class LobbyManager {
       currentFloor,
       status,
       ...(currentRoomId === null ? {} : { currentRoomId: Math.trunc(currentRoomId) }),
+      ...(state.isDodging ? { isDodging: true } : {}),
+      ...(dodgeProgress === null ? {} : { dodgeProgress: Math.max(0, Math.min(1, dodgeProgress)) }),
       ...(aimX === null ? {} : { aimX }),
       ...(aimY === null ? {} : { aimY })
     };
