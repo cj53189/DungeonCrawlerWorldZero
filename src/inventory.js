@@ -1,4 +1,6 @@
-const SLOT_LABELS={weapon:"Weapon",head:"Head",chest:"Chest",legs:"Legs",feet:"Feet",accessory:"Accessory",light:"Light"};
+const SLOT_LABELS={weapon:"Weapon",head:"Head",chest:"Body / Armor",offhand:"Offhand / Shield",legs:"Legs",feet:"Feet",accessory:"Trinket",light:"Light"};
+const INVENTORY_CATEGORIES={gear:"Gear",items:"Consumables / Items",lootboxes:"Loot Boxes"};
+let activeInventoryCategory="gear";
 const ITEM_BASES={head:["Helmet","Cap","Crown","Hood"],chest:["Vest","Tunic","Breastplate","Jacket"],legs:["Pants","Greaves","Shorts","Trousers"],feet:["Boots","Sandals","Crocs","Footwraps"],accessory:["Ring","Charm","Badge","Pendant"]};
 const ITEM_PREFIXES=["Goblin","Rat-hide","Bone","Rusty","Lucky","Crawler","Moldy","Questionable","Royal","Screaming"];
 const WEAPON_PREFIXES=["Notched","Goblin-Forged","Bone","Rusted","Whispering","Crawler","Mold-Blessed","Royal","Arena-Worn","Blood-Marked"];
@@ -26,7 +28,7 @@ function generateWeapon(forceRare=false, forcedWeaponId=null){
 }
 function generateTorchItem(){return{id:makeId("torch"),type:"light",slot:"light",rarity:"Common",name:"Crawler Torch",radius:isMobileLike()?142:164,intensity:.36};}
 function hasEquippedLightSource(){return !!player.equipment?.light && player.equipment.light.type==="light";}
-function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room."; if(i.type==="light")return"Equipped light source. Illuminates the crawler while carried."; if(i.type==="weapon")return`${i.damage} DMG · ${i.range} RNG · ${i.cooldown} CD`; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
+function itemDescription(i){if(!i)return""; if(i.type==="lootbox")return"Can only be opened in a safe room. Open it from the Loot Boxes tab when you reach safety."; if(i.type==="light")return"Equipped light source. Illuminates the crawler while carried."; if(i.type==="weapon")return`${i.damage} DMG · ${i.range} RNG · ${i.cooldown} CD`; let b=[]; if(i.hp)b.push(`+${i.hp} HP`); if(i.attack)b.push(`+${i.attack} ATK`); if(i.defense)b.push(`+${i.defense} DEF`); if(i.speed)b.push(`+${i.speed.toFixed(2)} SPD`); if(i.audience)b.push(`+${i.audience} Audience`); return b.join(" · ")||"Mostly decorative. The dungeon approves of pointless confidence.";}
 function addItem(item){
  player.inventory.push(item);
  if(item.type==="lootbox"){stats.lootBoxesFound++; achievement("NEW LOOT BOX",`You found a ${item.name}. It can only be opened in a safe room.`,`box_${item.id}`);}
@@ -70,6 +72,8 @@ function setupInventoryActionHandlers(){
  if(!panel||panel.dataset.actionsBound==="true")return;
  panel.dataset.actionsBound="true";
  panel.addEventListener("click",e=>{
+  const tab=e.target.closest("button[data-inventory-category]");
+  if(tab){activeInventoryCategory=tab.dataset.inventoryCategory;updateInventoryUI();return;}
   const weaponButton=e.target.closest("button[data-weapon-id]");
   if(weaponButton){setPlayerWeapon(weaponButton.dataset.weaponId);updateInventoryUI();return;}
   const unequipButton=e.target.closest("button[data-action='unequip'][data-slot]");
@@ -93,32 +97,58 @@ function slotIcon(item){
  if(item.type==="weapon")return {greatsword:"⚔",hammer:"◉",spear:"↗",bow:"弓"}[item.weaponId]||"⚔";
  return {head:"◠",chest:"▣",legs:"▥",feet:"⌞",accessory:"◇"}[item.slot]||"◆";
 }
-function renderItemCard(item, extraClass=""){
- const action=item.type==="gear"||item.type==="light"||item.type==="weapon"?"equip":"open";
- const actionLabel=action==="equip"?"Equip":"Open";
- const slotLabel=item.type==="gear"||item.type==="light"||item.type==="weapon"?SLOT_LABELS[item.slot]:"Loot Box";
- return `<div class="invItem ${rarityClass(item)} ${typeClass(item)} ${extraClass}"><div class="itemIcon">${slotIcon(item)}</div><div class="itemName">${escapeHtml(item.name)}</div><div class="itemSlot">${escapeHtml(slotLabel)} · ${escapeHtml(item.rarity||"Common")}</div><div class="itemMeta">${escapeHtml(itemDescription(item))}</div><div class="itemActions"><button class="itemBtn" type="button" data-action="${action}" data-item-id="${escapeHtml(item.id)}">${actionLabel}</button><button class="itemBtn" type="button" data-action="drop" data-item-id="${escapeHtml(item.id)}">Drop</button></div></div>`;
+function inventoryCategoryFor(item){
+ if(item.type==="lootbox")return"lootboxes";
+ if(item.type==="gear"||item.type==="light"||item.type==="weapon")return"gear";
+ return"items";
 }
+function gearComparisonText(item){
+ if(!item||!(item.type==="gear"||item.type==="light"||item.type==="weapon"))return"";
+ const equipped=player.equipment?.[item.slot];
+ if(!equipped)return"Compared: empty slot";
+ if(item.type==="weapon")return `Compared: ${item.damage-(equipped.damage||0)>=0?"+":""}${item.damage-(equipped.damage||0)} DMG · ${item.range-(equipped.range||0)>=0?"+":""}${item.range-(equipped.range||0)} RNG · ${item.cooldown-(equipped.cooldown||0)<=0?"":"+"}${item.cooldown-(equipped.cooldown||0)} CD`;
+ const parts=[];
+ for(const [key,label] of [["hp","HP"],["attack","ATK"],["defense","DEF"],["speed","SPD"],["audience","AUD"]]){
+  const diff=(item[key]||0)-(equipped[key]||0);
+  if(diff)parts.push(`${diff>0?"+":""}${key==="speed"?diff.toFixed(2):diff} ${label}`);
+ }
+ return parts.length?`Compared: ${parts.join(" · ")}`:"Compared: no stat change";
+}
+function renderItemCard(item, extraClass=""){
+ const isGear=item.type==="gear"||item.type==="light"||item.type==="weapon";
+ const action=isGear?"equip":"open";
+ const actionLabel=action==="equip"?"Equip":"Open";
+ const slotLabel=isGear?SLOT_LABELS[item.slot]||item.slot:"Loot Box";
+ const comparison=isGear?`<div class="itemCompare">${escapeHtml(gearComparisonText(item))}</div>`:"";
+ return `<div class="invItem ${rarityClass(item)} ${typeClass(item)} ${extraClass}"><div class="itemIcon">${slotIcon(item)}</div><div class="itemName">${escapeHtml(item.name)}</div><div class="itemSlot">${escapeHtml(slotLabel)} · ${escapeHtml(item.rarity||"Common")}</div><div class="itemMeta">${escapeHtml(itemDescription(item))}</div>${comparison}<div class="itemActions"><button class="itemBtn" type="button" data-action="${action}" data-item-id="${escapeHtml(item.id)}">${actionLabel}</button><button class="itemBtn" type="button" data-action="drop" data-item-id="${escapeHtml(item.id)}">Drop</button></div></div>`;
+}
+function equippedSlotKeys(){return Object.keys({...SLOT_LABELS,...(player.equipment||{})});}
 function renderEquipmentSlot(slot){
- const item=player.equipment[slot];
- if(!item)return `<div class="equipSlot empty"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipEmpty">Empty</div></div>`;
+ const item=player.equipment?.[slot];
+ if(!item)return `<div class="equipSlot empty"><div class="equipLabel">${escapeHtml(SLOT_LABELS[slot]||slot)}</div><div class="equipEmpty">Empty</div></div>`;
  const actions=`<div class="itemActions"><button class="itemBtn" type="button" data-action="unequip" data-slot="${escapeHtml(slot)}">Unequip</button><button class="itemBtn" type="button" data-action="drop-equipped" data-slot="${escapeHtml(slot)}">Drop</button></div>`;
- return `<div class="equipSlot ${rarityClass(item)} ${typeClass(item)}"><div class="equipLabel">${SLOT_LABELS[slot]}</div><div class="equipName">${escapeHtml(item.name)}</div><div class="equipMeta">${escapeHtml(itemDescription(item))}</div>${actions}</div>`;
+ return `<div class="equipSlot ${rarityClass(item)} ${typeClass(item)}"><div class="equipLabel">${escapeHtml(SLOT_LABELS[slot]||slot)}</div><div class="equipName">${escapeHtml(item.name)}</div><div class="equipMeta">${escapeHtml(itemDescription(item))}</div>${actions}</div>`;
 }
 function renderWeaponGrid(){
  const current=getCurrentWeapon();
  return `<button class="weaponCell weaponfists ${current.id==="fists"?"active":""}" type="button" data-weapon-id="fists"><span>Fists</span><small>Unequipped fallback</small></button>` + (player.equipment.weapon?`<button class="weaponCell weapon${escapeHtml(player.equipment.weapon.weaponId)} active" type="button" data-weapon-id="${escapeHtml(player.equipment.weapon.weaponId)}"><span>${escapeHtml(player.equipment.weapon.name)}</span><small>${escapeHtml(itemDescription(player.equipment.weapon))}</small></button>`:`<div class="weaponCell empty"><span>No weapon equipped</span><small>Loot and equip weapons from corpses.</small></div>`);
 }
+function renderInventoryTabs(counts){
+ return `<div class="inventoryTabs">${Object.entries(INVENTORY_CATEGORIES).map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}">${escapeHtml(label)} <span>${counts[key]||0}</span></button>`).join("")}</div>`;
+}
 function updateInventoryUI(){
  const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
  setupInventoryActionHandlers();
- eq.innerHTML=`<div class="inventoryHeader"><div><div class="inventoryTitle">Stash & Armory</div><div class="inventorySubTitle">Diablo-style loot grid</div></div><div class="inventoryPower">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · AUD +${player.audienceBonus}</div></div><div class="weaponGrid">${renderWeaponGrid()}</div><div class="equipGrid">${Object.keys(SLOT_LABELS).map(renderEquipmentSlot).join("")}</div>`;
- if(!player.inventory.length){list.innerHTML='<div class="inventoryGrid"><div class="invItem empty"><div class="itemIcon">□</div><div class="itemName">Empty Pack</div><div class="itemMeta">Inventory empty. The dungeon recommends crime.</div></div></div>';return;}
- const sorted=[...player.inventory].sort((a,b)=>(rarityPower(b.rarity)-rarityPower(a.rarity))||String(a.type).localeCompare(String(b.type))||String(a.slot||"").localeCompare(String(b.slot||""))||String(a.name).localeCompare(String(b.name)));
- list.innerHTML=`<div class="inventoryGrid">${sorted.map(item=>renderItemCard(item)).join("")}</div>`;
+ eq.innerHTML=`<div class="inventoryHeader"><div><div class="inventoryTitle">Pinned Equipment</div><div class="inventorySubTitle">Equipped gear stays visible while your pack scrolls.</div></div><div class="inventoryPower">ATK ${player.attackDamage} · DEF ${player.defense} · SPD ${player.speed.toFixed(2)} · AUD +${player.audienceBonus}</div></div><div class="weaponGrid">${renderWeaponGrid()}</div><div class="equipGrid">${equippedSlotKeys().map(renderEquipmentSlot).join("")}</div>`;
+ const counts={gear:0,items:0,lootboxes:0};
+ for(const item of player.inventory)counts[inventoryCategoryFor(item)]++;
+ if(!INVENTORY_CATEGORIES[activeInventoryCategory])activeInventoryCategory="gear";
+ const sorted=[...player.inventory].filter(item=>inventoryCategoryFor(item)===activeInventoryCategory).sort((a,b)=>(rarityPower(b.rarity)-rarityPower(a.rarity))||String(a.type).localeCompare(String(b.type))||String(a.slot||"").localeCompare(String(b.slot||""))||String(a.name).localeCompare(String(b.name)));
+ const emptyText=activeInventoryCategory==="lootboxes"?"No loot boxes. The cardboard economy slumbers.":activeInventoryCategory==="items"?"No consumables or normal items yet.":"No spare gear. Loot corpses or chests to restock.";
+ list.innerHTML=`${renderInventoryTabs(counts)}<div class="inventoryContentTitle">${escapeHtml(INVENTORY_CATEGORIES[activeInventoryCategory])}</div><div class="inventoryGrid">${sorted.length?sorted.map(item=>renderItemCard(item,activeInventoryCategory==="lootboxes"?"lootBoxCard":"")).join(""):`<div class="invItem empty"><div class="itemIcon">□</div><div class="itemName">Empty Category</div><div class="itemMeta">${escapeHtml(emptyText)}</div></div>`}</div>`;
 }
-function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.style.display==="block"){p.style.display="none"; if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur(); return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display="block"; if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
-function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p){p.style.display="none"; if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur();}}
+function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.classList.contains("open")){p.classList.remove("open");p.style.display=""; if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur(); return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display=""; p.classList.add("open"); if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
+function closeInventoryPanel(){const p=document.getElementById("inventoryPanel"); if(p){p.classList.remove("open");p.style.display=""; if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur();}}
 function rewardChestLoot(room=null){
  const themeId=room?.themeId;
  if(themeId==="armory"){
