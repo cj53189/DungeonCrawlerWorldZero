@@ -459,7 +459,7 @@ function getGameLink() {
 
 function getInviteText() {
   const link = getGameLink();
-  if (multiplayer.partyCode) return `Join my Dungeon Crawler World lobby ${multiplayer.partyCode}: ${link}`;
+  if (multiplayer.lobbyCode || multiplayer.partyCode) return `Join my Dungeon Crawler World lobby ${multiplayer.lobbyCode || multiplayer.partyCode}: ${link}`;
   return `Dungeon Crawler World Render build: ${link}`;
 }
 
@@ -505,8 +505,8 @@ async function copyInviteLink(buttonId = "copyGameLinkBtn") {
   const button = document.getElementById(buttonId);
   try {
     await copyTextToClipboard(getInviteText());
-    flashCopyButton(button, multiplayer.partyCode ? "Invite Copied" : "Link Copied");
-    if (typeof announcer === "function" && gameMode !== GAME_MODES.TITLE) announcer(multiplayer.partyCode ? "Invite link copied with lobby code." : "Game link copied.");
+    flashCopyButton(button, (multiplayer.lobbyCode || multiplayer.partyCode) ? "Invite Copied" : "Link Copied");
+    if (typeof announcer === "function" && gameMode !== GAME_MODES.TITLE) announcer((multiplayer.lobbyCode || multiplayer.partyCode) ? "Invite link copied with lobby code." : "Game link copied.");
   } catch {
     flashCopyButton(button, "Copy Unavailable", "copyStatusWarn");
     if (typeof announcer === "function" && gameMode !== GAME_MODES.TITLE) announcer("Copy is unavailable in this browser. Share the page URL and lobby code manually.");
@@ -515,7 +515,7 @@ async function copyInviteLink(buttonId = "copyGameLinkBtn") {
 
 function updateTesterReadinessUI() {
   const connection = getConnectionStatusInfo();
-  const lobbyText = multiplayer.partyCode ? ` · lobby: ${multiplayer.partyCode}` : "";
+  const lobbyText = (multiplayer.lobbyCode || multiplayer.partyCode) ? ` · lobby: ${multiplayer.lobbyCode || multiplayer.partyCode}` : "";
   const statusText = `Connection: ${connection.label}`;
 
   for (const id of ["titleConnectionStatus", "mpConnectionStatus"]) {
@@ -536,7 +536,7 @@ function updateTesterReadinessUI() {
   if (copyGameLink) {
     copyGameLink.hidden = !copySupported;
     if (copySupported && !copyGameLink.classList.contains("copyStatusOk") && !copyGameLink.classList.contains("copyStatusWarn")) {
-      copyGameLink.textContent = multiplayer.partyCode ? "Copy Invite Link" : "Copy Game Link";
+      copyGameLink.textContent = (multiplayer.lobbyCode || multiplayer.partyCode) ? "Copy Invite Link" : "Copy Game Link";
     }
   }
 
@@ -544,7 +544,7 @@ function updateTesterReadinessUI() {
   if (copyInvite) {
     copyInvite.hidden = !copySupported;
     if (copySupported && !copyInvite.classList.contains("copyStatusOk") && !copyInvite.classList.contains("copyStatusWarn")) {
-      copyInvite.textContent = multiplayer.partyCode ? "Copy Invite Link" : "Copy Game Link";
+      copyInvite.textContent = (multiplayer.lobbyCode || multiplayer.partyCode) ? "Copy Invite Link" : "Copy Game Link";
     }
   }
 }
@@ -613,7 +613,8 @@ function formatMultiplayerCrawlerStatus(status) {
 function updateMultiplayerPanel() {
   const panel = document.getElementById("multiplayerPanel");
   if (!panel) return;
-  const count = multiplayer.partyMembers.length || 1;
+  const lobbyMembers = typeof getLobbyMembers === "function" ? getLobbyMembers() : (multiplayer.lobbyMembers?.length ? multiplayer.lobbyMembers : multiplayer.partyMembers);
+  const count = lobbyMembers.length || 1;
   const statusLabel = {
     offline: "Offline",
     party: "Floor 0 Collapse",
@@ -635,7 +636,12 @@ function updateMultiplayerPanel() {
     : currentFloor === 0 ? ` ${formatTimer(floorTimeLeft)}` : "";
   setText("mpStatus", `${statusLabel}${countdownText}`);
   setText("mpCount", `${count} / ${multiplayer.targetPlayers} Crawlers Registered`);
-  setText("mpPartyCode", multiplayer.partyCode ? `Lobby Code: ${multiplayer.partyCode}` : "Quick Match Floor 0 Collapse");
+  const partySummary = multiplayer.partyId
+    ? `Party: Connected${multiplayer.partyMembers?.length ? ` (${multiplayer.partyMembers.length})` : ""}`
+    : "Solo Crawler";
+  setText("mpPartyCode", (multiplayer.lobbyCode || multiplayer.partyCode)
+    ? `Lobby Code: ${multiplayer.lobbyCode || multiplayer.partyCode} · ${partySummary}`
+    : `Quick Match Floor 0 Collapse · ${partySummary}`);
   updateTesterReadinessUI();
   const serverRule = multiplayer.usingServer
     ? "Server-owned Floor 0 collapse timer. Crawlers Registered only shorten the remaining time. Find the stairs before collapse."
@@ -647,11 +653,11 @@ function updateMultiplayerPanel() {
   const list = document.getElementById("mpMemberList");
   if (list) {
     list.innerHTML = "";
-    const members = multiplayer.partyMembers.length ? multiplayer.partyMembers : [{ name: "You", local: true, leader: multiplayer.isPartyLeader }];
+    const members = lobbyMembers.length ? lobbyMembers : [{ name: "You", local: true, leader: multiplayer.isPartyLeader, isPartyLeader: multiplayer.isPartyLeader, partyId: multiplayer.partyId }];
     for (const member of members) {
       const row = document.createElement("div");
       row.className = "mpMember";
-      const role = member.admin ? "Admin" : (member.leader && !multiplayer.usingServer ? "Leader" : "Crawler");
+      const role = member.isPartyLeader || member.leader ? "Party Leader" : (member.partyId ? "Party Member" : "Solo Crawler");
       const floor0Status = formatMultiplayerCrawlerStatus(member.floor0Status || (member.local ? multiplayer.localFloor0Status : "exploring"));
       const statusText = currentFloor === 0 || ["start_pending", "active"].includes(multiplayer.status)
         ? `${role} · ${floor0Status}`
@@ -679,19 +685,19 @@ function setupTitleScreenHandlers() {
 
   bind("startSingleBtn", startSinglePlayer);
   bind("quickMatchBtn", startQuickMatch);
-  bind("createPartyBtn", createParty);
+  bind("createPartyBtn", createLobby);
   bind("joinPartyBtn", () => {
-    const code = prompt("Enter lobby code", multiplayer.partyCode || "RUNE-");
-    if (code) joinParty(code);
+    const code = prompt("Enter lobby code", multiplayer.lobbyCode || multiplayer.partyCode || "RUNE-");
+    if (code) joinLobby(code);
     else showFriendlyMultiplayerError("Enter a lobby code to join a crawler lobby.");
   });
   bind("copyGameLinkBtn", () => copyInviteLink("copyGameLinkBtn"));
   bind("localMultiTestBtn", () => {
-    startMultiplayerFloor0({ partyCode: "LOCAL-TEST", leader: true, status: "party" });
-    fillMockParty();
+    startMultiplayerFloor0({ lobbyCode: "LOCAL-TEST", leader: true, status: "party" });
+    fillMockLobby();
   });
-  bind("mpAddMockBtn", addMockPartyMember);
-  bind("mpFillMockBtn", fillMockParty);
+  bind("mpAddMockBtn", addMockLobbyCrawler);
+  bind("mpFillMockBtn", fillMockLobby);
   bind("mpForceStartBtn", forceLocalMultiplayerStart);
   bind("mpCopyInviteBtn", () => copyInviteLink("mpCopyInviteBtn"));
   bind("mpCancelBtn", returnToTitle);
@@ -806,7 +812,7 @@ function loseGame() {
 }
 function restartGame() {
   pendingFloorAdvance = false;
-  if (multiplayer.enabled) startMultiplayerFloor0({ partyCode: multiplayer.partyCode, leader: multiplayer.isPartyLeader, status: multiplayer.partyCode ? "party" : "matchmaking" });
+  if (multiplayer.enabled) startMultiplayerFloor0({ lobbyCode: multiplayer.lobbyCode || multiplayer.partyCode, leader: multiplayer.isPartyLeader, status: (multiplayer.lobbyCode || multiplayer.partyCode) ? "party" : "matchmaking" });
   else startSinglePlayer();
 }
 
