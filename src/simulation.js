@@ -9,18 +9,34 @@ function canMoveTo(x, y, r) {
   return !isBlocked(x - r, y - r) && !isBlocked(x + r, y - r) && !isBlocked(x - r, y + r) && !isBlocked(x + r, y + r);
 }
 
-function moveEntity(entity, dx, dy) {
+function moveEntity(entity, dx, dy, options = {}) {
   if (dx === 0 && dy === 0) return;
+  const countWallBump = options.countWallBump !== false;
   let nx = entity.x + dx, ny = entity.y;
   if (canMoveTo(nx, ny, entity.r)) entity.x = nx;
-  else if (entity === player) {
+  else if (entity === player && countWallBump) {
     stats.wallBumps++;
     if (stats.wallBumps === 10) achievement("NEW ACHIEVEMENT: Wall Scholar", "You have studied the wall with your face ten times. The wall remains undefeated.", "wallScholar");
   }
 
   nx = entity.x; ny = entity.y + dy;
   if (canMoveTo(nx, ny, entity.r)) entity.y = ny;
-  else if (entity === player) stats.wallBumps++;
+  else if (entity === player && countWallBump) stats.wallBumps++;
+}
+
+function applyKnockback(entity, fromX, fromY, distance) {
+  if (!entity || !Number.isFinite(distance) || distance <= 0) return;
+  const dx = entity.x - fromX;
+  const dy = entity.y - fromY;
+  const len = Math.hypot(dx, dy) || 1;
+  const capped = Math.min(distance, entity === player ? 9 : 18);
+  const step = 3;
+  let remaining = capped;
+  while (remaining > 0) {
+    const amount = Math.min(step, remaining);
+    moveEntity(entity, dx / len * amount, dy / len * amount, { countWallBump: false });
+    remaining -= amount;
+  }
 }
 
 
@@ -183,6 +199,8 @@ for (const enemy of enemies) {
       const rawDmg = enemy.damage || 8;
       const dmg = Math.max(1, rawDmg - player.defense);
       player.hp -= dmg;
+      addPlayerFeedbackText(`-${dmg} HP`, { color: "#ff6b6b", size: 16 });
+      applyKnockback(player, enemy.x, enemy.y, 5 + Math.min(4, dmg * 0.18));
       stats.damageTaken += dmg;
       stats.riskyMoments++;
       changeAudience(1);
@@ -208,7 +226,10 @@ function getWeaponDamage(weapon) {
 function damageEnemy(enemy, damage) {
   if (!enemy || enemy.hp <= 0) return false;
   if (enemy.boss) triggerBossAggro("attack");
+  const dealt = Math.max(0, Math.min(enemy.hp, damage));
   enemy.hp -= damage;
+  addFloatingFeedbackText(`-${Math.round(dealt)}`, enemy.x, enemy.y - enemy.r, { anchor: enemy, color: enemy.boss ? "#ff9df8" : "#ffb86b", size: enemy.boss ? 17 : 15 });
+  applyKnockback(enemy, player.x, player.y, (enemy.boss ? 0.45 : 1) * Math.min(18, 4 + dealt * 0.32));
   if (typeof sendFloor0EnemyEvent === "function") sendFloor0EnemyEvent(enemy.hp <= 0 ? "enemy_killed" : "enemy_damaged", enemy);
   if (enemy.hp <= 0) {
     stats.enemiesKilled++;

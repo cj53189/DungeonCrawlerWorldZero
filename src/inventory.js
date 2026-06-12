@@ -135,7 +135,7 @@ function rewardChestLoot(room=null){
  }
  if(themeId==="storageRoom"&&Math.random()<.45){addItem(generateLootBox()); updateInventoryUI(); updateHUD(); return;}
  const roll=Math.random();
- if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}
+ if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; addPlayerFeedbackText(`+${gained} gold`, { color: "#ffd86b", size: 15 }); achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}
  else if(roll<.68)addItem(generateLootBox());
  else if(roll<.78)addItem(generateTorchItem());
  else if(roll<.88)addItem(generateWeapon());
@@ -146,6 +146,7 @@ function rewardChestLoot(room=null){
 
 function gainXP(amount) {
   player.xp += amount;
+  addPlayerFeedbackText(`+${amount} XP`, { color: "#7cf7ff", size: 15, offsetY: -38 });
 
   if (!achievements.has("firstXP")) {
     achievement("NEW ACHIEVEMENT: Number Goes Up", "You gained experience. This is how games trick mammals into enjoying chores.", "firstXP");
@@ -166,6 +167,7 @@ function levelUpPlayer() {
   player.hp = player.maxHp;
 
   changeAudience(6);
+  addPlayerFeedbackText(`LEVEL ${player.level}!`, { color: "#b6ff7c", size: 18, life: 72, offsetY: -54 });
   achievement("LEVEL UP", `You reached level ${player.level}. Your numbers improved, which is technically character development.`, `level${player.level}`);
 }
 
