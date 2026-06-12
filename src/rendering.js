@@ -12,6 +12,7 @@ const PLAYER_SPRITE_FRAME_HEIGHT = 32;
 const PLAYER_SPRITE_RENDER_WIDTH = 34;
 const PLAYER_SPRITE_RENDER_HEIGHT = 42;
 const PLAYER_SPRITE_ANIMATION_SEQUENCE = [0, 1, 2, 1];
+const PLAYER_SPRITE_WALK_FRAME_DELAY = 14;
 const PLAYER_SPRITE_MOVEMENT_THRESHOLD = 0.12;
 
 function applyDungeonCameraTransform(camX) {
@@ -186,7 +187,9 @@ function drawPlayerSprite() {
   }
 
   const moving = isPlayerTryingToMove();
-  const frame = moving ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / 8) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length] : 0;
+  const frame = moving
+    ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
+    : 0;
   const row = playerSpriteRowForAim();
   const sx = frame * PLAYER_SPRITE_FRAME_WIDTH;
   const sy = row * PLAYER_SPRITE_FRAME_HEIGHT;
