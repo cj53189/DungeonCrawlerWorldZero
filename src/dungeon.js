@@ -284,9 +284,9 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 5, medium: 2, large: 1 },
     lootBias: 0.8,
     enemies: [
-      { name: "Small Rat", r: 9, hp: 0.82, damage: 0.78, speed: 1.18, xp: 0.85 },
-      { name: "Hungry Rat", r: 11, hp: 1.0, damage: 1.05, speed: 1.06, xp: 1.0 },
-      { name: "Giant Rat", r: 14, hp: 1.32, damage: 1.18, speed: 0.9, xp: 1.18 }
+      { name: "Small Rat", behaviorTag: "rat_swarm", r: 9, hp: 0.82, damage: 0.78, speed: 1.18, xp: 0.85 },
+      { name: "Hungry Rat", behaviorTag: "rat_swarm", r: 11, hp: 1.0, damage: 1.05, speed: 1.06, xp: 1.0 },
+      { name: "Giant Rat", behaviorTag: "rat_bruiser", r: 14, hp: 1.32, damage: 1.18, speed: 0.82, xp: 1.18 }
     ]
   },
   spiderDen: {
@@ -296,9 +296,9 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 4, medium: 3, large: 1 },
     lootBias: 0.55,
     enemies: [
-      { name: "Cave Spider", r: 10, hp: 0.9, damage: 0.9, speed: 1.18, xp: 0.95 },
-      { name: "Venom Spider", r: 11, hp: 1.02, damage: 1.22, speed: 1.08, xp: 1.12 },
-      { name: "Brood Spider", r: 15, hp: 1.42, damage: 1.08, speed: 0.86, xp: 1.24 }
+      { name: "Cave Spider", behaviorTag: "spider_lunge", r: 10, hp: 0.9, damage: 0.9, speed: 1.18, xp: 0.95 },
+      { name: "Venom Spider", behaviorTag: "spider_hit_and_run", r: 11, hp: 1.02, damage: 1.22, speed: 1.08, xp: 1.12 },
+      { name: "Brood Spider", behaviorTag: "spider_lunge", r: 15, hp: 1.42, damage: 1.08, speed: 0.86, xp: 1.24 }
     ]
   },
   supplyCloset: {
@@ -310,8 +310,8 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 5, medium: 2, large: 0.3 },
     lootBias: 2.8,
     enemies: [
-      { name: "Small Rat", r: 9, hp: 0.78, damage: 0.72, speed: 1.12, xp: 0.8 },
-      { name: "Janitor Bot", r: 12, hp: 1.08, damage: 0.88, speed: 0.86, xp: 1.0 }
+      { name: "Small Rat", behaviorTag: "rat_swarm", r: 9, hp: 0.78, damage: 0.72, speed: 1.12, xp: 0.8 },
+      { name: "Janitor Bot", behaviorTag: "bot_patrol", r: 12, hp: 1.08, damage: 0.88, speed: 0.78, xp: 1.0 }
     ]
   },
   maintenanceTunnel: {
@@ -323,9 +323,9 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 3, medium: 4, large: 1 },
     lootBias: 0.9,
     enemies: [
-      { name: "Janitor Bot", r: 12, hp: 1.0, damage: 0.92, speed: 0.92, xp: 1.0 },
-      { name: "Maintenance Guard", r: 13, hp: 1.16, damage: 1.08, speed: 0.9, xp: 1.12 },
-      { name: "Security Drone", r: 10, hp: 0.9, damage: 1.04, speed: 1.22, xp: 1.06 }
+      { name: "Janitor Bot", behaviorTag: "bot_patrol", r: 12, hp: 1.0, damage: 0.92, speed: 0.82, xp: 1.0 },
+      { name: "Maintenance Guard", behaviorTag: "guard_bruiser", r: 13, hp: 1.16, damage: 1.08, speed: 0.9, xp: 1.12 },
+      { name: "Security Drone", behaviorTag: "drone_skirmisher", r: 10, hp: 0.9, damage: 1.04, speed: 1.28, xp: 1.06 }
     ]
   },
   armory: {
@@ -337,8 +337,8 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 1, medium: 4, large: 2 },
     lootBias: 2.2,
     enemies: [
-      { name: "Maintenance Guard", r: 13, hp: 1.2, damage: 1.12, speed: 0.92, xp: 1.14 },
-      { name: "Security Drone", r: 10, hp: 0.92, damage: 1.16, speed: 1.2, xp: 1.08 }
+      { name: "Maintenance Guard", behaviorTag: "guard_bruiser", r: 13, hp: 1.2, damage: 1.12, speed: 0.92, xp: 1.14 },
+      { name: "Security Drone", behaviorTag: "drone_skirmisher", r: 10, hp: 0.92, damage: 1.16, speed: 1.26, xp: 1.08 }
     ]
   },
   barracks: {
@@ -348,9 +348,9 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 1, medium: 4, large: 3 },
     lootBias: 1.1,
     enemies: [
-      { name: "Security Drone", r: 10, hp: 0.95, damage: 1.12, speed: 1.22, xp: 1.08 },
-      { name: "Janitor Bot", r: 12, hp: 1.06, damage: 0.9, speed: 0.9, xp: 1.0 },
-      { name: "Maintenance Guard", r: 14, hp: 1.28, damage: 1.18, speed: 0.88, xp: 1.2 }
+      { name: "Security Drone", behaviorTag: "drone_skirmisher", r: 10, hp: 0.95, damage: 1.12, speed: 1.28, xp: 1.08 },
+      { name: "Janitor Bot", behaviorTag: "bot_patrol", r: 12, hp: 1.06, damage: 0.9, speed: 0.8, xp: 1.0 },
+      { name: "Maintenance Guard", behaviorTag: "guard_bruiser", r: 14, hp: 1.28, damage: 1.18, speed: 0.88, xp: 1.2 }
     ]
   },
   storageRoom: {
@@ -360,8 +360,8 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 2, medium: 4, large: 2 },
     lootBias: 1.8,
     enemies: [
-      { name: "Hungry Rat", r: 11, hp: 1.0, damage: 1.0, speed: 1.06, xp: 1.0 },
-      { name: "Janitor Bot", r: 12, hp: 1.05, damage: 0.92, speed: 0.88, xp: 1.0 }
+      { name: "Hungry Rat", behaviorTag: "rat_swarm", r: 11, hp: 1.0, damage: 1.0, speed: 1.06, xp: 1.0 },
+      { name: "Janitor Bot", behaviorTag: "bot_patrol", r: 12, hp: 1.05, damage: 0.92, speed: 0.78, xp: 1.0 }
     ]
   },
   floodedChamber: {
@@ -371,9 +371,9 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 1, medium: 3, large: 4 },
     lootBias: 0.75,
     enemies: [
-      { name: "Cave Spider", r: 10, hp: 0.92, damage: 0.92, speed: 1.1, xp: 0.96 },
-      { name: "Hungry Rat", r: 11, hp: 1.0, damage: 1.0, speed: 1.02, xp: 1.0 },
-      { name: "Giant Rat", r: 14, hp: 1.3, damage: 1.16, speed: 0.86, xp: 1.18 }
+      { name: "Cave Spider", behaviorTag: "spider_lunge", r: 10, hp: 0.92, damage: 0.92, speed: 1.1, xp: 0.96 },
+      { name: "Hungry Rat", behaviorTag: "rat_swarm", r: 11, hp: 1.0, damage: 1.0, speed: 1.02, xp: 1.0 },
+      { name: "Giant Rat", behaviorTag: "rat_bruiser", r: 14, hp: 1.3, damage: 1.16, speed: 0.78, xp: 1.18 }
     ]
   },
   securityOffice: {
@@ -383,8 +383,8 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 2, medium: 4, large: 1 },
     lootBias: 1.25,
     enemies: [
-      { name: "Security Drone", r: 10, hp: 0.96, damage: 1.18, speed: 1.24, xp: 1.1 },
-      { name: "Maintenance Guard", r: 14, hp: 1.24, damage: 1.12, speed: 0.9, xp: 1.16 }
+      { name: "Security Drone", behaviorTag: "drone_skirmisher", r: 10, hp: 0.96, damage: 1.18, speed: 1.3, xp: 1.1 },
+      { name: "Maintenance Guard", behaviorTag: "guard_bruiser", r: 14, hp: 1.24, damage: 1.12, speed: 0.9, xp: 1.16 }
     ]
   },
   stairwell: {
@@ -396,8 +396,8 @@ const FLOOR0_ROOM_THEMES = {
     sizeWeights: { small: 1, medium: 2, large: 3 },
     lootBias: 0.35,
     enemies: [
-      { name: "Security Drone", r: 10, hp: 0.92, damage: 1.08, speed: 1.2, xp: 1.05 },
-      { name: "Maintenance Guard", r: 13, hp: 1.16, damage: 1.08, speed: 0.9, xp: 1.1 }
+      { name: "Security Drone", behaviorTag: "drone_skirmisher", r: 10, hp: 0.92, damage: 1.08, speed: 1.26, xp: 1.05 },
+      { name: "Maintenance Guard", behaviorTag: "guard_bruiser", r: 13, hp: 1.16, damage: 1.08, speed: 0.9, xp: 1.1 }
     ]
   }
 };
@@ -1247,6 +1247,8 @@ function placeBossEnemy(){
     damage:10+lvl*4,
     xpReward:75+lvl*24,
     speed:.62+lvl*.025,
+    behaviorTag:"boss_gatekeeper",
+    ...enemySpriteMetadataForKey("gatekeeper"),
     roomId:bossRoom.id,
     damageCooldown:0,
     wanderAngle:Math.random()*Math.PI*2
@@ -1636,7 +1638,7 @@ function createEnemyForRoom(room, spot, spawnRoom = null) {
   const enemyLevel = rollScaledEnemyLevel(room, spawnRoom);
   const variant = chooseEnemyVariantForRoom(room);
   const maxHp = Math.max(12, Math.round((24 + enemyLevel * 10) * (variant.hp || 1)));
-  return {
+  return applyEnemyIdentity({
     x: spot.x * TILE + TILE / 2,
     y: spot.y * TILE + TILE / 2,
     r: variant.r || 11,
@@ -1650,8 +1652,9 @@ function createEnemyForRoom(room, spot, spawnRoom = null) {
     speed: (0.74 + enemyLevel * 0.045) * (variant.speed || 1),
     roomId: room.id,
     damageCooldown: 0,
-    wanderAngle: Math.random() * Math.PI * 2
-  };
+    wanderAngle: Math.random() * Math.PI * 2,
+    behaviorState: {}
+  }, variant);
 }
 
 function placeFloor0StarterEnemies(excludedRooms = [], spawnRoom = null) {
