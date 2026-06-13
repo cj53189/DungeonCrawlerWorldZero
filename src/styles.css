@@ -1247,9 +1247,12 @@ body:has(#settingsOverlay.open) .mpOpenPanelBtn {
 
 #settingsPanel {
   position: relative;
-  width: min(560px, calc(100vw - 28px));
-  max-height: min(94vh, 520px);
-  overflow-y: auto;
+  width: min(720px, 88vw);
+  height: min(520px, 82vh);
+  max-height: calc(100vh - 28px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   border: 2px solid rgba(214,181,92,0.82);
   border-radius: 16px;
   background: linear-gradient(145deg, rgba(20,12,7,0.98), rgba(45,28,15,0.98) 48%, rgba(9,8,8,0.99));
@@ -1257,6 +1260,18 @@ body:has(#settingsOverlay.open) .mpOpenPanelBtn {
   padding: 14px;
   color: #f3ead8;
   font-size: 13px;
+}
+
+.settingsHeader,
+.settingsFooter { flex: 0 0 auto; }
+
+.settingsBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 4px 0;
+  touch-action: pan-y;
 }
 
 #settingsPanel h2 {
@@ -1288,7 +1303,7 @@ body:has(#settingsOverlay.open) .mpOpenPanelBtn {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .settingsToggle,
@@ -1301,6 +1316,21 @@ body:has(#settingsOverlay.open) .mpOpenPanelBtn {
   cursor: pointer;
   font-weight: 900;
   padding: 8px 14px;
+}
+
+.settingsToggle,
+.settingsAction,
+#settingsPanel input[type="range"] { min-height: 44px; }
+
+.dangerSection p {
+  margin: 0 0 8px;
+  color: #d9c8b2;
+  font-size: 12px;
+}
+
+.dangerAction {
+  border-color: rgba(255,106,106,0.56);
+  background: linear-gradient(135deg, #ffbf66, #8f2e1c);
 }
 
 .settingsToggle[aria-pressed="false"] {
@@ -1325,13 +1355,15 @@ body:has(#settingsOverlay.open) .mpOpenPanelBtn {
 #settingsPanel input:focus {
   outline: 3px solid #7cf7ff;
   outline-offset: 2px;
+  box-shadow: 0 0 0 2px rgba(255,216,107,0.85), 0 0 18px rgba(124,247,255,0.45);
 }
 
 @media (hover: none) and (pointer: coarse), (max-width: 900px) {
   .settingsButton { top: 8px; right: 8px; width: 40px; height: 40px; font-size: 21px; }
   #settingsOverlay { padding: 8px; }
   #settingsPanel {
-    width: min(620px, calc(100vw - 16px));
+    width: min(720px, 88vw);
+    height: min(520px, 82vh);
     max-height: calc(100vh - 16px);
     padding: 10px;
     font-size: 11px;
@@ -1339,8 +1371,8 @@ body:has(#settingsOverlay.open) .mpOpenPanelBtn {
   #settingsPanel h2 { font-size: 16px; margin-bottom: 6px; }
   .settingsSection { padding: 6px 8px; margin-top: 6px; }
   .settingsSection h3 { font-size: 10px; margin-bottom: 4px; }
-  .settingsRow { min-height: 34px; }
-  .settingsToggle, .settingsAction { min-height: 34px; padding: 7px 12px; }
+  .settingsRow { min-height: 44px; }
+  .settingsToggle, .settingsAction { min-height: 44px; padding: 8px 12px; }
   .settingsControlsTips { grid-template-columns: 1fr 1fr; }
   .settingsControlsTips div { font-size: 10px; }
 }

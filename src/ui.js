@@ -276,6 +276,19 @@ function setUiEditMode(enabled, persist = true) {
   if (persist) writeSavedUiEditMode(uiEditMode);
 }
 function resetUiLayout() { localStorage.removeItem(UI_LAYOUT_STORAGE_KEY); location.reload(); }
+function scrollSettingsPanel(deltaY) {
+  const body = document.querySelector("#settingsPanel .settingsBody");
+  if (!body) return false;
+  body.scrollTop += deltaY;
+  return true;
+}
+function confirmRegenerateMap() {
+  if (gameMode === GAME_MODES.TITLE) return;
+  const ok = window.confirm("Regenerate the dungeon map and start a fresh run? This is intended for dev/testing.");
+  if (!ok) return;
+  closeSettingsPanel();
+  restartGame();
+}
 function isSettingsOpen() { return document.getElementById("settingsOverlay")?.classList.contains("open"); }
 function openSettingsPanel() {
   const overlay = document.getElementById("settingsOverlay");
@@ -313,7 +326,8 @@ function setupUiLayoutEditor() {
     document.getElementById("uiEditToggle")?.addEventListener("click", () => setUiEditMode(!uiEditMode));
     document.getElementById("uiScaleSlider")?.addEventListener("input", e => setUiScale(e.target.value));
     document.getElementById("resetUiLayoutBtn")?.addEventListener("click", resetUiLayout);
-    document.getElementById("resetUiLayoutBtnBottom")?.addEventListener("click", resetUiLayout);
+    document.getElementById("settingsDoneBtn")?.addEventListener("click", closeSettingsPanel);
+    document.getElementById("regenerateMapBtn")?.addEventListener("click", confirmRegenerateMap);
   }
   const layout = readUiLayout();
   const panels = [["inventory","inventoryPanel"],["recap","safeRoomRecap"],["log","logPanel"],["hud","hud"],["minimap","minimapEditPanel"]];
@@ -380,7 +394,7 @@ function getActiveControllerWindow() {
 
 function getControllerWindowButtons(root = getActiveControllerWindow()) {
   if (!root) return [];
-  return Array.from(root.querySelectorAll("button, [role='button'], input[type='button'], input[type='submit'], [tabindex]"))
+  return Array.from(root.querySelectorAll("button, [role='button'], input[type='button'], input[type='submit'], input[type='range'], [tabindex]"))
     .filter(el => {
       if (el.disabled || el.getAttribute("aria-disabled") === "true") return false;
       if (el.tabIndex < 0 && !["BUTTON", "INPUT"].includes(el.tagName)) return false;
@@ -462,6 +476,7 @@ function activateControllerWindowSelection() {
     : getPreferredControllerButton(buttons);
   if (!current) return false;
   focusControllerWindowButton(current);
+  if (current.type === "range") return true;
   current.click();
   return true;
 }

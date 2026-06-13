@@ -64,13 +64,18 @@
   <div id="settingsOverlay" aria-hidden="true">
     <div id="settingsPanel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
       <button id="closeSettingsBtn" class="panelClose" type="button" aria-label="Close settings">×</button>
-      <h2 id="settingsTitle">SETTINGS</h2>
+      <div class="settingsHeader"><h2 id="settingsTitle">SETTINGS</h2></div>
+      <div class="settingsBody">
       <section class="settingsSection">
         <h3>Audio</h3>
         <div class="settingsRow">
           <span>Music</span>
           <button id="musicToggleBtn" class="settingsToggle" type="button" aria-pressed="true">On</button>
         </div>
+        <label class="settingsRow settingsSliderRow" for="musicVolumeSlider">
+          <span>Volume <strong id="musicVolumeValue">35%</strong></span>
+          <input id="musicVolumeSlider" type="range" min="0" max="100" step="5" value="35">
+        </label>
       </section>
       <section class="settingsSection">
         <h3>Interface</h3>
@@ -87,14 +92,18 @@
       <section class="settingsSection settingsControlsTips">
         <h3>Controls</h3>
         <div>Left stick / D-pad: Navigate</div>
-        <div>Right stick: Scroll inventory</div>
+        <div>Right stick: Scroll</div>
         <div>A / Enter: Select</div>
         <div>B / Escape: Back</div>
+        <div>Former New Map button: Settings</div>
       </section>
-      <section class="settingsSection">
-        <h3>Reset</h3>
-        <button id="resetUiLayoutBtnBottom" class="settingsAction" type="button">Reset UI Layout</button>
+      <section class="settingsSection dangerSection">
+        <h3>Danger Zone / Dev</h3>
+        <p>Regenerate the map only when intentionally testing a fresh run.</p>
+        <button id="regenerateMapBtn" class="settingsAction dangerAction" type="button">Regenerate Map</button>
       </section>
+      </div>
+      <div class="settingsFooter"><button id="settingsDoneBtn" class="settingsAction" type="button">Done</button></div>
     </div>
   </div>
 
