@@ -26,9 +26,6 @@ function resetFloorTimerForCurrentFloor() {
 
 
 function resetRunProgress() {
-  player.level = 1;
-  player.xp = 0;
-  player.xpToNext = 40;
   player.maxHp = 100;
   player.hp = player.maxHp;
   player.attackDamage = 20;
@@ -43,7 +40,7 @@ function resetRunProgress() {
   player.pvpFreezeFrames = 0;
   resetPlayerDodgeState();
   player.currentWeaponId = "fists";
-  if (typeof initProgression === "function") initProgression({ reset: true, skipLoad: false });
+  if (typeof resetProgression === "function") resetProgression({ resetVitals: true });
   player.aimX = 1;
   player.aimY = 0;
   currentFloor = 0;
@@ -83,21 +80,6 @@ function resetState(options = {}) {
   lastObservationFrame = 0;
   audienceScore = 10; currentReputation = "Undeclared Menace"; roomsSeen = 0;
 
-  if (!preserveRun) {
-    player.level = 1;
-    player.xp = 0;
-    player.xpToNext = 40;
-    player.maxHp = 100;
-    player.hp = player.maxHp;
-    player.attackDamage = 20;
-    player.baseSpeed = 2.45;
-    player.speed = player.baseSpeed;
-    player.defense = 0;
-    player.audienceBonus = 0;
-    player.inventory = [];
-    player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
-    if (typeof initProgression === "function") initProgression({ reset: true, skipLoad: false });
-    }
   player.currentRoomId = null;
   player.lastTileX = 0;
   player.lastTileY = 0;
