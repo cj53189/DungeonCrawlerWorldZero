@@ -1,4 +1,3 @@
-const PROGRESSION_STORAGE_KEY = "dcw.progression.v1";
 const ATTRIBUTE_DEFINITIONS = {
   strength: { id: "strength", name: "Strength", baseValue: 10, description: "Physical power for close-quarters violence.", effect: "+1% melee damage per point above 10." },
   agility: { id: "agility", name: "Agility", baseValue: 10, description: "Footwork, balance, and recovery under pressure.", effect: "+0.6% speed and dodge recovery per point above 10." },
@@ -33,8 +32,8 @@ function getDefaultProgressionState() {
 }
 
 function initProgression(options = {}) {
-  clearSavedProgression();
-  if (!player.progression || options.reset) return resetProgression({ resetVitals: false });
+  clearSavedProgressionStorage();
+  if (!player.progression || options.reset) return resetRunProgression({ resetVitals: false });
   player.progression = mergeProgression(player.progression);
   applyProgressionBonuses({ resetVitals: false });
   return player.progression;
@@ -49,21 +48,36 @@ function mergeProgression(saved, defaults = getDefaultProgressionState()) {
 }
 
 function makeDefaultProgression() { return getDefaultProgressionState(); }
-function clearSavedProgression() { try { localStorage.removeItem(PROGRESSION_STORAGE_KEY); } catch {} }
-function resetProgression(options = {}) {
+function clearSavedProgressionStorage() {
+  try {
+    const legacyProgressionKeys = ["dcw.progression.v1"];
+    const preferenceKeyPattern = /(?:ui|layout|music|volume|muted|controller|controls|settings|scale|edit)/i;
+    const progressionKeyPattern = /(?:progression|playerLevel|playerXp|crawlerLevel|skill(?:Level|Xp|XP)?|attribute|xpToNext)/i;
+    const keysToRemove = new Set(legacyProgressionKeys);
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && progressionKeyPattern.test(key) && !preferenceKeyPattern.test(key)) keysToRemove.add(key);
+    }
+    for (const key of keysToRemove) localStorage.removeItem(key);
+  } catch {}
+}
+function resetRunProgression(options = {}) {
   player.level = 1;
   player.xp = 0;
   player.xpToNext = 40;
   player.progression = getDefaultProgressionState();
   applyProgressionBonuses({ resetVitals: options.resetVitals !== false });
-  clearSavedProgression();
+  clearSavedProgressionStorage();
   if (typeof updateInventoryUI === "function") updateInventoryUI();
+  if (typeof updateProgressionPanel === "function") {
+    const panel = document.getElementById("progressionPanel");
+    if (panel?.classList.contains("open")) updateProgressionPanel();
+  }
   if (typeof updateHUD === "function") updateHUD();
   return player.progression;
 }
-function initProgressionForNewRun() { return resetProgression({ resetVitals: false }); }
-function saveProgression() { clearSavedProgression(); }
-function loadProgression() { clearSavedProgression(); }
+function resetProgression(options = {}) { return resetRunProgression(options); }
+function initProgressionForNewRun() { return resetRunProgression({ resetVitals: false }); }
 function getSkillLevel(skillId) { return player.progression?.skills?.[skillId]?.level || 1; }
 function getAttributeValue(attributeId) { return player.progression?.attributes?.[attributeId]?.value || ATTRIBUTE_DEFINITIONS[attributeId]?.baseValue || 1; }
 function progressionBonusPct(level, perLevel = 0.01) { return Math.max(0, (getSkillLevel(level) - 1) * perLevel); }

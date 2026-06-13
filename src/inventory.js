@@ -252,7 +252,6 @@ function gainXP(amount, options = {}) {
   }
 
   updateHUD();
-  if (typeof saveProgression === "function") saveProgression();
 }
 
 function levelUpPlayer() {
@@ -265,7 +264,6 @@ function levelUpPlayer() {
   addPlayerFeedbackText(`LEVEL ${player.level}!`, { color: "#b6ff7c", size: 18, life: 72, offsetY: -54 });
   achievement("CRAWLER LEVEL INCREASED", `Crawler Level Increased: ${player.level}`, `level${player.level}`);
   if (player.progression) player.progression.unspentAttributePoints = (player.progression.unspentAttributePoints || 0) + 1;
-  if (typeof saveProgression === "function") saveProgression();
 }
 
 

@@ -40,7 +40,7 @@ function resetRunProgress() {
   player.pvpFreezeFrames = 0;
   resetPlayerDodgeState();
   player.currentWeaponId = "fists";
-  if (typeof resetProgression === "function") resetProgression({ resetVitals: true });
+  if (typeof resetRunProgression === "function") resetRunProgression({ resetVitals: true });
   player.aimX = 1;
   player.aimY = 0;
   currentFloor = 0;
