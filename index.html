@@ -37,6 +37,7 @@
     </div>
 
     <div class="hudWeapon">Weapon <span id="weaponName">Fists</span></div>
+    <div id="petHud" class="hudPet">Pet <span id="petName">None</span></div>
 
     <div id="stairHud" class="hudStair">Stairwell marked</div>
 
@@ -146,6 +147,12 @@
     <div id="inventoryHelp">Loot boxes can only be opened in safe rooms. Equip a light item to illuminate the crawler. Open Skills to review progression.</div>
   </div>
 
+  <div id="petMerchantPanel" role="dialog" aria-modal="true" aria-labelledby="petMerchantTitle">
+    <button id="closePetMerchantBtn" class="panelClose" type="button" aria-label="Close pet merchant">×</button>
+    <h3 id="petMerchantTitle">Run Companion Merchant</h3>
+    <div id="petMerchantOptions"></div>
+  </div>
+
   <div id="progressionPanel" role="dialog" aria-modal="true" aria-labelledby="progressionTitle">
     <button id="closeProgressionBtn" class="panelClose" type="button" aria-label="Close skills">×</button>
     <h3 id="progressionTitle">Skills / Attributes</h3>
@@ -208,6 +215,7 @@
 <script defer src="./src/audio.js"></script>
 <script defer src="./src/run-state.js"></script>
 <script defer src="./src/entities.js"></script>
+<script defer src="./src/pets.js"></script>
 <script defer src="./src/dungeon.js"></script>
 <script defer src="./src/simulation.js"></script>
 <script defer src="./src/inventory.js"></script>

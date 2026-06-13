@@ -1516,3 +1516,19 @@ body.progressionOpen { overflow: hidden; }
   .skillRow.compact { grid-template-columns:minmax(0,1fr) auto; }
   .skillRowText small { display:none; }
 }
+
+.hudPet { margin-top: 4px; color: rgba(230,245,255,0.9); font-size: 12px; }
+#petMerchantPanel {
+  display: none; position: fixed; z-index: 45; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(720px, calc(100vw - 24px)); max-height: min(78vh, 680px); overflow: auto;
+  padding: 16px; border: 1px solid rgba(255,216,107,.42); border-radius: 14px;
+  background: rgba(14, 12, 18, .96); color: #f4ead2; box-shadow: 0 18px 60px rgba(0,0,0,.62);
+}
+#petMerchantPanel h3 { margin: 0 0 12px; color: #ffd86b; text-transform: uppercase; letter-spacing: .08em; }
+#petMerchantOptions { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.petOption { border: 1px solid rgba(255,255,255,.14); border-radius: 12px; padding: 12px; background: rgba(255,255,255,.05); }
+.petOption strong { display:block; color:#fff; font-size: 15px; }
+.petOption span, .petOption small { display:block; color: rgba(230,235,255,.78); margin-top: 3px; }
+.petOption p { min-height: 54px; margin: 8px 0; color: rgba(255,245,220,.9); }
+.petOption button { margin-top: 10px; width: 100%; }
+.paperSlot-pet { border-color: rgba(159,235,255,.38); }
