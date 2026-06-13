@@ -227,12 +227,33 @@ function updatePanelScrollFromController() {
 }
 
 const UI_LAYOUT_STORAGE_KEY = "dcw.uiLayout.v1";
+const UI_EDIT_STORAGE_KEY = "dcw.uiEditMode.v1";
+const UI_SCALE_STORAGE_KEY = "dcw.uiScale.v1";
 let uiEditMode = false;
+let uiScale = 100;
 
 function readUiLayout() {
   try { return JSON.parse(localStorage.getItem(UI_LAYOUT_STORAGE_KEY) || "{}"); } catch { return {}; }
 }
 function writeUiLayout(layout) { localStorage.setItem(UI_LAYOUT_STORAGE_KEY, JSON.stringify(layout)); }
+function readSavedUiEditMode() { try { return localStorage.getItem(UI_EDIT_STORAGE_KEY) === "true"; } catch { return false; } }
+function writeSavedUiEditMode(enabled) { try { localStorage.setItem(UI_EDIT_STORAGE_KEY, enabled ? "true" : "false"); } catch {} }
+function readSavedUiScale() {
+  try {
+    const value = Number(localStorage.getItem(UI_SCALE_STORAGE_KEY) || "100");
+    return Number.isFinite(value) ? Math.max(75, Math.min(125, value)) : 100;
+  } catch { return 100; }
+}
+function writeSavedUiScale(value) { try { localStorage.setItem(UI_SCALE_STORAGE_KEY, String(value)); } catch {} }
+function setUiScale(value, persist = true) {
+  uiScale = Math.max(75, Math.min(125, Number(value) || 100));
+  document.documentElement.style.setProperty("--ui-scale", uiScale / 100);
+  const slider = document.getElementById("uiScaleSlider");
+  const label = document.getElementById("uiScaleValue");
+  if (slider) slider.value = String(uiScale);
+  if (label) label.textContent = `${uiScale}%`;
+  if (persist) writeSavedUiScale(uiScale);
+}
 function applyUiPanelLayout(el, saved) {
   if (!el || !saved) return;
   el.style.left = `${saved.left}px`; el.style.top = `${saved.top}px`;
@@ -247,19 +268,52 @@ function saveUiPanelLayout(el) {
   layout[key] = { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) };
   writeUiLayout(layout);
 }
-function setUiEditMode(enabled) {
+function setUiEditMode(enabled, persist = true) {
   uiEditMode = !!enabled;
   document.body.classList.toggle("uiEditMode", uiEditMode);
   const toggle = document.getElementById("uiEditToggle");
-  if (toggle) { toggle.setAttribute("aria-pressed", String(uiEditMode)); toggle.textContent = uiEditMode ? "UI Edit: On" : "UI Edit"; }
+  if (toggle) { toggle.setAttribute("aria-pressed", String(uiEditMode)); toggle.textContent = uiEditMode ? "On" : "Off"; }
+  if (persist) writeSavedUiEditMode(uiEditMode);
 }
 function resetUiLayout() { localStorage.removeItem(UI_LAYOUT_STORAGE_KEY); location.reload(); }
+function isSettingsOpen() { return document.getElementById("settingsOverlay")?.classList.contains("open"); }
+function openSettingsPanel() {
+  const overlay = document.getElementById("settingsOverlay");
+  if (!overlay) return;
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  resetTransientInputState?.();
+  syncSettingsControls();
+  document.getElementById("closeSettingsBtn")?.focus({ preventScroll: true });
+  if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
+}
+function closeSettingsPanel() {
+  const overlay = document.getElementById("settingsOverlay");
+  if (!overlay) return;
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+  if (document.activeElement && overlay.contains(document.activeElement)) document.activeElement.blur();
+  resetTransientInputState?.();
+}
+function syncSettingsControls() {
+  setUiScale(uiScale, false);
+  setUiEditMode(uiEditMode, false);
+  if (typeof dungeonMusic !== "undefined") dungeonMusic.updateToggleLabel();
+}
 function setupUiLayoutEditor() {
-  const controls = document.getElementById("devControls");
-  if (controls && controls.dataset.uiEditBound !== "true") {
-    controls.dataset.uiEditBound = "true";
+  if (document.body.dataset.settingsBound !== "true") {
+    document.body.dataset.settingsBound = "true";
+    uiEditMode = readSavedUiEditMode();
+    uiScale = readSavedUiScale();
+    setUiScale(uiScale, false);
+    setUiEditMode(uiEditMode, false);
+    document.getElementById("settingsBtn")?.addEventListener("click", openSettingsPanel);
+    document.getElementById("closeSettingsBtn")?.addEventListener("click", closeSettingsPanel);
+    document.getElementById("settingsOverlay")?.addEventListener("pointerdown", e => { if (e.target.id === "settingsOverlay") closeSettingsPanel(); });
     document.getElementById("uiEditToggle")?.addEventListener("click", () => setUiEditMode(!uiEditMode));
+    document.getElementById("uiScaleSlider")?.addEventListener("input", e => setUiScale(e.target.value));
     document.getElementById("resetUiLayoutBtn")?.addEventListener("click", resetUiLayout);
+    document.getElementById("resetUiLayoutBtnBottom")?.addEventListener("click", resetUiLayout);
   }
   const layout = readUiLayout();
   const panels = [["inventory","inventoryPanel"],["recap","safeRoomRecap"],["log","logPanel"],["hud","hud"],["minimap","minimapEditPanel"]];
@@ -309,6 +363,7 @@ function isControllerWindowVisible(el) {
 
 function getActiveControllerWindow() {
   const selectors = [
+    "#settingsOverlay",
     "#centerMessage",
     "#lootWindow",
     "#inventoryPanel",

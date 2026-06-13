@@ -58,12 +58,44 @@
   <div id="announcer"></div>
   <div id="prompt"></div>
   <div id="testerDebugLine" aria-live="polite">build/source: Render · connection: Connecting</div>
-  <button id="musicToggleBtn" class="musicToggle" type="button" aria-pressed="true">Music: On</button>
+  <button id="settingsBtn" class="settingsButton" type="button" aria-label="Open settings" title="Settings">⚙</button>
   <div id="minimapEditPanel"><div class="minimapEditHeader">Minimap</div></div>
 
-  <div id="devControls" class="devControls" aria-label="Developer controls">
-    <button id="uiEditToggle" type="button" aria-pressed="false">UI Edit</button>
-    <button id="resetUiLayoutBtn" type="button">Reset UI Layout</button>
+  <div id="settingsOverlay" aria-hidden="true">
+    <div id="settingsPanel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <button id="closeSettingsBtn" class="panelClose" type="button" aria-label="Close settings">×</button>
+      <h2 id="settingsTitle">SETTINGS</h2>
+      <section class="settingsSection">
+        <h3>Audio</h3>
+        <div class="settingsRow">
+          <span>Music</span>
+          <button id="musicToggleBtn" class="settingsToggle" type="button" aria-pressed="true">On</button>
+        </div>
+      </section>
+      <section class="settingsSection">
+        <h3>Interface</h3>
+        <div class="settingsRow">
+          <span>UI Edit Mode</span>
+          <button id="uiEditToggle" class="settingsToggle" type="button" aria-pressed="false">Off</button>
+        </div>
+        <label class="settingsRow settingsSliderRow" for="uiScaleSlider">
+          <span>UI Scale <strong id="uiScaleValue">100%</strong></span>
+          <input id="uiScaleSlider" type="range" min="75" max="125" step="5" value="100">
+        </label>
+        <button id="resetUiLayoutBtn" class="settingsAction" type="button">Reset UI Layout</button>
+      </section>
+      <section class="settingsSection settingsControlsTips">
+        <h3>Controls</h3>
+        <div>Left stick / D-pad: Navigate</div>
+        <div>Right stick: Scroll inventory</div>
+        <div>A / Enter: Select</div>
+        <div>B / Escape: Back</div>
+      </section>
+      <section class="settingsSection">
+        <h3>Reset</h3>
+        <button id="resetUiLayoutBtnBottom" class="settingsAction" type="button">Reset UI Layout</button>
+      </section>
+    </div>
   </div>
 
   <div id="touchControls" aria-label="Touch controls">

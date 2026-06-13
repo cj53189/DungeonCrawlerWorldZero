@@ -546,7 +546,8 @@
     #logPanel button:focus,
     #safeRoomRecap button:focus,
     #inventoryPanel button:focus,
-    #lootWindow button:focus {
+    #lootWindow button:focus,
+    #settingsOverlay button:focus {
       outline: 3px solid #7cf7ff;
       outline-offset: 3px;
       box-shadow: 0 0 0 2px rgba(0,0,0,0.8), 0 0 18px rgba(124,247,255,0.58);
@@ -1181,3 +1182,165 @@ body.inventoryOpen .devControls { opacity: 1 !important; visibility: visible !im
 }
 body.uiEditMode #minimapEditPanel { display: block; pointer-events: auto; }
 #inventoryPanel .lootGrid { grid-auto-rows: minmax(64px, 1fr); }
+
+:root { --ui-scale: 1; }
+
+#hud,
+#touchControls,
+#logPanel,
+#safeRoomRecap,
+#inventoryPanel,
+#lootWindow,
+#multiplayerPanel,
+.mpOpenPanelBtn,
+#settingsBtn,
+#minimapEditPanel {
+  zoom: var(--ui-scale);
+}
+
+.settingsButton {
+  position: fixed;
+  top: 52px;
+  right: 14px;
+  z-index: 75;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255,216,107,0.54);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, rgba(255,216,107,0.26), rgba(12, 12, 12, 0.82) 62%);
+  color: #ffe49a;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 900;
+  box-shadow: 0 0 14px rgba(0,0,0,0.42), inset 0 0 12px rgba(255,216,107,0.08);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.settingsButton:hover,
+.settingsButton:focus-visible {
+  background: radial-gradient(circle at 35% 25%, rgba(255,216,107,0.42), rgba(44,34,13,0.9) 62%);
+  outline: none;
+  border-color: rgba(255,216,107,0.86);
+}
+
+#settingsOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background: rgba(0,0,0,0.68);
+  backdrop-filter: blur(2px);
+}
+
+#settingsOverlay.open { display: flex; }
+
+body:has(#settingsOverlay.open) #touchControls,
+body:has(#settingsOverlay.open) #hud,
+body:has(#settingsOverlay.open) .mpOpenPanelBtn {
+  filter: brightness(0.45) saturate(0.75);
+  pointer-events: none;
+}
+
+#settingsPanel {
+  position: relative;
+  width: min(560px, calc(100vw - 28px));
+  max-height: min(94vh, 520px);
+  overflow-y: auto;
+  border: 2px solid rgba(214,181,92,0.82);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(20,12,7,0.98), rgba(45,28,15,0.98) 48%, rgba(9,8,8,0.99));
+  box-shadow: 0 22px 56px rgba(0,0,0,0.66), 0 0 30px rgba(168,84,30,0.20), inset 0 0 0 1px rgba(255,232,156,0.14);
+  padding: 14px;
+  color: #f3ead8;
+  font-size: 13px;
+}
+
+#settingsPanel h2 {
+  margin: 0 32px 10px 0;
+  color: #ffd86b;
+  font-size: 20px;
+  letter-spacing: 0.18em;
+  text-shadow: 0 2px 4px #000;
+}
+
+.settingsSection {
+  border: 1px solid rgba(255,216,107,0.18);
+  border-radius: 12px;
+  background: rgba(0,0,0,0.22);
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+
+.settingsSection h3 {
+  margin: 0 0 7px;
+  color: #f6d07a;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.settingsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+}
+
+.settingsToggle,
+.settingsAction {
+  min-height: 36px;
+  border: 1px solid rgba(255,216,107,0.42);
+  border-radius: 999px;
+  background: linear-gradient(135deg, #d6b55c, #9b6126);
+  color: #130d08;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 8px 14px;
+}
+
+.settingsToggle[aria-pressed="false"] {
+  background: rgba(255,255,255,0.08);
+  color: #ddd0bd;
+  border-color: rgba(255,255,255,0.20);
+}
+
+.settingsAction {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.settingsSliderRow { flex-wrap: wrap; }
+#uiScaleSlider { flex: 1 1 220px; accent-color: #ffd86b; min-height: 34px; }
+#uiScaleValue { color: #ffd86b; margin-left: 6px; }
+.settingsControlsTips { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
+.settingsControlsTips h3 { grid-column: 1 / -1; }
+.settingsControlsTips div { color: #ddd0bd; font-size: 12px; }
+
+#settingsPanel button:focus,
+#settingsPanel input:focus {
+  outline: 3px solid #7cf7ff;
+  outline-offset: 2px;
+}
+
+@media (hover: none) and (pointer: coarse), (max-width: 900px) {
+  .settingsButton { top: 8px; right: 8px; width: 40px; height: 40px; font-size: 21px; }
+  #settingsOverlay { padding: 8px; }
+  #settingsPanel {
+    width: min(620px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    padding: 10px;
+    font-size: 11px;
+  }
+  #settingsPanel h2 { font-size: 16px; margin-bottom: 6px; }
+  .settingsSection { padding: 6px 8px; margin-top: 6px; }
+  .settingsSection h3 { font-size: 10px; margin-bottom: 4px; }
+  .settingsRow { min-height: 34px; }
+  .settingsToggle, .settingsAction { min-height: 34px; padding: 7px 12px; }
+  .settingsControlsTips { grid-template-columns: 1fr 1fr; }
+  .settingsControlsTips div { font-size: 10px; }
+}

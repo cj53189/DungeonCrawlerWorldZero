@@ -113,7 +113,7 @@ function createDungeonMusicManager() {
   function setButtonLabel() {
     const button = document.getElementById("musicToggleBtn");
     if (!button) return;
-    button.textContent = `Music: ${muted ? "Off" : "On"}`;
+    button.textContent = muted ? "Off" : "On";
     button.setAttribute("aria-pressed", muted ? "false" : "true");
   }
 
