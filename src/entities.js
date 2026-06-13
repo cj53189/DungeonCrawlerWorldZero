@@ -1,3 +1,62 @@
+
+const ENEMY_BEHAVIOR_TAGS = {
+  RAT_SWARM: "rat_swarm",
+  RAT_BRUISER: "rat_bruiser",
+  SPIDER_LUNGE: "spider_lunge",
+  SPIDER_HIT_AND_RUN: "spider_hit_and_run",
+  BOT_PATROL: "bot_patrol",
+  GUARD_BRUISER: "guard_bruiser",
+  DRONE_SKIRMISHER: "drone_skirmisher",
+  BOSS_GATEKEEPER: "boss_gatekeeper"
+};
+
+const ENEMY_SPRITE_DEFINITIONS = {
+  rat: { spriteKey: "rat", src: "./assets/sprites/enemies/rat.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 10 },
+  spider: { spriteKey: "spider", src: "./assets/sprites/enemies/spider.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 9 },
+  janitor_bot: { spriteKey: "janitor_bot", src: "./assets/sprites/enemies/janitor_bot.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 12 },
+  maintenance_guard: { spriteKey: "maintenance_guard", src: "./assets/sprites/enemies/maintenance_guard.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 11 },
+  security_drone: { spriteKey: "security_drone", src: "./assets/sprites/enemies/security_drone.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 8 },
+  gatekeeper: { spriteKey: "gatekeeper", src: "./assets/sprites/enemies/gatekeeper.png", frameWidth: 48, frameHeight: 48, frameCount: 4, animationSpeed: 11 }
+};
+
+const ENEMY_IDENTITY_BY_NAME = {
+  "Small Rat": { behaviorTag: ENEMY_BEHAVIOR_TAGS.RAT_SWARM, spriteKey: "rat" },
+  "Hungry Rat": { behaviorTag: ENEMY_BEHAVIOR_TAGS.RAT_SWARM, spriteKey: "rat" },
+  "Giant Rat": { behaviorTag: ENEMY_BEHAVIOR_TAGS.RAT_BRUISER, spriteKey: "rat" },
+  "Cave Spider": { behaviorTag: ENEMY_BEHAVIOR_TAGS.SPIDER_LUNGE, spriteKey: "spider" },
+  "Venom Spider": { behaviorTag: ENEMY_BEHAVIOR_TAGS.SPIDER_HIT_AND_RUN, spriteKey: "spider" },
+  "Brood Spider": { behaviorTag: ENEMY_BEHAVIOR_TAGS.SPIDER_LUNGE, spriteKey: "spider" },
+  "Janitor Bot": { behaviorTag: ENEMY_BEHAVIOR_TAGS.BOT_PATROL, spriteKey: "janitor_bot" },
+  "Maintenance Guard": { behaviorTag: ENEMY_BEHAVIOR_TAGS.GUARD_BRUISER, spriteKey: "maintenance_guard" },
+  "Security Drone": { behaviorTag: ENEMY_BEHAVIOR_TAGS.DRONE_SKIRMISHER, spriteKey: "security_drone" }
+};
+
+function enemyIdentityForName(name) {
+  return ENEMY_IDENTITY_BY_NAME[name] || null;
+}
+
+function enemySpriteMetadataForKey(spriteKey) {
+  const definition = ENEMY_SPRITE_DEFINITIONS[spriteKey];
+  if (!definition) return null;
+  return {
+    spriteKey: definition.spriteKey,
+    spritePath: definition.src,
+    frameWidth: definition.frameWidth,
+    frameHeight: definition.frameHeight,
+    frameCount: definition.frameCount,
+    animationSpeed: definition.animationSpeed,
+    animationState: "walk"
+  };
+}
+
+function applyEnemyIdentity(enemy, variant = {}) {
+  if (!enemy) return enemy;
+  const identity = enemyIdentityForName(variant.name || enemy.name) || {};
+  const spriteKey = variant.spriteKey || identity.spriteKey || enemy.spriteKey || null;
+  enemy.behaviorTag = variant.behaviorTag || identity.behaviorTag || enemy.behaviorTag || null;
+  if (spriteKey) Object.assign(enemy, enemySpriteMetadataForKey(spriteKey));
+  return enemy;
+}
 function roomDistance(a, b) {
   if (!a || !b) return 0;
   return Math.hypot(a.cx - b.cx, a.cy - b.cy);

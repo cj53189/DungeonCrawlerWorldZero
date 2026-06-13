@@ -285,6 +285,118 @@ function hasLineOfSight(x1, y1, x2, y2) {
   return true;
 }
 
+function normalizeVector(x, y) {
+  const length = Math.hypot(x, y);
+  if (length <= 0.0001) return { x: 0, y: 0 };
+  return { x: x / length, y: y / length };
+}
+
+function countNearbySwarmAllies(enemy) {
+  if (!Array.isArray(enemies)) return 0;
+  return enemies.filter(other => other !== enemy && other.hp > 0 && other.behaviorTag === "rat_swarm" && Math.hypot(other.x - enemy.x, other.y - enemy.y) < 76).length;
+}
+
+function updateSpiderLungeState(enemy, dist, canSeePlayer, tag) {
+  const state = enemy.behaviorState || (enemy.behaviorState = {});
+  state.lungeCooldown = Math.max(0, (state.lungeCooldown || 0) - 1);
+  state.windup = Math.max(0, state.windup || 0);
+  state.lungeFrames = Math.max(0, state.lungeFrames || 0);
+  state.repositionFrames = Math.max(0, state.repositionFrames || 0);
+
+  if (state.windup > 0) {
+    state.windup--;
+    enemy.animationState = "windup";
+    if (state.windup === 0) {
+      const dir = normalizeVector(player.x - enemy.x, player.y - enemy.y);
+      state.lungeDirX = dir.x;
+      state.lungeDirY = dir.y;
+      state.lungeFrames = tag === "spider_hit_and_run" ? 11 : 14;
+      state.lungeCooldown = tag === "spider_hit_and_run" ? 72 : 56;
+    }
+    return { dx: 0, dy: 0 };
+  }
+
+  if (state.lungeFrames > 0) {
+    state.lungeFrames--;
+    enemy.animationState = "lunge";
+    const lungeSpeed = enemy.speed * (tag === "spider_hit_and_run" ? 1.9 : 2.15);
+    return { dx: (state.lungeDirX || 0) * lungeSpeed, dy: (state.lungeDirY || 0) * lungeSpeed };
+  }
+
+  if (tag === "spider_hit_and_run" && state.repositionFrames > 0) {
+    state.repositionFrames--;
+    enemy.animationState = "reposition";
+    const away = normalizeVector(enemy.x - player.x, enemy.y - player.y);
+    const side = state.repositionSide || 1;
+    return {
+      dx: (away.x * 0.72 + -away.y * side * 0.58) * enemy.speed * 1.22,
+      dy: (away.y * 0.72 + away.x * side * 0.58) * enemy.speed * 1.22
+    };
+  }
+
+  if (canSeePlayer && dist < (tag === "spider_hit_and_run" ? 168 : 148) && state.lungeCooldown <= 0) {
+    state.windup = tag === "spider_hit_and_run" ? 12 : 16;
+    state.repositionSide = Math.random() < 0.5 ? -1 : 1;
+    enemy.animationState = "windup";
+    return { dx: 0, dy: 0 };
+  }
+
+  return null;
+}
+
+function calculateEnemyMovement(enemy, canSeePlayer, bossCanAlwaysTrack, dist) {
+  const tag = enemy.behaviorTag || "";
+  const state = enemy.behaviorState || (enemy.behaviorState = {});
+  enemy.animationState = "walk";
+
+  if (canSeePlayer || bossCanAlwaysTrack) {
+    if (tag === "spider_lunge" || tag === "spider_hit_and_run") {
+      const spiderMove = updateSpiderLungeState(enemy, dist, canSeePlayer || bossCanAlwaysTrack, tag);
+      if (spiderMove) return spiderMove;
+    }
+
+    const dir = normalizeVector(player.x - enemy.x, player.y - enemy.y);
+    let speed = enemy.speed;
+    let strafe = 0;
+
+    if (tag === "rat_swarm") {
+      const allies = countNearbySwarmAllies(enemy);
+      speed *= 1.08 + Math.min(0.08, allies * 0.025);
+      if (allies > 0 && dist > player.r + enemy.r + 18) strafe = (state.swarmSide || (state.swarmSide = Math.random() < 0.5 ? -1 : 1)) * 0.12;
+    } else if (tag === "rat_bruiser") {
+      speed *= 0.92;
+    } else if (tag === "bot_patrol") {
+      speed *= 0.78;
+    } else if (tag === "guard_bruiser") {
+      speed *= 0.98;
+    } else if (tag === "drone_skirmisher") {
+      speed *= 1.16;
+      strafe = (state.skirmishSide || (state.skirmishSide = Math.random() < 0.5 ? -1 : 1)) * (dist < 130 ? 0.72 : 0.36);
+      if (Math.random() < 0.018) state.skirmishSide *= -1;
+    } else if (tag === "boss_gatekeeper") {
+      speed *= 0.95;
+    }
+
+    return {
+      dx: (dir.x + -dir.y * strafe) * speed,
+      dy: (dir.y + dir.x * strafe) * speed
+    };
+  }
+
+  enemy.animationState = "idle";
+  const patrolSpeed = tag === "bot_patrol" ? 0.24 : tag === "drone_skirmisher" ? 0.48 : 0.35;
+  if (Math.random() < (tag === "bot_patrol" ? 0.006 : 0.015)) enemy.wanderAngle = Math.random() * Math.PI * 2;
+  return { dx: Math.cos(enemy.wanderAngle) * patrolSpeed, dy: Math.sin(enemy.wanderAngle) * patrolSpeed };
+}
+
+function enemyPlayerKnockbackMultiplier(enemy) {
+  if (enemy?.behaviorTag === "rat_bruiser") return 1.32;
+  if (enemy?.behaviorTag === "guard_bruiser") return 1.18;
+  if (enemy?.behaviorTag === "bot_patrol") return 1.08;
+  if (enemy?.behaviorTag === "drone_skirmisher") return 0.9;
+  return 1;
+}
+
 
 function updateEnemies() {
   processPendingBossLocks();
@@ -320,14 +432,8 @@ for (const enemy of enemies) {
         triggerBossAggro("seen");
       }
       const bossCanAlwaysTrack = enemy.boss && bossAggroed;
-      let dx = 0, dy = 0;
-      if (canSeePlayer || bossCanAlwaysTrack) { dx = (player.x - enemy.x) / Math.max(1, dist) * enemy.speed; dy = (player.y - enemy.y) / Math.max(1, dist) * enemy.speed; }
-      else {
-        dx = Math.cos(enemy.wanderAngle) * 0.35;
-        dy = Math.sin(enemy.wanderAngle) * 0.35;
-        if (Math.random() < 0.015) enemy.wanderAngle = Math.random() * Math.PI * 2;
-      }
-      moveEntity(enemy, dx, dy);
+      const movement = calculateEnemyMovement(enemy, canSeePlayer, bossCanAlwaysTrack, dist);
+      moveEntity(enemy, movement.dx, movement.dy);
     }
     if (typeof floor0EnemyRoomId === "function") {
       const roomId = floor0EnemyRoomId(enemy);
@@ -340,11 +446,15 @@ for (const enemy of enemies) {
       const dmg = Math.max(1, rawDmg - player.defense);
       player.hp -= dmg;
       addPlayerFeedbackText(`-${dmg} HP`, { color: "#ff6b6b", size: 16 });
-      applyKnockback(player, enemy.x, enemy.y, 5 + Math.min(4, dmg * 0.18));
+      applyKnockback(player, enemy.x, enemy.y, (5 + Math.min(4, dmg * 0.18)) * enemyPlayerKnockbackMultiplier(enemy));
       stats.damageTaken += dmg;
       stats.riskyMoments++;
       changeAudience(1);
       enemy.damageCooldown = 70;
+      if (enemy.behaviorTag === "spider_hit_and_run") {
+        enemy.behaviorState = enemy.behaviorState || {};
+        enemy.behaviorState.repositionFrames = 36;
+      }
       updateHUD();
       if (!achievements.has("firstHit")) achievement("NEW ACHIEVEMENT: Physical Contact", "A dungeon creature touched you without consent. Human resources has been eaten.", "firstHit");
       if (player.hp <= 0) loseGame();
