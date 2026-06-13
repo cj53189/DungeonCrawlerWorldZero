@@ -1,3 +1,4 @@
+const PROGRESSION_STORAGE_KEY = "dcw.progression.v1";
 const ATTRIBUTE_DEFINITIONS = {
   strength: { id: "strength", name: "Strength", baseValue: 10, description: "Physical power for close-quarters violence.", effect: "+1% melee damage per point above 10." },
   agility: { id: "agility", name: "Agility", baseValue: 10, description: "Footwork, balance, and recovery under pressure.", effect: "+0.6% speed and dodge recovery per point above 10." },
@@ -23,7 +24,7 @@ const SKILL_DEFINITIONS = {
   audienceAppeal: { id: "audienceAppeal", name: "Audience Appeal", category: "Dungeon", description: "Earning cheers by making combat look intentional.", linkedAttribute: "audienceAppeal" }
 };
 
-function getDefaultProgressionState() {
+function makeDefaultProgression() {
   return {
     attributes: Object.fromEntries(Object.values(ATTRIBUTE_DEFINITIONS).map(def => [def.id, { ...def, value: def.baseValue }])),
     skills: Object.fromEntries(Object.values(SKILL_DEFINITIONS).map(def => [def.id, { ...def, level: 1, xp: 0, xpToNext: 28 }])),
@@ -32,20 +33,15 @@ function getDefaultProgressionState() {
 }
 
 function initProgression(options = {}) {
-  if (options.freshRun || options.reset || options.newRun) return resetRunProgression({ resetVitals: options.resetVitals !== false });
-  return preserveActiveRunProgression({ resetVitals: options.resetVitals === true });
-}
-
-function initProgressionForNewRun(options = {}) { return resetRunProgression({ resetVitals: options.resetVitals !== false }); }
-function resetProgression(options = {}) { return resetRunProgression(options); }
-
-function preserveActiveRunProgression(options = {}) {
-  player.progression = mergeProgression(player.progression);
-  applyProgressionBonuses({ resetVitals: options.resetVitals === true });
+  const fresh = makeDefaultProgression();
+  if (!player.progression || options.reset) player.progression = fresh;
+  else player.progression = mergeProgression(player.progression, fresh);
+  if (!options.skipLoad) loadProgression();
+  applyProgressionBonuses();
   return player.progression;
 }
 
-function mergeProgression(saved, defaults = getDefaultProgressionState()) {
+function mergeProgression(saved, defaults = makeDefaultProgression()) {
   const merged = { ...defaults, attributes: { ...defaults.attributes }, skills: { ...defaults.skills } };
   for (const [id, attr] of Object.entries(saved?.attributes || {})) if (merged.attributes[id]) merged.attributes[id] = { ...merged.attributes[id], value: Math.max(1, Number(attr.value) || merged.attributes[id].value) };
   for (const [id, skill] of Object.entries(saved?.skills || {})) if (merged.skills[id]) merged.skills[id] = { ...merged.skills[id], level: Math.max(1, Number(skill.level) || 1), xp: Math.max(0, Number(skill.xp) || 0), xpToNext: Math.max(1, Number(skill.xpToNext) || merged.skills[id].xpToNext) };
@@ -53,40 +49,8 @@ function mergeProgression(saved, defaults = getDefaultProgressionState()) {
   return merged;
 }
 
-function makeDefaultProgression() { return getDefaultProgressionState(); }
-let savedProgressionStorageCleared = false;
-function saveProgression() { return null; } // Deprecated no-op: progression is run-only and never persisted.
-function loadProgression() { return null; } // Deprecated no-op: progression is run-only and never loaded.
-function clearSavedProgressionStorage() {
-  if (savedProgressionStorageCleared) return;
-  savedProgressionStorageCleared = true;
-  try {
-    const oldProgressionKeys = [
-      "dcw.progression.v1",
-      "dcw.playerProgression.v1",
-      "dcw.playerLevel.v1",
-      "dcw.playerXp.v1",
-      "dcw.skillProgression.v1",
-      "dcw.attributeProgression.v1"
-    ];
-    for (const key of oldProgressionKeys) localStorage.removeItem(key);
-  } catch {}
-}
-function resetRunProgression(options = {}) {
-  player.level = 1;
-  player.xp = 0;
-  player.xpToNext = 40;
-  player.progression = getDefaultProgressionState();
-  clearSavedProgressionStorage();
-  applyProgressionBonuses({ resetVitals: options.resetVitals !== false });
-  if (typeof updateInventoryUI === "function") updateInventoryUI();
-  if (typeof updateProgressionPanel === "function") {
-    const panel = document.getElementById("progressionPanel");
-    if (panel?.classList.contains("open")) updateProgressionPanel();
-  }
-  if (typeof updateHUD === "function") updateHUD();
-  return player.progression;
-}
+function saveProgression() { try { localStorage.setItem(PROGRESSION_STORAGE_KEY, JSON.stringify({ progression: player.progression, playerLevel: player.level, playerXp: player.xp, playerXpToNext: player.xpToNext })); } catch {} }
+function loadProgression() { try { const saved = JSON.parse(localStorage.getItem(PROGRESSION_STORAGE_KEY) || "null"); if (!saved) return; player.progression = mergeProgression(saved.progression); player.level = Math.max(1, Number(saved.playerLevel) || player.level); player.xp = Math.max(0, Number(saved.playerXp) || player.xp); player.xpToNext = Math.max(1, Number(saved.playerXpToNext) || player.xpToNext); } catch {} }
 function getSkillLevel(skillId) { return player.progression?.skills?.[skillId]?.level || 1; }
 function getAttributeValue(attributeId) { return player.progression?.attributes?.[attributeId]?.value || ATTRIBUTE_DEFINITIONS[attributeId]?.baseValue || 1; }
 function progressionBonusPct(level, perLevel = 0.01) { return Math.max(0, (getSkillLevel(level) - 1) * perLevel); }
@@ -111,7 +75,7 @@ function getWeaponSkillDamageMultiplier(weapon) {
   return 1 + Math.max(0, getSkillLevel(skillId) - 1) * 0.01;
 }
 function awardSkillXp(skillId, amount, reason = "practice") {
-  if (!player.progression) preserveActiveRunProgression();
+  if (!player.progression) initProgression({ skipLoad: true });
   const skill = player.progression.skills?.[skillId];
   if (!skill || amount <= 0) return false;
   skill.xp += Math.max(1, Math.round(amount * getSkillXpMultiplier()));
@@ -125,9 +89,10 @@ function awardSkillXp(skillId, amount, reason = "practice") {
   }
   if (typeof gainXP === "function") gainXP(Math.max(1, Math.floor(amount * 0.35)), { silent: true });
   applyProgressionBonuses();
+  saveProgression();
   if (typeof updateInventoryUI === "function") updateInventoryUI();
   if (typeof updateHUD === "function") updateHUD();
   return leveled;
 }
-function applyProgressionBonuses(options = {}) { if (!player.progression) return; if (typeof recalcEquipmentStats === "function") recalcEquipmentStats(); if (options.resetVitals) player.hp = player.maxHp; }
+function applyProgressionBonuses() { if (!player.progression) return; if (typeof recalcEquipmentStats === "function") recalcEquipmentStats(); }
 function awardWeaponSkillXpForHit(weapon, dealt = 0) { awardSkillXp(getWeaponSkillForItem(weapon), Math.max(3, Math.min(12, 4 + Math.round(dealt * 0.18))), "weapon_hit"); }

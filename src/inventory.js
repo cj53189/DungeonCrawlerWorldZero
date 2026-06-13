@@ -152,7 +152,7 @@ function renderProgressBar(value,max,label){
  return `<div class="skillProgress" aria-label="${escapeHtml(label)}"><span style="width:${pct.toFixed(1)}%"></span></div>`;
 }
 function renderProgressionInventoryView(){
- if(typeof preserveActiveRunProgression==="function")preserveActiveRunProgression();
+ if(typeof initProgression==="function")initProgression({skipLoad:true});
  const attrs=Object.values(player.progression?.attributes||{});
  const skills=Object.values(player.progression?.skills||{});
  const attrRows=attrs.map(attr=>`<button class="attributeRow" type="button" data-progression-row="attribute-${escapeHtml(attr.id||attr.name)}" aria-label="${escapeHtml(attr.name)} ${attr.value}"><div><strong>${escapeHtml(attr.name)}</strong><small>${escapeHtml(attr.effect||attr.description||"")}</small></div><span>${attr.value}</span></button>`).join("");
@@ -252,6 +252,7 @@ function gainXP(amount, options = {}) {
   }
 
   updateHUD();
+  if (typeof saveProgression === "function") saveProgression();
 }
 
 function levelUpPlayer() {
@@ -264,6 +265,7 @@ function levelUpPlayer() {
   addPlayerFeedbackText(`LEVEL ${player.level}!`, { color: "#b6ff7c", size: 18, life: 72, offsetY: -54 });
   achievement("CRAWLER LEVEL INCREASED", `Crawler Level Increased: ${player.level}`, `level${player.level}`);
   if (player.progression) player.progression.unspentAttributePoints = (player.progression.unspentAttributePoints || 0) + 1;
+  if (typeof saveProgression === "function") saveProgression();
 }
 
 
@@ -308,7 +310,7 @@ function getReputationComment(rep) {
 
 function renderProgressionPanel() {
  const panel=document.getElementById("progressionPanel"); if(!panel)return;
- if(typeof preserveActiveRunProgression==="function")preserveActiveRunProgression();
+ if(typeof initProgression==="function")initProgression({skipLoad:true});
  const attrs=Object.values(player.progression?.attributes||{});
  const skills=Object.values(player.progression?.skills||{});
  const skillRows=skills.map(skill=>{
