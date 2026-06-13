@@ -1433,3 +1433,86 @@ body.progressionOpen { overflow: hidden; }
   .attributeCard p,.skillRow small { display:none; }
   .skillRow { min-height: 56px; }
 }
+
+/* Compact Skills / Attributes inventory tab */
+#inventoryPanel .progressionInventory {
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: clamp(6px, 1vw, 10px);
+}
+.progressionSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.progressionSummary > div,
+.progressionSection {
+  border: 1px solid rgba(255,216,107,.18);
+  border-radius: 10px;
+  background: linear-gradient(160deg, rgba(47,31,17,.72), rgba(7,5,4,.54));
+  box-shadow: inset 0 0 18px rgba(0,0,0,.25);
+}
+.progressionSummary > div { padding: 6px 8px; min-width: 0; }
+.progressionSummary span,
+.attributeRow small,
+.skillRow span,
+.skillRow small,
+.skillRow em { color: #bcae9c; font-size: clamp(7px, 1vw, 10px); line-height: 1.15; }
+.progressionSummary strong { color:#ffdf91; font-size: clamp(10px, 1.7vw, 14px); }
+.summaryXp { display:grid; gap:3px; }
+.progressionColumns { min-height: 0; display:grid; grid-template-columns: minmax(150px, .8fr) minmax(0, 1.2fr); gap: 8px; }
+.progressionSection { min-width:0; min-height:0; overflow:hidden; padding: 7px; }
+.progressionSection h4 { margin: 0 0 6px; color:#ffd86b; font-size: clamp(9px, 1.35vw, 12px); letter-spacing:.1em; text-transform:uppercase; }
+.attributeGrid.compact,
+.skillList.compact { display:grid; gap:5px; }
+.attributeRow,
+.skillRow.compact {
+  width:100%;
+  min-height: 40px;
+  border:1px solid rgba(255,216,107,.18);
+  border-radius: 8px;
+  background: rgba(0,0,0,.24);
+  color:#e8dcc8;
+  text-align:left;
+  cursor:pointer;
+}
+.attributeRow { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px 7px; }
+.attributeRow strong,
+.skillRow strong { display:block; color:#ffdf91; font-size: clamp(9px, 1.35vw, 12px); }
+.attributeRow span { color:#7cf7ff; font-weight:900; font-size: clamp(12px, 1.8vw, 16px); }
+.skillRow.compact { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:3px 8px; align-items:center; padding:5px 7px; }
+.skillRowText { min-width:0; }
+.skillRowText small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.skillLevel { color:#7cf7ff; font-weight:900; font-size: clamp(9px, 1.35vw, 12px); }
+.skillProgress { grid-column:1 / -1; height:5px; border-radius:999px; overflow:hidden; background:rgba(0,0,0,.45); border:1px solid rgba(255,216,107,.16); }
+.skillProgress span { display:block; height:100%; background:linear-gradient(90deg,#7cf7ff,#ffd86b); box-shadow:0 0 8px rgba(124,247,255,.35); }
+.skillRow em { grid-column:1 / -1; font-style:normal; }
+.progressionHelp { color:#bcae9c; font-size: clamp(7px, 1vw, 10px); text-align:center; }
+#inventoryPanel .attributeRow:focus,
+#inventoryPanel .skillRow:focus,
+#inventoryPanel .inventoryTab:focus {
+  outline: 2px solid #7cf7ff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px rgba(255,216,107,.55), 0 0 18px rgba(124,247,255,.25), inset 0 0 16px rgba(255,216,107,.08);
+}
+
+@media (max-width: 900px), (hover:none) and (pointer:coarse) {
+  body.inventoryOpen #touchControls { opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; }
+  #inventoryPanel .progressionInventory { gap:5px; padding-right:2px; }
+  .progressionSummary { grid-template-columns: repeat(3, minmax(0, 1fr)); gap:4px; }
+  .progressionSummary > div { padding:4px 5px; border-radius:7px; }
+  .progressionColumns { grid-template-columns:1fr; gap:5px; }
+  .progressionSection { padding:5px; border-radius:8px; }
+  .progressionSection h4 { margin-bottom:4px; font-size:8px; }
+  .attributeGrid.compact,.skillList.compact { gap:4px; }
+  .attributeRow,.skillRow.compact { min-height:40px; padding:4px 6px; border-radius:7px; }
+  .skillRow.compact { grid-template-columns:minmax(0,1fr) auto; }
+  .skillRowText small { display:none; }
+}

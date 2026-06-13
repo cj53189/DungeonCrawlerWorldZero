@@ -201,7 +201,7 @@ function getOpenScrollablePanel() {
 
   const prog = document.getElementById("progressionPanel");
   if (prog && prog.classList.contains("open")) return prog;
-  if (inv && inv.classList.contains("open")) return document.querySelector("#inventoryPanel .lootGrid") || document.getElementById("inventoryList") || inv;
+  if (inv && inv.classList.contains("open")) return document.querySelector("#inventoryPanel .progressionInventory") || document.querySelector("#inventoryPanel .lootGrid") || document.getElementById("inventoryList") || inv;
   if (isVisiblePanel(log)) return log;
   if (isVisiblePanel(recap)) return recap;
   return null;
