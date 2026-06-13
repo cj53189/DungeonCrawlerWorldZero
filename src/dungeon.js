@@ -175,7 +175,10 @@ function ensureFloor0TutorialDoor() {
     }
   }
 
-  if (best) map[best.y][best.x] = "D";
+  if (best) {
+    map[best.y][best.x] = "D";
+    cleanupBadDoors();
+  }
 }
 
 function addTutorialSign(definition, target, room = null) {
@@ -751,7 +754,23 @@ function carveHorizontal(x1, x2, y) { for (let x = Math.min(x1, x2); x <= Math.m
 function carveVertical(y1, y2, x) { for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) carveCorridorTile(x, y); }
 
 function isWalkableForDoor(tile) {
-  return tile === "." || tile === "S" || tile === "C" || tile === "E";
+  return tile === "." || tile === "S" || tile === "C" || tile === "E" || tile === "D";
+}
+
+function isSolidForDoor(tile) {
+  return tile === "#";
+}
+
+function hasDoorBypassAround(x, y, orientation) {
+  if (orientation === "horizontal") {
+    const topBypass = isWalkableForDoor(map[y - 1][x - 1]) && isWalkableForDoor(map[y - 1][x]) && isWalkableForDoor(map[y - 1][x + 1]);
+    const bottomBypass = isWalkableForDoor(map[y + 1][x - 1]) && isWalkableForDoor(map[y + 1][x]) && isWalkableForDoor(map[y + 1][x + 1]);
+    return topBypass || bottomBypass;
+  }
+
+  const leftBypass = isWalkableForDoor(map[y - 1][x - 1]) && isWalkableForDoor(map[y][x - 1]) && isWalkableForDoor(map[y + 1][x - 1]);
+  const rightBypass = isWalkableForDoor(map[y - 1][x + 1]) && isWalkableForDoor(map[y][x + 1]) && isWalkableForDoor(map[y + 1][x + 1]);
+  return leftBypass || rightBypass;
 }
 
 function isValidDoorSpot(x, y) {
@@ -763,34 +782,21 @@ function isValidDoorSpot(x, y) {
   const left = map[y][x - 1];
   const right = map[y][x + 1];
 
-  // Horizontal passage door:
-  // wall above + wall below, walkable left + walkable right
   const horizontalDoor =
-    up === "#" &&
-    down === "#" &&
+    isSolidForDoor(up) &&
+    isSolidForDoor(down) &&
     isWalkableForDoor(left) &&
     isWalkableForDoor(right);
 
-  // Vertical passage door:
-  // wall left + wall right, walkable up + walkable down
   const verticalDoor =
-    left === "#" &&
-    right === "#" &&
+    isSolidForDoor(left) &&
+    isSolidForDoor(right) &&
     isWalkableForDoor(up) &&
     isWalkableForDoor(down);
 
-  if (!horizontalDoor && !verticalDoor) return false;
-
-  // Extra anti-goofiness rule:
-  // Reject doors that have obvious walk-around space diagonally adjacent on both sides.
-  // This helps prevent decorative doors in wide open rooms.
-  const diagonalWalkables =
-    [
-      map[y - 1][x - 1], map[y - 1][x + 1],
-      map[y + 1][x - 1], map[y + 1][x + 1]
-    ].filter(isWalkableForDoor).length;
-
-  return diagonalWalkables <= 2;
+  if (horizontalDoor) return !hasDoorBypassAround(x, y, "horizontal");
+  if (verticalDoor) return !hasDoorBypassAround(x, y, "vertical");
+  return false;
 }
 
 function cleanupBadDoors() {
