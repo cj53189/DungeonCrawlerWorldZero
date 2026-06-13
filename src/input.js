@@ -315,6 +315,7 @@ function initInputControls() {
   setupPanelCloseButtons();
   setupDirectPanelButtonFallbacks();
   setupInventoryButtonFallback();
+  if (typeof setupUiLayoutEditor === "function") setupUiLayoutEditor();
   updateInputVisibility();
 }
 
@@ -394,8 +395,8 @@ function pollGamepad() {
   if (hasActiveGamepadInput) setLastActiveInputMethod("gamepad");
 
   const controllerWindowOpen = typeof hasControllerWindowOpen === "function" && hasControllerWindowOpen();
-  gamepadState.moveX = Math.abs(axisX) > GAMEPAD_DEADZONE ? axisX : (controllerWindowOpen ? 0 : dpadX);
-  gamepadState.moveY = Math.abs(axisY) > GAMEPAD_DEADZONE ? axisY : (controllerWindowOpen ? 0 : dpadY);
+  gamepadState.moveX = controllerWindowOpen ? 0 : (Math.abs(axisX) > GAMEPAD_DEADZONE ? axisX : dpadX);
+  gamepadState.moveY = controllerWindowOpen ? 0 : (Math.abs(axisY) > GAMEPAD_DEADZONE ? axisY : dpadY);
 
   const aimLength = Math.hypot(aimAxisX, aimAxisY);
   if (aimLength > GAMEPAD_DEADZONE) {

@@ -1281,7 +1281,11 @@ function drawMinimap(){
   }
 
   const w=minimapCanvas.width, h=minimapCanvas.height;
-  const x0=canvas.width-w-14, y0=canvas.height-h-14;
+  let x0=canvas.width-w-14, y0=canvas.height-h-14;
+  try {
+    const saved=JSON.parse(localStorage.getItem("dcw.uiLayout.v1")||"{}").minimap;
+    if(saved){ x0=saved.left+6; y0=saved.top+6; }
+  } catch {}
 
   ctx.fillStyle="rgba(0,0,0,0.58)";
   ctx.fillRect(x0-6,y0-6,w+12,h+12);

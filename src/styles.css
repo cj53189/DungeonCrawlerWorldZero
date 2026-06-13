@@ -1121,3 +1121,63 @@ body.inventoryOpen #game { pointer-events: none; }
   .paperDoll { min-height: 260px; }
   #inventoryList { overflow:visible; }
 }
+
+.devControls {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  z-index: 80;
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid rgba(255,216,107,0.22);
+  border-radius: 999px;
+  background: rgba(0,0,0,0.58);
+  box-shadow: 0 0 14px rgba(0,0,0,0.28);
+}
+.devControls button {
+  border: 1px solid rgba(255,216,107,0.32);
+  border-radius: 999px;
+  background: rgba(255,216,107,0.12);
+  color: #ffd86b;
+  font-size: 10px;
+  font-weight: 900;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.devControls button[aria-pressed="true"] { background: linear-gradient(135deg,#ffd86b,#b87525); color:#211407; }
+.uiResizeHandle { display:none; position:absolute; right:3px; bottom:3px; width:16px; height:16px; border-right:2px solid rgba(124,247,255,.9); border-bottom:2px solid rgba(124,247,255,.9); cursor:nwse-resize; z-index:120; }
+body.uiEditMode #hud,
+body.uiEditMode #inventoryPanel,
+body.uiEditMode #safeRoomRecap,
+body.uiEditMode #logPanel { outline: 2px dashed rgba(124,247,255,.74); outline-offset: 3px; resize: none; }
+body.uiEditMode .uiDragHandle { cursor: move; user-select: none; }
+body.uiEditMode .uiResizeHandle { display:block; }
+body.uiEditMode #hud,
+body.uiEditMode #safeRoomRecap,
+body.uiEditMode #logPanel { pointer-events:auto; }
+#inventoryPanel .lootGrid { overflow-y: auto; overscroll-behavior: contain; padding-right: 3px; }
+#inventoryPanel .uiResizeHandle { grid-column: auto; }
+body.inventoryOpen .devControls { opacity: 1 !important; visibility: visible !important; pointer-events: auto !important; }
+#minimapEditPanel {
+  position: fixed;
+  right: 8px;
+  bottom: 8px;
+  z-index: 15;
+  width: 178px;
+  height: 132px;
+  display: none;
+  border: 1px dashed rgba(124,247,255,.72);
+  background: rgba(0,0,0,.20);
+  pointer-events: none;
+}
+#minimapEditPanel .minimapEditHeader {
+  padding: 3px 6px;
+  color: #7cf7ff;
+  background: rgba(0,0,0,.62);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+body.uiEditMode #minimapEditPanel { display: block; pointer-events: auto; }
+#inventoryPanel .lootGrid { grid-auto-rows: minmax(64px, 1fr); }
