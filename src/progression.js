@@ -1,4 +1,6 @@
 const PROGRESSION_STORAGE_KEY = "dcw.progression.v1";
+// Player progression is run-scoped. This key is only referenced to clear
+// stale saves from older builds that persisted level, XP, skills, or attributes.
 const ATTRIBUTE_DEFINITIONS = {
   strength: { id: "strength", name: "Strength", baseValue: 10, description: "Physical power for close-quarters violence.", effect: "+1% melee damage per point above 10." },
   agility: { id: "agility", name: "Agility", baseValue: 10, description: "Footwork, balance, and recovery under pressure.", effect: "+0.6% speed and dodge recovery per point above 10." },
@@ -36,7 +38,7 @@ function initProgression(options = {}) {
   const fresh = makeDefaultProgression();
   if (!player.progression || options.reset) player.progression = fresh;
   else player.progression = mergeProgression(player.progression, fresh);
-  if (!options.skipLoad) loadProgression();
+  clearLegacyProgressionSave();
   applyProgressionBonuses();
   return player.progression;
 }
@@ -49,8 +51,13 @@ function mergeProgression(saved, defaults = makeDefaultProgression()) {
   return merged;
 }
 
-function saveProgression() { try { localStorage.setItem(PROGRESSION_STORAGE_KEY, JSON.stringify({ progression: player.progression, playerLevel: player.level, playerXp: player.xp, playerXpToNext: player.xpToNext })); } catch {} }
-function loadProgression() { try { const saved = JSON.parse(localStorage.getItem(PROGRESSION_STORAGE_KEY) || "null"); if (!saved) return; player.progression = mergeProgression(saved.progression); player.level = Math.max(1, Number(saved.playerLevel) || player.level); player.xp = Math.max(0, Number(saved.playerXp) || player.xp); player.xpToNext = Math.max(1, Number(saved.playerXpToNext) || player.xpToNext); } catch {} }
+function clearLegacyProgressionSave() { try { localStorage.removeItem(PROGRESSION_STORAGE_KEY); } catch {} }
+
+// Reserved for future account/meta-progression. Current player progression is
+// run-scoped, so these intentionally avoid saving or restoring level, XP,
+// skills, or attributes across browser sessions.
+function saveProgression() { clearLegacyProgressionSave(); }
+function loadProgression() { clearLegacyProgressionSave(); }
 function getSkillLevel(skillId) { return player.progression?.skills?.[skillId]?.level || 1; }
 function getAttributeValue(attributeId) { return player.progression?.attributes?.[attributeId]?.value || ATTRIBUTE_DEFINITIONS[attributeId]?.baseValue || 1; }
 function progressionBonusPct(level, perLevel = 0.01) { return Math.max(0, (getSkillLevel(level) - 1) * perLevel); }
@@ -89,7 +96,6 @@ function awardSkillXp(skillId, amount, reason = "practice") {
   }
   if (typeof gainXP === "function") gainXP(Math.max(1, Math.floor(amount * 0.35)), { silent: true });
   applyProgressionBonuses();
-  saveProgression();
   if (typeof updateInventoryUI === "function") updateInventoryUI();
   if (typeof updateHUD === "function") updateHUD();
   return leveled;
