@@ -212,7 +212,7 @@ function updatePlayerAim(dx, dy) {
 }
 
 const keys = {};
-const inputState = { lastActiveInputMethod: null, lastTouchAt: 0 };
+const inputState = { lastActiveInputMethod: null, lastTouchAt: 0, touchControlsEnabled: false };
 const gamepadState = { connected: false, name: "", moveX: 0, moveY: 0, aimX: 0, aimY: 0, hasAimInput: false, previousButtons: [] };
 const touchState = {
   moveX: 0,

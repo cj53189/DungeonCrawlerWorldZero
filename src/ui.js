@@ -313,6 +313,7 @@ function closeSettingsPanel() {
 function syncSettingsControls() {
   setUiScale(uiScale, false);
   setUiEditMode(uiEditMode, false);
+  if (typeof updateTouchControlsToggle === "function") updateTouchControlsToggle();
   if (typeof dungeonMusic !== "undefined") dungeonMusic.updateToggleLabel();
 }
 function setupUiLayoutEditor() {
@@ -326,6 +327,9 @@ function setupUiLayoutEditor() {
     document.getElementById("closeSettingsBtn")?.addEventListener("click", closeSettingsPanel);
     document.getElementById("settingsOverlay")?.addEventListener("pointerdown", e => { if (e.target.id === "settingsOverlay") closeSettingsPanel(); });
     document.getElementById("uiEditToggle")?.addEventListener("click", () => setUiEditMode(!uiEditMode));
+    document.getElementById("touchControlsToggle")?.addEventListener("click", () => {
+      if (typeof setTouchControlsEnabled === "function") setTouchControlsEnabled(!inputState.touchControlsEnabled);
+    });
     document.getElementById("uiScaleSlider")?.addEventListener("input", e => setUiScale(e.target.value));
     document.getElementById("resetUiLayoutBtn")?.addEventListener("click", resetUiLayout);
     document.getElementById("settingsDoneBtn")?.addEventListener("click", closeSettingsPanel);

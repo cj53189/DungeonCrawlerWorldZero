@@ -317,7 +317,7 @@
     #btnLight { right: 24px; top: 134px; width: 52px; height: 52px; font-size: 10px; }
 
     #controllerHint {
-      display: none;
+      display: none !important;
       position: absolute;
       left: 50%;
       top: 8px;

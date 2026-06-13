@@ -8,8 +8,32 @@ function isMobileLike() {
   return window.matchMedia("(hover: none) and (pointer: coarse)").matches || window.innerWidth <= 900;
 }
 
+const TOUCH_CONTROLS_STORAGE_KEY = "dcwz.touchControlsEnabled";
+
+function readTouchControlsEnabled() {
+  try { return localStorage.getItem(TOUCH_CONTROLS_STORAGE_KEY) === "true"; } catch { return false; }
+}
+
+function writeTouchControlsEnabled(enabled) {
+  try { localStorage.setItem(TOUCH_CONTROLS_STORAGE_KEY, enabled ? "true" : "false"); } catch {}
+}
+
 function getDefaultInputMethod() {
-  return isMobileLike() ? "touch" : "keyboard";
+  return "keyboard";
+}
+
+function setTouchControlsEnabled(enabled, persist = true) {
+  if (!inputState) return;
+  inputState.touchControlsEnabled = !!enabled;
+  if (persist) writeTouchControlsEnabled(inputState.touchControlsEnabled);
+  if (!inputState.touchControlsEnabled && inputState.lastActiveInputMethod === "touch") {
+    inputState.lastActiveInputMethod = getDefaultInputMethod();
+    resetTransientInputState?.();
+  } else if (inputState.touchControlsEnabled && isMobileLike()) {
+    inputState.lastActiveInputMethod = "touch";
+  }
+  updateTouchControlsToggle?.();
+  updateInputVisibility();
 }
 
 function setLastActiveInputMethod(method) {
@@ -20,7 +44,15 @@ function setLastActiveInputMethod(method) {
 
 function updateInputVisibility() {
   const lastInputMethod = inputState.lastActiveInputMethod || getDefaultInputMethod();
-  document.body.classList.toggle("showTouchControls", lastInputMethod === "touch");
+  const shouldShowTouchControls = lastInputMethod === "touch" && inputState.touchControlsEnabled === true;
+  document.body.classList.toggle("showTouchControls", shouldShowTouchControls);
+}
+
+function updateTouchControlsToggle() {
+  const toggle = document.getElementById("touchControlsToggle");
+  if (!toggle || !inputState) return;
+  toggle.setAttribute("aria-pressed", String(inputState.touchControlsEnabled === true));
+  toggle.textContent = inputState.touchControlsEnabled ? "On" : "Off";
 }
 
 function resetTransientInputState() {
@@ -46,7 +78,7 @@ function setupAdaptiveInputDetection() {
 
   const markTouch = () => {
     inputState.lastTouchAt = performance.now();
-    setLastActiveInputMethod("touch");
+    if (inputState.touchControlsEnabled === true) setLastActiveInputMethod("touch");
   };
 
   const markMouse = () => {
@@ -315,14 +347,16 @@ function initInputControls() {
   setupPanelCloseButtons();
   setupDirectPanelButtonFallbacks();
   setupInventoryButtonFallback();
+  inputState.touchControlsEnabled = readTouchControlsEnabled();
   if (typeof setupUiLayoutEditor === "function") setupUiLayoutEditor();
+  updateTouchControlsToggle();
   updateInputVisibility();
 }
 
 window.addEventListener("gamepadconnected", e => {
   gamepadState.connected = true;
   gamepadState.name = e.gamepad.id || "Controller";
-  updateInputVisibility();
+  setLastActiveInputMethod("gamepad");
   achievement("CONTROLLER CONNECTED", "A mysterious handheld device has joined the crawl. D-pad maneuvers open windows; A/Cross confirms the selected option.", "controllerConnected");
   if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
   updateHUD();
@@ -388,7 +422,7 @@ function pollGamepad() {
 
   if (!gamepadState.connected) {
     gamepadState.connected = true;
-    updateInputVisibility();
+    setLastActiveInputMethod("gamepad");
   }
   gamepadState.name = gp.id || "Controller";
 
