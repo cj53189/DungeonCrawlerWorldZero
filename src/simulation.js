@@ -611,7 +611,7 @@ function updateProjectiles() {
     projectile.remainingRange -= step;
 
     if (projectile.remainingRange <= 0 || isBlocked(projectile.x, projectile.y)) {
-      if (!projectile.hit) {
+      if (!projectile.hit && !projectile.petOwnerId) {
         stats.missedAttacks++;
         if (!achievements.has("airPunch")) achievement("NEW ACHIEVEMENT: Ghost Violence", "You attacked the air. The air has declined to press charges.", "airPunch");
       }
@@ -624,7 +624,8 @@ function updateProjectiles() {
       if (enemy.hp <= 0 || projectile.hitEnemies.has(enemy)) continue;
       if (Math.hypot(projectile.x - enemy.x, projectile.y - enemy.y) <= projectile.radius + enemy.r) {
         projectile.hitEnemies.add(enemy);
-        damageEnemy(enemy, projectile.damage, projectile.weapon);
+        if (projectile.petOwnerId) damageEnemyByPet(enemy, projectile.damage, getActivePet());
+        else damageEnemy(enemy, projectile.damage, projectile.weapon);
         projectile.hit = true;
         hit = true;
         break;
@@ -668,6 +669,7 @@ function updateTutorialSigns() {
 
 function interact() {
   if (gameWon || gameLost || isPlayerDodging()) return;
+  if (typeof petMerchantInReach === "function" && petMerchantInReach()) { showPetMerchantPanel(); return; }
 
   for (const corpse of corpses) {
     if (corpse.looted) continue;

@@ -45,6 +45,7 @@ function updatePrompt() {
     if (t === "D") { text = "Open door"; break; }
     if (t === "C") { text = "Open chest"; break; }
   }
+  if (!text && typeof petMerchantInReach === "function" && petMerchantInReach()) text = "Hire run companion";
   if (!text && player.safe) text = "Safe Room";
   prompt.textContent = text;
   prompt.style.display = text ? "block" : "none";
@@ -390,6 +391,7 @@ function getActiveControllerWindow() {
     "#lootWindow",
     "#inventoryPanel",
     "#progressionPanel",
+    "#petMerchantPanel",
     "#multiplayerPanel",
     "#titleScreen",
     "#safeRoomRecap",
@@ -512,7 +514,8 @@ function captureRunProgress() {
       currentWeaponId: player.currentWeaponId, aimX: player.aimX, aimY: player.aimY,
       inventory: player.inventory.map(item => ({ ...item })),
       equipment: Object.fromEntries(Object.entries(player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null])),
-      progression: player.progression ? JSON.parse(JSON.stringify(player.progression)) : null
+      progression: player.progression ? JSON.parse(JSON.stringify(player.progression)) : null,
+      pet: player.pet ? JSON.parse(JSON.stringify(player.pet)) : null
     },
     stats: { ...stats },
     audienceScore,
@@ -538,7 +541,8 @@ function restoreRunProgress(snapshot) {
   player.aimX = snapshot.player.aimX || 1;
   player.aimY = snapshot.player.aimY || 0;
   player.inventory = snapshot.player.inventory.map(item => ({ ...item }));
-  player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:null, ...Object.fromEntries(Object.entries(snapshot.player.equipment || {}).map(([slot, item]) => [slot, item ? { ...item } : null]))};
+  player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:null,pet:null, ...Object.fromEntries(Object.entries(snapshot.player.equipment || {}).map(([slot, item]) => [slot, item ? { ...item } : null]))};
+  setActivePet(snapshot.player.pet ? JSON.parse(JSON.stringify(snapshot.player.pet)) : (player.equipment.pet || null));
   if (typeof mergeProgression === "function") player.progression = mergeProgression(snapshot.player.progression);
 
   for (const key of Object.keys(stats)) stats[key] = snapshot.stats[key] ?? 0;
@@ -857,6 +861,8 @@ function updateHUD() {
   setText("audience", audienceScore);
   const weapon = getCurrentWeapon();
   setText("weaponName", weapon.name);
+  const pet = typeof getActivePet === "function" ? getActivePet() : null;
+  setText("petName", pet ? `${pet.displayName} Lv ${pet.level} · ${Math.ceil(pet.hp)}/${pet.maxHp} HP` : "None");
   const displayedFloorTimeLeft = multiplayer.enabled && multiplayer.usingServer && currentFloor === 0 && multiplayer.collapseAt
     ? Math.max(0, Math.ceil((multiplayer.collapseAt - Date.now()) / 1000))
     : floorTimeLeft;
@@ -967,4 +973,43 @@ function toggleLighting() {
   lightingEnabled = true;
   updateLightingToggleLabel();
   announcer("Lighting controls are disabled. Equip a torch if you want the crawler lit.");
+}
+
+function petMerchantInReach() {
+  return petMerchant && currentFloor === 1 && Math.hypot(player.x - petMerchant.x, player.y - petMerchant.y) < player.r + petMerchant.r + 36;
+}
+function hidePetMerchantPanel() {
+  const panel = document.getElementById("petMerchantPanel");
+  if (panel) panel.style.display = "none";
+}
+function showPetMerchantPanel() {
+  const panel = document.getElementById("petMerchantPanel");
+  const list = document.getElementById("petMerchantOptions");
+  if (!panel || !list || !petMerchant) return;
+  list.innerHTML = PET_MERCHANT_OPTIONS.map(type => {
+    const def = PET_DEFINITIONS[type], stats = def.baseStats;
+    const disabled = player.coins < def.cost || !!getActivePet();
+    const reason = getActivePet() ? "You already have a companion." : (player.coins < def.cost ? `Need ${def.cost} coins.` : "Hire companion");
+    return `<div class="petOption"><div><strong>${escapeHtml(def.displayName)}</strong><span>${escapeHtml(def.role)} · ${def.cost} coins</span></div><p>${escapeHtml(def.description)}</p><small>HP ${stats.hp} · DMG ${stats.damage} · SPD ${stats.speed.toFixed(2)} · ${escapeHtml(def.primarySkill)}</small><button class="itemBtn primary" type="button" data-pet-type="${escapeHtml(type)}" ${disabled ? "disabled" : ""}>${escapeHtml(reason)}</button></div>`;
+  }).join("");
+  panel.style.display = "block";
+  if (!panel.dataset.bound) {
+    panel.dataset.bound = "true";
+    document.getElementById("closePetMerchantBtn")?.addEventListener("click", hidePetMerchantPanel);
+    panel.addEventListener("click", event => {
+      const button = event.target.closest("button[data-pet-type]");
+      if (button) purchasePet(button.dataset.petType);
+    });
+  }
+}
+function purchasePet(type) {
+  const def = PET_DEFINITIONS[type];
+  if (!def || !petMerchantInReach()) return;
+  if (getActivePet()) { announcer("You already have a companion. The dungeon refuses to process a custody triangle."); showPetMerchantPanel(); return; }
+  if (player.coins < def.cost) { announcer(`Need ${def.cost} coins. The merchant accepts exposure only from enemies.`); showPetMerchantPanel(); return; }
+  player.coins -= def.cost;
+  setActivePet(createPet(type, player.x - 18, player.y + 18));
+  hidePetMerchantPanel();
+  updateInventoryUI(); updateHUD();
+  announcer(`${def.displayName} joins your run. No refunds, no chew-toy warranty, no questions from management.`);
 }

@@ -37,7 +37,8 @@ function resetRunProgress() {
   player.defense = 0;
   player.audienceBonus = 0;
   player.inventory = [];
-  player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
+  player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null,pet:null};
+  if (typeof resetPetState === "function") resetPetState();
   player.coins = 0;
   player.attackCooldown = 0;
   player.pvpFreezeFrames = 0;
@@ -64,6 +65,7 @@ function resetState(options = {}) {
   corpses = [];
   dungeonVisuals = { floor: [], decals: [] };
   tutorialSigns = [];
+  petMerchant = null;
   environmentalLights = [];
   projectiles = [];
   attackTelegraphs = [];
@@ -95,7 +97,8 @@ function resetState(options = {}) {
     player.defense = 0;
     player.audienceBonus = 0;
     player.inventory = [];
-    player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
+    player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null,pet:null};
+  if (typeof resetPetState === "function") resetPetState();
     if (typeof initProgression === "function") initProgression({ reset: true, skipLoad: true });
     }
   player.currentRoomId = null;
@@ -128,6 +131,7 @@ function resetState(options = {}) {
   if (typeof closeProgressionPanel === "function") closeProgressionPanel();
   closeLootWindow();
   hideSafeRoomRecap();
+  if (typeof hidePetMerchantPanel === "function") hidePetMerchantPanel();
 
   generateDungeon();
 

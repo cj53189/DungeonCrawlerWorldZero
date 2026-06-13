@@ -11,6 +11,7 @@ const MEMORY_RADIUS = 12;
 let map, seen, visible, rooms, enemies, corpses, openedChests, achievements, achievementHistory, activePopups, floatingFeedbackTexts;
 let dodgeAfterimages = [], dodgePuffs = [];
 let tutorialSigns = [], seenTutorialSignIds = new Set();
+let petMerchant = null;
 let activeLootCorpseId = null;
 let dungeonVisuals = { floor: [], decals: [] };
 let environmentalLights = [];
@@ -135,7 +136,7 @@ const player = {
   x: TILE * 2.5, y: TILE * 2.5, r: 11, speed: 2.45,
   hp: 100, maxHp: 100, coins: 0,
   level: 1, xp: 0, xpToNext: 40, attackDamage: 20,
-  baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{},
+  baseSpeed:2.45, defense:0, audienceBonus:0, inventory:[], equipment:{}, pet:null,
   attackCooldown: 0, pvpFreezeFrames: 0, currentWeaponId: "fists", aimX: 1, aimY: 0,
   safe: true, wasSafe: true, currentRoomId:null, lastTileX:0, lastTileY:0,
   dodgeCooldown: 0, dodgeFrames: 0, dodgeMaxFrames: 0, dodgeInvulnFrames: 0,

@@ -112,6 +112,7 @@ function generateDungeonLayout() {
 
   const spawnRoom = chooseCrawlerSpawnRoom(startRoom);
   placeCrawlerInRoom(spawnRoom);
+  placePetMerchantInSafeRoom(startRoom);
 
   placeObjects("C", Math.min(10, Math.max(4, Math.floor(rooms.length / 5))), [startRoom, exitRoom, bossRoom, spawnRoom]);
   placeFloor0StarterLoot([startRoom, exitRoom, bossRoom, spawnRoom]);
@@ -124,6 +125,20 @@ function generateDungeonLayout() {
   stats.floorRooms = rooms.length;
 }
 
+function placePetMerchantInSafeRoom(room) {
+  petMerchant = null;
+  if (currentFloor !== 1 || !room) return;
+  const candidates = roomTileList(room, 1)
+    .filter(tile => map[tile.y]?.[tile.x] === "S")
+    .filter(tile => Math.hypot(tile.x + 0.5 - player.x / TILE, tile.y + 0.5 - player.y / TILE) > 1.4)
+    .sort((a, b) => Math.hypot(a.x - room.cx, a.y - room.cy) - Math.hypot(b.x - room.cx, b.y - room.cy));
+  const tile = candidates[0] || { x: room.cx, y: room.cy };
+  petMerchant = {
+    id: "floor1_pet_merchant", type: "pet_merchant",
+    x: tile.x * TILE + TILE / 2, y: tile.y * TILE + TILE / 2, r: 13, floor: 1,
+    options: [...PET_MERCHANT_OPTIONS]
+  };
+}
 
 const FLOOR0_TUTORIAL_SIGN_DEFINITIONS = [
   { id: "floor0_sign_welcome", title: "Welcome Crawler", body: "Find the stairs before collapse." },

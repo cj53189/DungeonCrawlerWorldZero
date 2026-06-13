@@ -1092,6 +1092,7 @@ function draw() {
   }
 
   drawEnvironmentalDecals(camX, camY);
+  drawPetMerchant();
   drawAtmosphericLighting(startX, endX, startY, endY);
   drawEnvironmentalLightFixtures();
   drawEngravedRoomNames(camX, camY);
@@ -1152,6 +1153,7 @@ function draw() {
   }
 
   drawDodgeEffects();
+  drawActivePet();
   drawPlayerSprite();
 
   drawAimIndicator();
@@ -1431,4 +1433,43 @@ function drawMobileMinimap(){
   ctx.arc(centerX, centerY, radius - 0.5, 0, Math.PI * 2);
   ctx.stroke();
   ctx.lineWidth = 1;
+}
+
+function drawPetMerchant() {
+  if (!petMerchant) return;
+  const tx = Math.floor(petMerchant.x / TILE), ty = Math.floor(petMerchant.y / TILE);
+  if (!visible[ty]?.[tx]) return;
+  ctx.save();
+  ctx.fillStyle = "rgba(255,216,107,0.88)";
+  ctx.beginPath(); ctx.arc(petMerchant.x, petMerchant.y, petMerchant.r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(70,35,10,0.9)"; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#2b1808"; ctx.font = "900 12px Arial"; ctx.textAlign = "center"; ctx.fillText("🐾", petMerchant.x, petMerchant.y + 4);
+  ctx.fillStyle = "rgba(255,245,190,0.92)"; ctx.font = "10px Arial"; ctx.fillText("Pet Merchant", petMerchant.x, petMerchant.y - 22);
+  ctx.restore();
+}
+
+function drawActivePet() {
+  const pet = typeof getActivePet === "function" ? getActivePet() : null;
+  if (!pet) return;
+  const tx = Math.floor(pet.x / TILE), ty = Math.floor(pet.y / TILE);
+  if (!visible[ty]?.[tx]) return;
+  ctx.save();
+  ctx.translate(pet.x, pet.y);
+  const def = getPetDefinition(pet);
+  if (pet.type === "fluffy_cat") {
+    ctx.fillStyle = "#f7d7ff"; ctx.beginPath(); ctx.arc(0, 0, pet.r + 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#f0b8fb"; ctx.beginPath(); ctx.moveTo(-7, -6); ctx.lineTo(-3, -16); ctx.lineTo(1, -6); ctx.moveTo(5, -6); ctx.lineTo(9, -16); ctx.lineTo(12, -5); ctx.fill();
+    ctx.fillStyle = "#9ff3ff"; ctx.fillRect(-5, -2, 3, 3); ctx.fillRect(4, -2, 3, 3);
+  } else if (pet.type === "small_velociraptor") {
+    ctx.fillStyle = "#70d46f"; ctx.beginPath(); ctx.ellipse(0, 1, pet.r + 5, pet.r, -0.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#b8ff9a"; ctx.beginPath(); ctx.moveTo(8, -2); ctx.lineTo(18, -7); ctx.lineTo(11, 5); ctx.fill();
+    ctx.strokeStyle = "#3d8b3d"; ctx.beginPath(); ctx.moveTo(-8, 2); ctx.lineTo(-18, 8); ctx.stroke();
+  } else {
+    ctx.fillStyle = "#d8a35d"; ctx.beginPath(); ctx.ellipse(0, 2, pet.r + 5, pet.r, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#8a5a2e"; ctx.beginPath(); ctx.arc(-6, -7, 4, 0, Math.PI * 2); ctx.arc(6, -7, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = "#f0c17b"; ctx.beginPath(); ctx.moveTo(10, 0); ctx.quadraticCurveTo(20, -8, 17, -15); ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = "rgba(255,255,255,0.82)"; ctx.font = "10px Arial"; ctx.textAlign = "center";
+  ctx.fillText(`${def?.displayName || pet.displayName} Lv ${pet.level}`, pet.x, pet.y - 24);
 }

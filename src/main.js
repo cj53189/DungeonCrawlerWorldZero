@@ -5,6 +5,7 @@ function gameLoop() {
   if (!isGameplayUpdatePaused() && !gameWon && !gameLost) {
     updatePlayer();
     updateBossLocks();
+    if (typeof updatePet === "function") updatePet();
     updateEnemies();
     updateProjectiles();
     updateFloorTimer();

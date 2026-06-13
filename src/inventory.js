@@ -1,4 +1,4 @@
-const SLOT_LABELS={weapon:"Weapon",head:"Head",chest:"Body / Armor",offhand:"Offhand / Shield",legs:"Legs",feet:"Feet",accessory:"Trinket",light:"Light"};
+const SLOT_LABELS={weapon:"Weapon",head:"Head",chest:"Body / Armor",offhand:"Offhand / Shield",legs:"Legs",feet:"Feet",accessory:"Trinket",light:"Light",pet:"Pet"};
 const INVENTORY_CATEGORIES={gear:"Gear",items:"Consumables / Items",lootboxes:"Loot Boxes",skills:"Skills"};
 let activeInventoryCategory="gear";
 let selectedInventoryItemId=null;
@@ -119,10 +119,11 @@ function rarityClass(item){return `rarity${(item?.rarity||"Common").replace(/[^a
 function typeClass(item){return `itemType${item?.type==="lootbox"?"LootBox":item?.type==="light"?"Light":item?.type==="weapon"?"Weapon":"Gear"}`;}
 function slotIcon(item){
  if(!item)return "?";
+ if(item.type&&PET_DEFINITIONS[item.type])return "🐾";
  if(item.type==="lootbox")return "⬡";
  if(item.type==="light")return "✦";
  if(item.type==="weapon")return {greatsword:"⚔",hammer:"◉",spear:"↗",bow:"弓"}[item.weaponId]||"⚔";
- return {head:"◠",chest:"▣",legs:"▥",feet:"⌞",accessory:"◇"}[item.slot]||"◆";
+ return {head:"◠",chest:"▣",legs:"▥",feet:"⌞",accessory:"◇",pet:"🐾"}[item.slot]||"◆";
 }
 function inventoryCategoryFor(item){
  if(item.type==="lootbox")return"lootboxes";
@@ -164,7 +165,7 @@ function renderProgressionInventoryView(){
  return `<div class="progressionInventory" role="region" aria-label="Skills and attributes"><div class="progressionSummary"><div><span>Crawler Level</span><strong>${player.level}</strong></div><div><span>Attribute Points</span><strong>${player.progression?.unspentAttributePoints||0}</strong></div><div class="summaryXp"><span>Next Level</span>${renderProgressBar(player.xp,player.xpToNext,"Crawler level progress")}<strong>${player.xp} / ${player.xpToNext}</strong></div></div><div class="progressionColumns"><section class="progressionSection attributesSection"><h4>Attributes</h4><div class="attributeGrid compact">${attrRows}</div></section><section class="progressionSection skillSection"><h4>Skills</h4><div class="skillList compact">${skillRows}</div></section></div><div class="progressionHelp">D-pad / left stick navigates · right stick scrolls · A / Enter selects · B / Escape backs out</div></div>`;
 }
 
-function equipmentSlotKeys(){return ["weapon","head","chest","legs","feet","accessory","light"];}
+function equipmentSlotKeys(){return ["weapon","head","chest","legs","feet","accessory","light","pet"];}
 function renderPaperDollSlot(slot){
  const item=player.equipment?.[slot];
  const selected=selectedEquipmentSlot===slot;
@@ -183,14 +184,15 @@ function selectedEquippedItem(){return selectedEquipmentSlot?player.equipment?.[
 function renderItemDetails(){
  const invItem=selectedInventoryItem(); const eqItem=selectedEquippedItem(); const item=invItem||eqItem;
  if(!item)return `<div class="itemDetails empty"><div class="detailTitle">Select Loot</div><div class="detailMeta">Choose an item slot or equipment slot to inspect stats and actions.</div></div>`;
+ const isPet=!!PET_DEFINITIONS[item.type];
  const isGear=item.type==="gear"||item.type==="light"||item.type==="weapon";
  const actions=[];
  if(invItem&&isGear)actions.push(`<button class="itemBtn primary" type="button" data-action="equip" data-item-id="${escapeHtml(item.id)}">Equip</button>`);
- if(eqItem)actions.push(`<button class="itemBtn" type="button" data-action="unequip" data-slot="${escapeHtml(selectedEquipmentSlot)}">Unequip</button>`);
+ if(eqItem&&!isPet)actions.push(`<button class="itemBtn" type="button" data-action="unequip" data-slot="${escapeHtml(selectedEquipmentSlot)}">Unequip</button>`);
  if(invItem&&item.type==="lootbox")actions.push(`<button class="itemBtn primary" type="button" data-action="open" data-item-id="${escapeHtml(item.id)}">Open</button>`);
  if(invItem&&!isGear&&item.type!=="lootbox")actions.push(`<button class="itemBtn" type="button" data-action="use" data-item-id="${escapeHtml(item.id)}">Use</button>`);
- actions.push(eqItem?`<button class="itemBtn danger" type="button" data-action="drop-equipped" data-slot="${escapeHtml(selectedEquipmentSlot)}">Drop</button>`:`<button class="itemBtn danger" type="button" data-action="drop" data-item-id="${escapeHtml(item.id)}">Drop</button>`);
- return `<div class="itemDetails ${rarityClass(item)}"><div class="detailTitle">${escapeHtml(item.name)}</div><div class="detailMeta">${escapeHtml(item.rarity||"Common")} · ${escapeHtml(isGear?(SLOT_LABELS[item.slot]||item.slot):"Inventory Item")}</div><div class="detailStats">${escapeHtml(itemDescription(item))}</div><div class="detailCompare">${escapeHtml(isGear?gearComparisonText(item):"No equipped comparison")}</div><div class="itemActions">${actions.join("")}</div></div>`;
+ if(!isPet)actions.push(eqItem?`<button class="itemBtn danger" type="button" data-action="drop-equipped" data-slot="${escapeHtml(selectedEquipmentSlot)}">Drop</button>`:`<button class="itemBtn danger" type="button" data-action="drop" data-item-id="${escapeHtml(item.id)}">Drop</button>`);
+ return `<div class="itemDetails ${rarityClass(item)}"><div class="detailTitle">${escapeHtml(item.name)}</div><div class="detailMeta">${escapeHtml(isPet?`Lv ${item.level} Companion`:item.rarity||"Common")} · ${escapeHtml(isGear?(SLOT_LABELS[item.slot]||item.slot):isPet?"Pet Slot":"Inventory Item")}</div><div class="detailStats">${escapeHtml(isPet?`HP ${Math.ceil(item.hp)}/${item.maxHp} · DMG ${item.damage} · XP ${item.xp}/${item.xpToNext}`:itemDescription(item))}</div><div class="detailCompare">${escapeHtml(isGear?gearComparisonText(item):isPet?"Run-scoped companion; resets on death, new run, or refresh.":"No equipped comparison")}</div><div class="itemActions">${actions.join("")}</div></div>`;
 }
 function updateInventoryUI(){
  const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
