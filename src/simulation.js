@@ -184,6 +184,11 @@ function updateBossLocks(){
 }
 
 function updatePlayer() {
+  if (isMajorUiOpen()) {
+    player.attackCooldown = Math.max(0, player.attackCooldown - 1);
+    player.dodgeCooldown = Math.max(0, player.dodgeCooldown - 1);
+    return;
+  }
   const previousTileX = Math.floor(player.x / TILE);
   const previousTileY = Math.floor(player.y / TILE);
   player.lastTileX = previousTileX;

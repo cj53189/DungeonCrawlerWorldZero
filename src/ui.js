@@ -199,9 +199,9 @@ function getOpenScrollablePanel() {
   const recap = document.getElementById("safeRoomRecap");
   const inv = document.getElementById("inventoryPanel");
 
+  if (inv && inv.classList.contains("open")) return document.querySelector("#inventoryPanel .lootGrid") || document.getElementById("inventoryList") || inv;
   if (isVisiblePanel(log)) return log;
   if (isVisiblePanel(recap)) return recap;
-  if (isVisiblePanel(inv)) return inv;
   return null;
 }
 
@@ -226,6 +226,57 @@ function updatePanelScrollFromController() {
   }
 }
 
+const UI_LAYOUT_STORAGE_KEY = "dcw.uiLayout.v1";
+let uiEditMode = false;
+
+function readUiLayout() {
+  try { return JSON.parse(localStorage.getItem(UI_LAYOUT_STORAGE_KEY) || "{}"); } catch { return {}; }
+}
+function writeUiLayout(layout) { localStorage.setItem(UI_LAYOUT_STORAGE_KEY, JSON.stringify(layout)); }
+function applyUiPanelLayout(el, saved) {
+  if (!el || !saved) return;
+  el.style.left = `${saved.left}px`; el.style.top = `${saved.top}px`;
+  el.style.right = "auto"; el.style.bottom = "auto"; el.style.transform = "none";
+  if (saved.width) el.style.width = `${saved.width}px`;
+  if (saved.height) el.style.height = `${saved.height}px`;
+}
+function saveUiPanelLayout(el) {
+  const key = el?.dataset.uiLayoutKey; if (!key) return;
+  const rect = el.getBoundingClientRect();
+  const layout = readUiLayout();
+  layout[key] = { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) };
+  writeUiLayout(layout);
+}
+function setUiEditMode(enabled) {
+  uiEditMode = !!enabled;
+  document.body.classList.toggle("uiEditMode", uiEditMode);
+  const toggle = document.getElementById("uiEditToggle");
+  if (toggle) { toggle.setAttribute("aria-pressed", String(uiEditMode)); toggle.textContent = uiEditMode ? "UI Edit: On" : "UI Edit"; }
+}
+function resetUiLayout() { localStorage.removeItem(UI_LAYOUT_STORAGE_KEY); location.reload(); }
+function setupUiLayoutEditor() {
+  const controls = document.getElementById("devControls");
+  if (controls && controls.dataset.uiEditBound !== "true") {
+    controls.dataset.uiEditBound = "true";
+    document.getElementById("uiEditToggle")?.addEventListener("click", () => setUiEditMode(!uiEditMode));
+    document.getElementById("resetUiLayoutBtn")?.addEventListener("click", resetUiLayout);
+  }
+  const layout = readUiLayout();
+  const panels = [["inventory","inventoryPanel"],["recap","safeRoomRecap"],["log","logPanel"],["hud","hud"],["minimap","minimapEditPanel"]];
+  for (const [key,id] of panels) {
+    const el = document.getElementById(id); if (!el || el.dataset.uiLayoutBound === "true") continue;
+    el.dataset.uiLayoutBound = "true"; el.dataset.uiLayoutKey = key; applyUiPanelLayout(el, layout[key]);
+    const header = el.querySelector("h3") || el.querySelector(".hudTop") || el;
+    header.classList.add("uiDragHandle");
+    const resize = document.createElement("div"); resize.className = "uiResizeHandle"; resize.setAttribute("aria-hidden", "true"); el.appendChild(resize);
+    let drag=null;
+    header.addEventListener("pointerdown", e => { if (!uiEditMode || e.target.closest("button")) return; e.preventDefault(); const r=el.getBoundingClientRect(); drag={type:"move", id:e.pointerId, x:e.clientX, y:e.clientY, left:r.left, top:r.top}; header.setPointerCapture?.(e.pointerId); });
+    resize.addEventListener("pointerdown", e => { if (!uiEditMode) return; e.preventDefault(); e.stopPropagation(); const r=el.getBoundingClientRect(); drag={type:"resize", id:e.pointerId, x:e.clientX, y:e.clientY, w:r.width, h:r.height}; resize.setPointerCapture?.(e.pointerId); });
+    const move = e => { if (!drag || drag.id!==e.pointerId) return; if (drag.type==="move") { el.style.left=`${Math.max(0, Math.min(window.innerWidth-60, drag.left+e.clientX-drag.x))}px`; el.style.top=`${Math.max(0, Math.min(window.innerHeight-40, drag.top+e.clientY-drag.y))}px`; el.style.right="auto"; el.style.bottom="auto"; el.style.transform="none"; } else { el.style.width=`${Math.max(160, drag.w+e.clientX-drag.x)}px`; el.style.height=`${Math.max(120, drag.h+e.clientY-drag.y)}px`; } };
+    const end = e => { if (!drag || drag.id!==e.pointerId) return; saveUiPanelLayout(el); drag=null; };
+    el.addEventListener("pointermove", move); el.addEventListener("pointerup", end); el.addEventListener("pointercancel", end);
+  }
+}
 
 function setupPanelCloseButtons() {
   const closeLog = document.getElementById("closeLogBtn");

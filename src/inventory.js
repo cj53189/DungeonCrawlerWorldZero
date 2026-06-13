@@ -39,10 +39,19 @@ function addItem(item){
  else{stats.gearFound++; achievement("NEW GEAR",`You found ${item.name}. ${itemDescription(item)}`,`gear_${item.id}`);}
  updateInventoryUI(); updateHUD();
 }
+function moveInventorySelectionAfterRemoval(removedIndex, preferredCategory=activeInventoryCategory){
+ const candidates=[...player.inventory].filter(item=>inventoryCategoryFor(item)===preferredCategory).sort((a,b)=>(rarityPower(b.rarity)-rarityPower(a.rarity))||String(a.type).localeCompare(String(b.type))||String(a.slot||"").localeCompare(String(b.slot||""))||String(a.name).localeCompare(String(b.name)));
+ if(!candidates.length){selectedInventoryItemId=null;selectedEquipmentSlot=null;return;}
+ const nextIndex=Math.min(Math.max(removedIndex,0),candidates.length-1);
+ selectedInventoryItemId=candidates[nextIndex]?.id||candidates[candidates.length-1].id;
+ selectedEquipmentSlot=null;
+}
 function equipItem(id){
  const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const item=player.inventory[idx]; if(item.type!=="gear"&&item.type!=="light"&&item.type!=="weapon")return;
+ const category=inventoryCategoryFor(item);
  const old=player.equipment[item.slot]; player.equipment[item.slot]=item; player.inventory.splice(idx,1); if(old)player.inventory.push(old);
  if(item.type==="weapon") player.currentWeaponId=item.weaponId;
+ moveInventorySelectionAfterRemoval(idx, category);
  recalcEquipmentStats(); achievement("EQUIPPED",`You equipped ${item.name}. ${itemDescription(item)}`,`equip_${item.id}`); updateInventoryUI(); updateHUD(); visibilityDirty=true;
 }
 function unequipItem(slot, announce=true){
@@ -55,13 +64,15 @@ function unequipItem(slot, announce=true){
 function openLootBox(id){
  const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const box=player.inventory[idx]; if(box.type!=="lootbox")return;
  if(!player.safe){announcer("Loot boxes may only be opened in safe rooms. The dungeon believes in responsible dopamine distribution.");return;}
+ const category=inventoryCategoryFor(box);
  player.inventory.splice(idx,1); stats.lootBoxesOpened++; const coins=8+Math.floor(Math.random()*16)+rarityPower(box.rarity)*6; player.coins+=coins;
  const gear=generateGear(box.rarity==="Rare"||box.rarity==="Epic"); player.inventory.push(gear); stats.gearFound++;
+ moveInventorySelectionAfterRemoval(idx, category);
  achievement("LOOT BOX OPENED",`You opened ${box.name} and received ${coins} coins and ${gear.name}. Pants-based civilization remains possible.`,`open_${box.id}`);
  if(!achievements.has("firstLootBoxOpen"))achievement("NEW ACHIEVEMENT: Delayed Gratification","You waited until a safe room to open a box. Somewhere, an impulse-control researcher just shed a single tear.","firstLootBoxOpen");
  updateInventoryUI(); updateHUD();
 }
-function discardItem(id){const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const [item]=player.inventory.splice(idx,1); announcer(`You dropped ${item.name}. The dungeon has sold it to someone with lower standards.`); updateInventoryUI(); updateHUD();}
+function discardItem(id){const idx=player.inventory.findIndex(i=>i.id===id); if(idx<0)return; const category=inventoryCategoryFor(player.inventory[idx]); const [item]=player.inventory.splice(idx,1); moveInventorySelectionAfterRemoval(idx, category); announcer(`You dropped ${item.name}. The dungeon has sold it to someone with lower standards.`); updateInventoryUI(); updateHUD();}
 function dropEquippedItem(slot){if(!Object.prototype.hasOwnProperty.call(player.equipment,slot))return; const item=player.equipment[slot]; if(!item)return; player.equipment[slot]=null; if(slot==="weapon")player.currentWeaponId="fists"; recalcEquipmentStats(); announcer(`You dropped ${item.name}. A future archaeologist will misinterpret this as a ritual.`); updateInventoryUI(); updateHUD(); visibilityDirty=true;}
 function recalcEquipmentStats(){
  let hp=0,atk=0,spd=0,def=0,aud=0; for(const item of Object.values(player.equipment)){if(!item||item.type==="light")continue; hp+=item.hp||0; atk+=item.attack||0; spd+=item.speed||0; def+=item.defense||0; aud+=item.audience||0;}
@@ -95,10 +106,10 @@ function setupInventoryActionHandlers(){
   if(button.dataset.action==="drop-equipped"&&button.dataset.slot){dropEquippedItem(button.dataset.slot);selectedEquipmentSlot=null;return;}
   const id=button.dataset.itemId;
   if(!id)return;
-  if(button.dataset.action==="equip"){equipItem(id);selectedInventoryItemId=null;}
+  if(button.dataset.action==="equip"){equipItem(id);}
   if(button.dataset.action==="use"){if(player.safe)openLootBox(id);else announcer("This item cannot be used right now.");}
-  if(button.dataset.action==="open"){openLootBox(id);selectedInventoryItemId=null;}
-  if(button.dataset.action==="drop"){discardItem(id);selectedInventoryItemId=null;}
+  if(button.dataset.action==="open"){openLootBox(id);}
+  if(button.dataset.action==="drop"){discardItem(id);}
  });
 }
 function rarityClass(item){return `rarity${(item?.rarity||"Common").replace(/[^a-z0-9]/gi,"")}`;}
