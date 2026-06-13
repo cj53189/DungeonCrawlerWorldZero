@@ -32,10 +32,16 @@ function getDefaultProgressionState() {
 }
 
 function initProgression(options = {}) {
-  clearSavedProgressionStorage();
-  if (!player.progression || options.reset) return resetRunProgression({ resetVitals: false });
+  if (options.freshRun || options.reset || options.newRun) return resetRunProgression({ resetVitals: options.resetVitals !== false });
+  return preserveActiveRunProgression({ resetVitals: options.resetVitals === true });
+}
+
+function initProgressionForNewRun(options = {}) { return resetRunProgression({ resetVitals: options.resetVitals !== false }); }
+function resetProgression(options = {}) { return resetRunProgression(options); }
+
+function preserveActiveRunProgression(options = {}) {
   player.progression = mergeProgression(player.progression);
-  applyProgressionBonuses({ resetVitals: false });
+  applyProgressionBonuses({ resetVitals: options.resetVitals === true });
   return player.progression;
 }
 
@@ -48,17 +54,22 @@ function mergeProgression(saved, defaults = getDefaultProgressionState()) {
 }
 
 function makeDefaultProgression() { return getDefaultProgressionState(); }
+let savedProgressionStorageCleared = false;
+function saveProgression() { return null; } // Deprecated no-op: progression is run-only and never persisted.
+function loadProgression() { return null; } // Deprecated no-op: progression is run-only and never loaded.
 function clearSavedProgressionStorage() {
+  if (savedProgressionStorageCleared) return;
+  savedProgressionStorageCleared = true;
   try {
-    const legacyProgressionKeys = ["dcw.progression.v1"];
-    const preferenceKeyPattern = /(?:ui|layout|music|volume|muted|controller|controls|settings|scale|edit)/i;
-    const progressionKeyPattern = /(?:progression|playerLevel|playerXp|crawlerLevel|skill(?:Level|Xp|XP)?|attribute|xpToNext)/i;
-    const keysToRemove = new Set(legacyProgressionKeys);
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && progressionKeyPattern.test(key) && !preferenceKeyPattern.test(key)) keysToRemove.add(key);
-    }
-    for (const key of keysToRemove) localStorage.removeItem(key);
+    const oldProgressionKeys = [
+      "dcw.progression.v1",
+      "dcw.playerProgression.v1",
+      "dcw.playerLevel.v1",
+      "dcw.playerXp.v1",
+      "dcw.skillProgression.v1",
+      "dcw.attributeProgression.v1"
+    ];
+    for (const key of oldProgressionKeys) localStorage.removeItem(key);
   } catch {}
 }
 function resetRunProgression(options = {}) {
@@ -66,8 +77,8 @@ function resetRunProgression(options = {}) {
   player.xp = 0;
   player.xpToNext = 40;
   player.progression = getDefaultProgressionState();
-  applyProgressionBonuses({ resetVitals: options.resetVitals !== false });
   clearSavedProgressionStorage();
+  applyProgressionBonuses({ resetVitals: options.resetVitals !== false });
   if (typeof updateInventoryUI === "function") updateInventoryUI();
   if (typeof updateProgressionPanel === "function") {
     const panel = document.getElementById("progressionPanel");
@@ -76,8 +87,6 @@ function resetRunProgression(options = {}) {
   if (typeof updateHUD === "function") updateHUD();
   return player.progression;
 }
-function resetProgression(options = {}) { return resetRunProgression(options); }
-function initProgressionForNewRun() { return resetRunProgression({ resetVitals: false }); }
 function getSkillLevel(skillId) { return player.progression?.skills?.[skillId]?.level || 1; }
 function getAttributeValue(attributeId) { return player.progression?.attributes?.[attributeId]?.value || ATTRIBUTE_DEFINITIONS[attributeId]?.baseValue || 1; }
 function progressionBonusPct(level, perLevel = 0.01) { return Math.max(0, (getSkillLevel(level) - 1) * perLevel); }
@@ -102,7 +111,7 @@ function getWeaponSkillDamageMultiplier(weapon) {
   return 1 + Math.max(0, getSkillLevel(skillId) - 1) * 0.01;
 }
 function awardSkillXp(skillId, amount, reason = "practice") {
-  if (!player.progression) initProgression({ skipLoad: true });
+  if (!player.progression) preserveActiveRunProgression();
   const skill = player.progression.skills?.[skillId];
   if (!skill || amount <= 0) return false;
   skill.xp += Math.max(1, Math.round(amount * getSkillXpMultiplier()));
