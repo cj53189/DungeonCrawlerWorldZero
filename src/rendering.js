@@ -34,7 +34,9 @@ function getEnemySpriteSheet(enemy) {
   if (entry.failed || !entry.image.complete) return null;
   const frameWidth = enemy.frameWidth || 32;
   const frameHeight = enemy.frameHeight || 32;
-  if (entry.image.naturalWidth < frameWidth || entry.image.naturalHeight < frameHeight) return null;
+  const frameCount = Math.max(1, enemy.frameCount || 1);
+  const rowCount = Math.max(1, enemy.rowCount || 1);
+  if (entry.image.naturalWidth < frameWidth * frameCount || entry.image.naturalHeight < frameHeight * rowCount) return null;
   return entry.image;
 }
 
@@ -169,6 +171,15 @@ function drawEnemyFallbackFigure(enemy) {
   });
 }
 
+function enemySpriteRow(enemy) {
+  const rows = enemy?.directionRows;
+  if (!rows) return 0;
+  const facingX = Number(enemy.facingX || 0);
+  const facingY = Number(enemy.facingY || 0);
+  if (Math.abs(facingX) > Math.abs(facingY)) return facingX < 0 ? (rows.left || 0) : (rows.right || 0);
+  return facingY < 0 ? (rows.up || 0) : (rows.down || 0);
+}
+
 function drawEnemySprite(enemy) {
   const sheet = getEnemySpriteSheet(enemy);
   if (!sheet) {
@@ -181,6 +192,7 @@ function drawEnemySprite(enemy) {
   const frameTotal = Math.max(1, enemy.frameCount || 1);
   const speed = Math.max(1, enemy.animationSpeed || 10);
   const frame = enemy.animationState === "idle" ? 0 : Math.floor(frameCount / speed) % frameTotal;
+  const row = Math.max(0, Math.min(Math.max(1, enemy.rowCount || 1) - 1, enemySpriteRow(enemy)));
   const renderWidth = Math.max(28, (enemy.r || 11) * (enemy.boss ? 2.8 : 2.35));
   const renderHeight = Math.max(34, renderWidth * (enemy.boss ? 1.25 : 1.18));
   const dx = enemy.x - renderWidth / 2;
@@ -192,7 +204,7 @@ function drawEnemySprite(enemy) {
   ctx.ellipse(enemy.x, enemy.y + (enemy.r || 11) * 0.72, (enemy.r || 11) * 1.08, Math.max(4, (enemy.r || 11) * 0.42), 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(sheet, frame * frameWidth, 0, frameWidth, frameHeight, dx, dy, renderWidth, renderHeight);
+  ctx.drawImage(sheet, frame * frameWidth, row * frameHeight, frameWidth, frameHeight, dx, dy, renderWidth, renderHeight);
   if (enemy.boss) {
     ctx.strokeStyle = "#ffd86b";
     ctx.lineWidth = 3;

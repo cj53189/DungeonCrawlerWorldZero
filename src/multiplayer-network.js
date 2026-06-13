@@ -801,6 +801,7 @@ function applyFloor0EnemyState(state, { immediate = false } = {}) {
   const distance = Math.hypot(targetX - enemy.x, targetY - enemy.y);
   if (immediate || distance > FLOOR0_ENEMY_SYNC_SNAP_DISTANCE) {
     // Only snap when joining a world state or when a crawler is far enough out of sync that interpolation would look worse.
+    if (typeof updateEnemyFacing === "function") updateEnemyFacing(enemy, targetX - enemy.x, targetY - enemy.y);
     enemy.x = targetX;
     enemy.y = targetY;
     enemy.floor0SyncTarget = null;
@@ -826,13 +827,17 @@ function updateFloor0EnemySyncInterpolation(enemy, now = Date.now()) {
   const target = enemy.floor0SyncTarget;
   const distance = Math.hypot(target.x - enemy.x, target.y - enemy.y);
   if (distance > FLOOR0_ENEMY_SYNC_SNAP_DISTANCE) {
+    if (typeof updateEnemyFacing === "function") updateEnemyFacing(enemy, target.x - enemy.x, target.y - enemy.y);
     enemy.x = target.x;
     enemy.y = target.y;
     enemy.floor0SyncTarget = null;
     return true;
   }
-  enemy.x += (target.x - enemy.x) * FLOOR0_ENEMY_SYNC_INTERPOLATION;
-  enemy.y += (target.y - enemy.y) * FLOOR0_ENEMY_SYNC_INTERPOLATION;
+  const stepX = (target.x - enemy.x) * FLOOR0_ENEMY_SYNC_INTERPOLATION;
+  const stepY = (target.y - enemy.y) * FLOOR0_ENEMY_SYNC_INTERPOLATION;
+  if (typeof updateEnemyFacing === "function") updateEnemyFacing(enemy, stepX, stepY);
+  enemy.x += stepX;
+  enemy.y += stepY;
   if (distance < 0.5) enemy.floor0SyncTarget = null;
   return true;
 }
