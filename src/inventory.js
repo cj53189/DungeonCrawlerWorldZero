@@ -1,5 +1,5 @@
 const SLOT_LABELS={weapon:"Weapon",head:"Head",chest:"Body / Armor",offhand:"Offhand / Shield",legs:"Legs",feet:"Feet",accessory:"Trinket",light:"Light"};
-const INVENTORY_CATEGORIES={gear:"Gear",items:"Consumables / Items",lootboxes:"Loot Boxes"};
+const INVENTORY_CATEGORIES={gear:"Gear",items:"Consumables / Items",lootboxes:"Loot Boxes",skills:"Skills"};
 let activeInventoryCategory="gear";
 let selectedInventoryItemId=null;
 let selectedEquipmentSlot=null;
@@ -145,7 +145,25 @@ function gearComparisonText(item){
  }
  return parts.length?`Compared: ${parts.join(" · ")}`:"Compared: no stat change";
 }
-function renderInventoryTabs(counts){return `<div class="inventoryTabs">${Object.entries(INVENTORY_CATEGORIES).map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}">${escapeHtml(label)} <span>${counts[key]||0}</span></button>`).join("")}<button class="inventoryTab" type="button" data-action="open-progression">Skills</button></div>`;}
+function renderInventoryTabs(counts){return `<div class="inventoryTabs">${Object.entries(INVENTORY_CATEGORIES).map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}">${escapeHtml(label)}${key!=="skills"?` <span>${counts[key]||0}</span>`:""}</button>`).join("")}</div>`;}
+
+function renderProgressBar(value,max,label){
+ const pct=Math.max(0,Math.min(100,(Number(value)||0)/Math.max(1,Number(max)||1)*100));
+ return `<div class="skillProgress" aria-label="${escapeHtml(label)}"><span style="width:${pct.toFixed(1)}%"></span></div>`;
+}
+function renderProgressionInventoryView(){
+ if(typeof initProgression==="function")initProgression({skipLoad:true});
+ const attrs=Object.values(player.progression?.attributes||{});
+ const skills=Object.values(player.progression?.skills||{});
+ const attrRows=attrs.map(attr=>`<button class="attributeRow" type="button" data-progression-row="attribute-${escapeHtml(attr.id||attr.name)}" aria-label="${escapeHtml(attr.name)} ${attr.value}"><div><strong>${escapeHtml(attr.name)}</strong><small>${escapeHtml(attr.effect||attr.description||"")}</small></div><span>${attr.value}</span></button>`).join("");
+ const skillRows=skills.map(skill=>{
+  const attr=skill.linkedAttribute&&player.progression.attributes[skill.linkedAttribute]?.name;
+  const bonus=[skill.category,attr].filter(Boolean).join(" · ");
+  return `<button class="skillRow compact" type="button" data-skill-id="${escapeHtml(skill.id)}"><div class="skillRowText"><strong>${escapeHtml(skill.name)}</strong><span>${escapeHtml(bonus)}</span><small>${escapeHtml(skill.description)}</small></div><div class="skillLevel">Lv ${skill.level}</div>${renderProgressBar(skill.xp,skill.xpToNext,`${skill.name} XP progress`)}<em>${skill.xp} / ${skill.xpToNext}</em></button>`;
+ }).join("");
+ return `<div class="progressionInventory" role="region" aria-label="Skills and attributes"><div class="progressionSummary"><div><span>Crawler Level</span><strong>${player.level}</strong></div><div><span>Attribute Points</span><strong>${player.progression?.unspentAttributePoints||0}</strong></div><div class="summaryXp"><span>Next Level</span>${renderProgressBar(player.xp,player.xpToNext,"Crawler level progress")}<strong>${player.xp} / ${player.xpToNext}</strong></div></div><div class="progressionColumns"><section class="progressionSection attributesSection"><h4>Attributes</h4><div class="attributeGrid compact">${attrRows}</div></section><section class="progressionSection skillSection"><h4>Skills</h4><div class="skillList compact">${skillRows}</div></section></div><div class="progressionHelp">D-pad / left stick navigates · right stick scrolls · A / Enter selects · B / Escape backs out</div></div>`;
+}
+
 function equipmentSlotKeys(){return ["weapon","head","chest","legs","feet","accessory","light"];}
 function renderPaperDollSlot(slot){
  const item=player.equipment?.[slot];
@@ -177,8 +195,15 @@ function renderItemDetails(){
 function updateInventoryUI(){
  const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
  setupInventoryActionHandlers();
- const counts={gear:0,items:0,lootboxes:0}; for(const item of player.inventory)counts[inventoryCategoryFor(item)]++;
+ const counts={gear:0,items:0,lootboxes:0,skills:0}; for(const item of player.inventory)counts[inventoryCategoryFor(item)]++;
  setActiveInventoryCategory(activeInventoryCategory);
+ if(activeInventoryCategory==="skills"){
+  selectedInventoryItemId=null;
+  selectedEquipmentSlot=null;
+  eq.innerHTML=renderCharacterPanel();
+  list.innerHTML=`${renderInventoryTabs(counts)}<div class="inventoryContentTitle">Skills / Attributes</div>${renderProgressionInventoryView()}`;
+  return;
+ }
  let sorted=[...player.inventory].filter(item=>inventoryCategoryFor(item)===activeInventoryCategory).sort((a,b)=>(rarityPower(b.rarity)-rarityPower(a.rarity))||String(a.type).localeCompare(String(b.type))||String(a.slot||"").localeCompare(String(b.slot||""))||String(a.name).localeCompare(String(b.name)));
  if(selectedInventoryItemId&&!sorted.some(i=>i.id===selectedInventoryItemId)){selectedInventoryItemId=null;}
  const slots=[...sorted]; while(slots.length<30)slots.push(null);
@@ -297,5 +322,5 @@ function renderProgressionPanel() {
  panel.innerHTML=`<button id="closeProgressionBtn" class="panelClose" type="button" aria-label="Close skills">×</button><h3>Skills / Attributes</h3><div class="progressionHero"><div><span>Crawler Level</span><strong>${player.level}</strong></div><div><span>Progress XP</span><strong>${player.xp} / ${player.xpToNext}</strong></div><div><span>Attribute Points</span><strong>${player.progression?.unspentAttributePoints||0}</strong></div></div><section class="progressionSection"><h4>Attributes</h4><div class="attributeGrid">${attrRows}</div></section><section class="progressionSection skillSection"><h4>Skills</h4><div class="skillList">${skillRows}</div></section><div class="progressionHelp">D-pad / left stick navigates · right stick scrolls · A / Enter selects · B / Escape backs out</div>`;
  document.getElementById("closeProgressionBtn")?.addEventListener("click",closeProgressionPanel);
 }
-function toggleProgressionPanel(){const p=document.getElementById("progressionPanel"); if(!p)return; if(p.classList.contains("open")){closeProgressionPanel();return;} closeInventoryPanel(); document.getElementById("logPanel").style.display="none"; renderProgressionPanel(); p.classList.add("open"); p.style.display=""; document.body.classList.add("progressionOpen"); if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
+function toggleProgressionPanel(){activeInventoryCategory="skills"; const p=document.getElementById("inventoryPanel"); if(!p?.classList.contains("open"))toggleInventoryPanel(); else updateInventoryUI(); if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
 function closeProgressionPanel(){const p=document.getElementById("progressionPanel"); if(p){p.classList.remove("open");p.style.display="";document.body.classList.remove("progressionOpen"); if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur();}}

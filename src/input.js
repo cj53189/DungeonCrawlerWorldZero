@@ -347,6 +347,13 @@ window.addEventListener("keydown", e => {
     e.preventDefault();
     return;
   }
+  const inventoryOpen = document.body.classList.contains("inventoryOpen");
+  if (inventoryOpen) {
+    if (e.key === "Escape") { e.preventDefault(); closeInventoryPanel(); return; }
+    if (e.key === "Enter" && document.activeElement?.click) return;
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)) e.preventDefault();
+    return;
+  }
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === "e") interact();
   if (e.key.toLowerCase() === "l") toggleLog();
@@ -407,7 +414,11 @@ function pollGamepad() {
   gamepadState.moveY = controllerWindowOpen ? 0 : (Math.abs(axisY) > GAMEPAD_DEADZONE ? axisY : dpadY);
 
   const aimLength = Math.hypot(aimAxisX, aimAxisY);
-  if (aimLength > GAMEPAD_DEADZONE) {
+  if (controllerWindowOpen) {
+    gamepadState.aimX = 0;
+    gamepadState.aimY = 0;
+    gamepadState.hasAimInput = false;
+  } else if (aimLength > GAMEPAD_DEADZONE) {
     gamepadState.aimX = aimAxisX;
     gamepadState.aimY = aimAxisY;
     gamepadState.hasAimInput = true;
