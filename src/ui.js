@@ -199,6 +199,8 @@ function getOpenScrollablePanel() {
   const recap = document.getElementById("safeRoomRecap");
   const inv = document.getElementById("inventoryPanel");
 
+  const prog = document.getElementById("progressionPanel");
+  if (prog && prog.classList.contains("open")) return prog;
   if (inv && inv.classList.contains("open")) return document.querySelector("#inventoryPanel .lootGrid") || document.getElementById("inventoryList") || inv;
   if (isVisiblePanel(log)) return log;
   if (isVisiblePanel(recap)) return recap;
@@ -350,6 +352,7 @@ function setupPanelCloseButtons() {
   const closeLog = document.getElementById("closeLogBtn");
   const closeRecap = document.getElementById("closeRecapBtn");
   const closeInventory = document.getElementById("closeInventoryBtn");
+  const closeProgression = document.getElementById("closeProgressionBtn");
 
   const bind = (el, fn) => {
     if (!el) return;
@@ -366,6 +369,7 @@ function setupPanelCloseButtons() {
   bind(closeLog, closeLogPanel);
   bind(closeRecap, closeRecapPanel);
   bind(closeInventory, closeInventoryPanel);
+  bind(closeProgression, closeProgressionPanel);
 }
 
 
@@ -381,6 +385,7 @@ function getActiveControllerWindow() {
     "#centerMessage",
     "#lootWindow",
     "#inventoryPanel",
+    "#progressionPanel",
     "#multiplayerPanel",
     "#titleScreen",
     "#safeRoomRecap",
@@ -502,7 +507,8 @@ function captureRunProgress() {
       audienceBonus: player.audienceBonus, coins: player.coins,
       currentWeaponId: player.currentWeaponId, aimX: player.aimX, aimY: player.aimY,
       inventory: player.inventory.map(item => ({ ...item })),
-      equipment: Object.fromEntries(Object.entries(player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null]))
+      equipment: Object.fromEntries(Object.entries(player.equipment).map(([slot, item]) => [slot, item ? { ...item } : null])),
+      progression: player.progression ? JSON.parse(JSON.stringify(player.progression)) : null
     },
     stats: { ...stats },
     audienceScore,
@@ -529,6 +535,7 @@ function restoreRunProgress(snapshot) {
   player.aimY = snapshot.player.aimY || 0;
   player.inventory = snapshot.player.inventory.map(item => ({ ...item }));
   player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:null, ...Object.fromEntries(Object.entries(snapshot.player.equipment || {}).map(([slot, item]) => [slot, item ? { ...item } : null]))};
+  if (typeof mergeProgression === "function") player.progression = mergeProgression(snapshot.player.progression);
 
   for (const key of Object.keys(stats)) stats[key] = snapshot.stats[key] ?? 0;
   audienceScore = snapshot.audienceScore;

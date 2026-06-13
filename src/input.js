@@ -352,7 +352,9 @@ window.addEventListener("keydown", e => {
   if (e.key.toLowerCase() === "l") toggleLog();
   if (e.key.toLowerCase() === "r") toggleSafeRoomRecap();
   if (e.key.toLowerCase() === "i") toggleInventoryPanel();
+  if (e.key.toLowerCase() === "c") toggleProgressionPanel();
   if (e.key.toLowerCase() === "k") toggleLighting();
+  if (e.key === "Escape" && typeof closeProgressionPanel === "function") closeProgressionPanel();
   if (e.key === "Escape" && multiplayer.enabled) closeMultiplayerPanel();
   if (e.code === "Space") { e.preventDefault(); triggerDodge(); }
   if (["1", "2", "3", "4", "5"].includes(e.key)) setPlayerWeapon(WEAPON_ORDER[Number(e.key) - 1]);
@@ -432,6 +434,7 @@ function pollGamepad() {
     if (!activeControllerWindow) return false;
     if (activeControllerWindow.id === "settingsOverlay" && typeof closeSettingsPanel === "function") { closeSettingsPanel(); return true; }
     if (activeControllerWindow.id === "inventoryPanel" && typeof closeInventoryPanel === "function") { closeInventoryPanel(); return true; }
+    if (activeControllerWindow.id === "progressionPanel" && typeof closeProgressionPanel === "function") { closeProgressionPanel(); return true; }
     if (activeControllerWindow.id === "logPanel" && typeof closeLogPanel === "function") { closeLogPanel(); return true; }
     if (activeControllerWindow.id === "safeRoomRecap" && typeof closeRecapPanel === "function") { closeRecapPanel(); return true; }
     if (activeControllerWindow.id === "multiplayerPanel" && typeof closeMultiplayerPanel === "function") { closeMultiplayerPanel(); return true; }

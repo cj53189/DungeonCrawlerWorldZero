@@ -139,7 +139,12 @@
     <h3>Inventory</h3>
     <div id="equipmentStats"></div>
     <div id="inventoryList"></div>
-    <div id="inventoryHelp">Loot boxes can only be opened in safe rooms. Equip a light item to illuminate the crawler.</div>
+    <div id="inventoryHelp">Loot boxes can only be opened in safe rooms. Equip a light item to illuminate the crawler. Open Skills to review progression.</div>
+  </div>
+
+  <div id="progressionPanel" role="dialog" aria-modal="true" aria-labelledby="progressionTitle">
+    <button id="closeProgressionBtn" class="panelClose" type="button" aria-label="Close skills">×</button>
+    <h3 id="progressionTitle">Skills / Attributes</h3>
   </div>
 
   <div id="lootWindow">
@@ -195,6 +200,7 @@
 
 <script defer src="./src/state.js"></script>
 <script defer src="./src/input.js"></script>
+<script defer src="./src/progression.js"></script>
 <script defer src="./src/audio.js"></script>
 <script defer src="./src/run-state.js"></script>
 <script defer src="./src/entities.js"></script>
