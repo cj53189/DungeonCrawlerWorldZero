@@ -936,7 +936,7 @@ function winGame() {
 function loseGame() {
   gameLost = true;
   pendingFloorAdvance = false;
-  if (typeof resetProgression === "function") resetProgression({ resetVitals: true });
+  if (typeof resetRunProgression === "function") resetRunProgression({ resetVitals: true });
   showCenter("You Died", "The dungeon would like to thank you for your brief but educational contribution to slapstick violence.", "Start New Run", restartGame);
 }
 function restartGame() {

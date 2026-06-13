@@ -955,7 +955,7 @@ function floorCollapseDeath() {
   if (typeof stopCollapseMusic === "function") stopCollapseMusic();
   else if (typeof syncMusicToGameState === "function") syncMusicToGameState();
   achievement("FLOOR COLLAPSE", "You failed to descend before the floor collapsed. The dungeon thanks you for becoming load-bearing paste.", "collapseDeath");
-  if (typeof resetProgression === "function") resetProgression({ resetVitals: true });
+  if (typeof resetRunProgression === "function") resetRunProgression({ resetVitals: true });
   showCenter("Floor Collapse", "You failed to descend before the floor collapsed. Any crawler remaining on the floor dies. The dungeon has filed your remains under: avoidable.", "Start New Run", restartGame);
 }
 
