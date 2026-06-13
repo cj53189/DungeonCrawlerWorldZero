@@ -389,6 +389,12 @@ function calculateEnemyMovement(enemy, canSeePlayer, bossCanAlwaysTrack, dist) {
   return { dx: Math.cos(enemy.wanderAngle) * patrolSpeed, dy: Math.sin(enemy.wanderAngle) * patrolSpeed };
 }
 
+function updateEnemyFacing(enemy, dx, dy) {
+  if (!enemy?.spriteKey || Math.hypot(dx, dy) < 0.05) return;
+  enemy.facingX = dx;
+  enemy.facingY = dy;
+}
+
 function enemyPlayerKnockbackMultiplier(enemy) {
   if (enemy?.behaviorTag === "rat_bruiser") return 1.32;
   if (enemy?.behaviorTag === "guard_bruiser") return 1.18;
@@ -433,6 +439,7 @@ for (const enemy of enemies) {
       }
       const bossCanAlwaysTrack = enemy.boss && bossAggroed;
       const movement = calculateEnemyMovement(enemy, canSeePlayer, bossCanAlwaysTrack, dist);
+      updateEnemyFacing(enemy, movement.dx, movement.dy);
       moveEntity(enemy, movement.dx, movement.dy);
     }
     if (typeof floor0EnemyRoomId === "function") {
