@@ -76,7 +76,9 @@ function discardItem(id){const idx=player.inventory.findIndex(i=>i.id===id); if(
 function dropEquippedItem(slot){if(!Object.prototype.hasOwnProperty.call(player.equipment,slot))return; const item=player.equipment[slot]; if(!item)return; player.equipment[slot]=null; if(slot==="weapon")player.currentWeaponId="fists"; recalcEquipmentStats(); announcer(`You dropped ${item.name}. A future archaeologist will misinterpret this as a ritual.`); updateInventoryUI(); updateHUD(); visibilityDirty=true;}
 function recalcEquipmentStats(){
  let hp=0,atk=0,spd=0,def=0,aud=0; for(const item of Object.values(player.equipment)){if(!item||item.type==="light")continue; hp+=item.hp||0; atk+=item.attack||0; spd+=item.speed||0; def+=item.defense||0; aud+=item.audience||0;}
- const old=player.maxHp; player.maxHp=100+(player.level-1)*14+hp; player.attackDamage=20+(player.level-1)*4+atk; player.speed=player.baseSpeed+spd; player.defense=def; player.audienceBonus=aud; if(player.maxHp>old)player.hp+=player.maxHp-old; player.hp=Math.min(player.hp,player.maxHp);
+ const progressionHp=typeof getProgressionMaxHpBonus==="function"?getProgressionMaxHpBonus():0;
+ const speedMultiplier=typeof getProgressionSpeedMultiplier==="function"?getProgressionSpeedMultiplier():1;
+ const old=player.maxHp; player.maxHp=100+(player.level-1)*14+hp+progressionHp; player.attackDamage=20+(player.level-1)*4+atk; player.speed=(player.baseSpeed+spd)*speedMultiplier; player.defense=def; player.audienceBonus=aud; if(player.maxHp>old)player.hp+=player.maxHp-old; player.hp=Math.min(player.hp,player.maxHp);
 }
 function lootBoxCount(){return player.inventory.filter(i=>i.type==="lootbox").length;}
 function escapeHtml(value){return String(value).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));}
@@ -102,6 +104,7 @@ function setupInventoryActionHandlers(){
   if(equipmentSlot){selectedEquipmentSlot=equipmentSlot.dataset.selectSlot;selectedInventoryItemId=null;updateInventoryUI();focusSelectedInventoryAction();return;}
   const button=e.target.closest("button[data-action]");
   if(!button)return;
+  if(button.dataset.action==="open-progression"){toggleProgressionPanel();return;}
   if(button.dataset.action==="unequip"&&button.dataset.slot){unequipItem(button.dataset.slot);selectedEquipmentSlot=null;return;}
   if(button.dataset.action==="drop-equipped"&&button.dataset.slot){dropEquippedItem(button.dataset.slot);selectedEquipmentSlot=null;return;}
   const id=button.dataset.itemId;
@@ -142,7 +145,7 @@ function gearComparisonText(item){
  }
  return parts.length?`Compared: ${parts.join(" · ")}`:"Compared: no stat change";
 }
-function renderInventoryTabs(counts){return `<div class="inventoryTabs">${Object.entries(INVENTORY_CATEGORIES).map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}">${escapeHtml(label)} <span>${counts[key]||0}</span></button>`).join("")}</div>`;}
+function renderInventoryTabs(counts){return `<div class="inventoryTabs">${Object.entries(INVENTORY_CATEGORIES).map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}">${escapeHtml(label)} <span>${counts[key]||0}</span></button>`).join("")}<button class="inventoryTab" type="button" data-action="open-progression">Skills</button></div>`;}
 function equipmentSlotKeys(){return ["weapon","head","chest","legs","feet","accessory","light"];}
 function renderPaperDollSlot(slot){
  const item=player.equipment?.[slot];
@@ -210,9 +213,9 @@ function rewardChestLoot(room=null){
  updateInventoryUI(); updateHUD();
 }
 
-function gainXP(amount) {
+function gainXP(amount, options = {}) {
   player.xp += amount;
-  addPlayerFeedbackText(`+${amount} XP`, { color: "#7cf7ff", size: 15, offsetY: -38 });
+  if (!options.silent) addPlayerFeedbackText(`+${amount} XP`, { color: "#7cf7ff", size: 15, offsetY: -38 });
 
   if (!achievements.has("firstXP")) {
     achievement("NEW ACHIEVEMENT: Number Goes Up", "You gained experience. This is how games trick mammals into enjoying chores.", "firstXP");
@@ -224,6 +227,7 @@ function gainXP(amount) {
   }
 
   updateHUD();
+  if (typeof saveProgression === "function") saveProgression();
 }
 
 function levelUpPlayer() {
@@ -234,7 +238,9 @@ function levelUpPlayer() {
 
   changeAudience(6);
   addPlayerFeedbackText(`LEVEL ${player.level}!`, { color: "#b6ff7c", size: 18, life: 72, offsetY: -54 });
-  achievement("LEVEL UP", `You reached level ${player.level}. Your numbers improved, which is technically character development.`, `level${player.level}`);
+  achievement("CRAWLER LEVEL INCREASED", `Crawler Level Increased: ${player.level}`, `level${player.level}`);
+  if (player.progression) player.progression.unspentAttributePoints = (player.progression.unspentAttributePoints || 0) + 1;
+  if (typeof saveProgression === "function") saveProgression();
 }
 
 
@@ -276,3 +282,20 @@ function getReputationComment(rep) {
     "Undeclared Menace": "Your brand remains unclear. Try committing to a bit before you die."
   }[rep] || "Your brand remains unclear. Try committing to a bit before you die.";
 }
+
+function renderProgressionPanel() {
+ const panel=document.getElementById("progressionPanel"); if(!panel)return;
+ if(typeof initProgression==="function")initProgression({skipLoad:true});
+ const attrs=Object.values(player.progression?.attributes||{});
+ const skills=Object.values(player.progression?.skills||{});
+ const skillRows=skills.map(skill=>{
+  const pct=Math.max(0,Math.min(100,(skill.xp/Math.max(1,skill.xpToNext))*100));
+  const attr=skill.linkedAttribute&&player.progression.attributes[skill.linkedAttribute]?.name;
+  return `<button class="skillRow" type="button" data-skill-id="${escapeHtml(skill.id)}"><div><strong>${escapeHtml(skill.name)}</strong><span>${escapeHtml(skill.category)}${attr?` · ${escapeHtml(attr)}`:""}</span><small>${escapeHtml(skill.description)}</small></div><div class="skillLevel">Lv ${skill.level}</div><div class="skillProgress" aria-label="${escapeHtml(skill.name)} progress"><span style="width:${pct.toFixed(1)}%"></span></div><em>${skill.xp} / ${skill.xpToNext}</em></button>`;
+ }).join("");
+ const attrRows=attrs.map(attr=>`<div class="attributeCard"><div><strong>${escapeHtml(attr.name)}</strong><span>${attr.value}</span></div><p>${escapeHtml(attr.description)}</p><small>${escapeHtml(attr.effect)}</small></div>`).join("");
+ panel.innerHTML=`<button id="closeProgressionBtn" class="panelClose" type="button" aria-label="Close skills">×</button><h3>Skills / Attributes</h3><div class="progressionHero"><div><span>Crawler Level</span><strong>${player.level}</strong></div><div><span>Progress XP</span><strong>${player.xp} / ${player.xpToNext}</strong></div><div><span>Attribute Points</span><strong>${player.progression?.unspentAttributePoints||0}</strong></div></div><section class="progressionSection"><h4>Attributes</h4><div class="attributeGrid">${attrRows}</div></section><section class="progressionSection skillSection"><h4>Skills</h4><div class="skillList">${skillRows}</div></section><div class="progressionHelp">D-pad / left stick navigates · right stick scrolls · A / Enter selects · B / Escape backs out</div>`;
+ document.getElementById("closeProgressionBtn")?.addEventListener("click",closeProgressionPanel);
+}
+function toggleProgressionPanel(){const p=document.getElementById("progressionPanel"); if(!p)return; if(p.classList.contains("open")){closeProgressionPanel();return;} closeInventoryPanel(); document.getElementById("logPanel").style.display="none"; renderProgressionPanel(); p.classList.add("open"); p.style.display=""; document.body.classList.add("progressionOpen"); if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
+function closeProgressionPanel(){const p=document.getElementById("progressionPanel"); if(p){p.classList.remove("open");p.style.display="";document.body.classList.remove("progressionOpen"); if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur();}}

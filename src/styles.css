@@ -1376,3 +1376,60 @@ body:has(#settingsOverlay.open) .mpOpenPanelBtn {
   .settingsControlsTips { grid-template-columns: 1fr 1fr; }
   .settingsControlsTips div { font-size: 10px; }
 }
+
+body.progressionOpen #hud,
+body.progressionOpen #touchControls,
+body.progressionOpen #safeRoomRecap,
+body.progressionOpen #logPanel,
+body.progressionOpen #prompt {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+body.progressionOpen { overflow: hidden; }
+#progressionPanel {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  width: 100vw;
+  height: 100dvh;
+  padding: clamp(10px, 1.8vw, 20px);
+  overflow-y: auto;
+  color: #eadfca;
+  background:
+    radial-gradient(circle at 16% 20%, rgba(255,216,107,0.13), transparent 24%),
+    radial-gradient(circle at 82% 72%, rgba(168,84,30,0.18), transparent 34%),
+    linear-gradient(145deg, rgba(15,9,6,0.99), rgba(31,20,13,0.98) 48%, rgba(9,7,6,0.99));
+  box-shadow: inset 0 0 0 2px rgba(168,118,48,0.82), inset 0 0 44px rgba(255,216,107,0.07);
+}
+#progressionPanel.open { display: grid; grid-template-rows: auto auto auto minmax(0,1fr) auto; gap: 10px; }
+#progressionPanel .panelClose { justify-self: end; }
+#progressionPanel h3 { margin: 0; color: #f6d07a; text-transform: uppercase; letter-spacing: .14em; }
+.progressionHero { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.progressionHero div,.attributeCard,.skillRow { border: 1px solid rgba(255,216,107,.22); border-radius: 12px; background: linear-gradient(160deg, rgba(47,31,17,.86), rgba(10,7,5,.82)); box-shadow: inset 0 0 16px rgba(0,0,0,.32); }
+.progressionHero div { padding: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.progressionHero span,.skillRow span,.skillRow em,.attributeCard small { color: #c0ad8d; font-size: 11px; font-style: normal; }
+.progressionHero strong { color: #ffd86b; font-size: clamp(18px, 3vw, 28px); }
+.progressionSection h4 { margin: 0 0 8px; color: #ffd86b; text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
+.attributeGrid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.attributeCard { padding: 9px; }
+.attributeCard div { display:flex; justify-content:space-between; gap:8px; color:#ffd86b; font-weight:900; }
+.attributeCard p { margin: 6px 0; font-size: 12px; color:#eadfca; }
+.skillList { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
+.skillRow { min-height: 82px; padding: 9px; color: inherit; text-align: left; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 5px 10px; cursor:pointer; }
+.skillRow:focus,.skillRow:hover { outline: 2px solid #ffd86b; outline-offset: 1px; }
+.skillRow strong { display:block; color:#f6d07a; }
+.skillRow small { display:block; margin-top:3px; color:#d7c5a9; font-size:10px; }
+.skillLevel { color:#ffd86b; font-weight:900; }
+.skillProgress { grid-column:1 / -1; height:8px; border-radius:999px; overflow:hidden; background:rgba(0,0,0,.48); border:1px solid rgba(255,216,107,.16); }
+.skillProgress span { display:block; height:100%; background:linear-gradient(90deg,#9a5c22,#ffd86b); }
+.progressionHelp { color:#c0ad8d; font-size:11px; text-align:center; }
+@media (max-width: 900px), (max-height: 520px) {
+  #progressionPanel.open { gap: 6px; }
+  .progressionHero { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .attributeGrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .skillList { grid-template-columns: 1fr; }
+  .attributeCard p,.skillRow small { display:none; }
+  .skillRow { min-height: 56px; }
+}

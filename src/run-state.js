@@ -43,6 +43,7 @@ function resetRunProgress() {
   player.pvpFreezeFrames = 0;
   resetPlayerDodgeState();
   player.currentWeaponId = "fists";
+  if (typeof initProgression === "function") initProgression({ reset: true, skipLoad: false });
   player.aimX = 1;
   player.aimY = 0;
   currentFloor = 0;
@@ -95,6 +96,7 @@ function resetState(options = {}) {
     player.audienceBonus = 0;
     player.inventory = [];
     player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:typeof generateTorchItem === "function" ? generateTorchItem() : null};
+    if (typeof initProgression === "function") initProgression({ reset: true, skipLoad: false });
     }
   player.currentRoomId = null;
   player.lastTileX = 0;
@@ -123,6 +125,7 @@ function resetState(options = {}) {
   document.getElementById("centerMessage").style.display = "none";
   document.getElementById("logPanel").style.display = "none";
   const invPanel=document.getElementById("inventoryPanel"); if(invPanel){invPanel.classList.remove("open"); invPanel.style.display="";} document.body.classList.remove("inventoryOpen");
+  if (typeof closeProgressionPanel === "function") closeProgressionPanel();
   closeLootWindow();
   hideSafeRoomRecap();
 

@@ -482,16 +482,22 @@ function angleDifference(a, b) {
 }
 
 function getWeaponDamage(weapon) {
-  return weapon.damage + Math.max(0, player.attackDamage - 20);
+  const base = weapon.damage + Math.max(0, player.attackDamage - 20);
+  const skillMult = typeof getWeaponSkillDamageMultiplier === "function" ? getWeaponSkillDamageMultiplier(weapon) : 1;
+  const meleeMult = typeof getMeleeDamageMultiplier === "function" && weapon.attackShape?.type !== "projectile" ? getMeleeDamageMultiplier() : 1;
+  const critChance = typeof getProgressionCritChance === "function" ? getProgressionCritChance() : 0;
+  const critMult = Math.random() < critChance ? 1.25 : 1;
+  return Math.round(base * skillMult * meleeMult * critMult);
 }
 
-function damageEnemy(enemy, damage) {
+function damageEnemy(enemy, damage, sourceWeapon = null) {
   if (!enemy || enemy.hp <= 0) return false;
   if (enemy.boss) triggerBossAggro("attack");
   const dealt = Math.max(0, Math.min(enemy.hp, damage));
   enemy.hp -= damage;
   addFloatingFeedbackText(`-${Math.round(dealt)}`, enemy.x, enemy.y - enemy.r, { anchor: enemy, color: enemy.boss ? "#ff9df8" : "#ffb86b", size: enemy.boss ? 17 : 15 });
   applyKnockback(enemy, player.x, player.y, (enemy.boss ? 0.45 : 1) * Math.min(18, 4 + dealt * 0.32));
+  if (dealt > 0 && typeof awardWeaponSkillXpForHit === "function") awardWeaponSkillXpForHit(sourceWeapon || getCurrentWeapon(), dealt);
   if (typeof sendFloor0EnemyEvent === "function") sendFloor0EnemyEvent(enemy.hp <= 0 ? "enemy_killed" : "enemy_damaged", enemy);
   if (enemy.hp <= 0) {
     stats.enemiesKilled++;
@@ -565,7 +571,8 @@ function attack() {
       hitEnemies: new Set(),
       hitCrawlers: new Set(),
       pvpEnabled: canCrawlerInitiatePvp(player),
-      hit: false
+      hit: false,
+      weapon
     });
     return;
   }
@@ -577,7 +584,7 @@ function attack() {
     if (shape.type === "circle") inShape = enemyInCircle(enemy, shape.radius);
     if (shape.type === "arc") inShape = enemyInArc(enemy, shape.radius, shape.angle);
     if (shape.type === "line") inShape = enemyInLine(enemy, shape.length, shape.width);
-    if (inShape) hit = damageEnemy(enemy, damage) || hit;
+    if (inShape) hit = damageEnemy(enemy, damage, weapon) || hit;
   }
 
   if (canCrawlerInitiatePvp(player) && multiplayer.remotePlayers?.size) {
@@ -617,7 +624,7 @@ function updateProjectiles() {
       if (enemy.hp <= 0 || projectile.hitEnemies.has(enemy)) continue;
       if (Math.hypot(projectile.x - enemy.x, projectile.y - enemy.y) <= projectile.radius + enemy.r) {
         projectile.hitEnemies.add(enemy);
-        damageEnemy(enemy, projectile.damage);
+        damageEnemy(enemy, projectile.damage, projectile.weapon);
         projectile.hit = true;
         hit = true;
         break;
