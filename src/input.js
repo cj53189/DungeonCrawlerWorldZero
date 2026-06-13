@@ -341,6 +341,12 @@ window.addEventListener("gamepaddisconnected", () => {
 
 window.addEventListener("keydown", e => {
   setLastActiveInputMethod("keyboard");
+  if (typeof isSettingsOpen === "function" && isSettingsOpen()) {
+    if (e.key === "Escape") { e.preventDefault(); closeSettingsPanel(); return; }
+    if (e.key === "Enter" && document.activeElement?.click) return;
+    e.preventDefault();
+    return;
+  }
   keys[e.key.toLowerCase()] = true;
   if (e.key.toLowerCase() === "e") interact();
   if (e.key.toLowerCase() === "l") toggleLog();
@@ -394,7 +400,8 @@ function pollGamepad() {
     gp.buttons.some(button => button.pressed);
   if (hasActiveGamepadInput) setLastActiveInputMethod("gamepad");
 
-  const controllerWindowOpen = typeof hasControllerWindowOpen === "function" && hasControllerWindowOpen();
+  const settingsOpen = typeof isSettingsOpen === "function" && isSettingsOpen();
+  const controllerWindowOpen = settingsOpen || (typeof hasControllerWindowOpen === "function" && hasControllerWindowOpen());
   gamepadState.moveX = controllerWindowOpen ? 0 : (Math.abs(axisX) > GAMEPAD_DEADZONE ? axisX : dpadX);
   gamepadState.moveY = controllerWindowOpen ? 0 : (Math.abs(axisY) > GAMEPAD_DEADZONE ? axisY : dpadY);
 
@@ -423,6 +430,7 @@ function pollGamepad() {
   const activeControllerWindow = uiWindowOpen && typeof getActiveControllerWindow === "function" ? getActiveControllerWindow() : null;
   const closeActiveControllerWindowWithButton = () => {
     if (!activeControllerWindow) return false;
+    if (activeControllerWindow.id === "settingsOverlay" && typeof closeSettingsPanel === "function") { closeSettingsPanel(); return true; }
     if (activeControllerWindow.id === "inventoryPanel" && typeof closeInventoryPanel === "function") { closeInventoryPanel(); return true; }
     if (activeControllerWindow.id === "logPanel" && typeof closeLogPanel === "function") { closeLogPanel(); return true; }
     if (activeControllerWindow.id === "safeRoomRecap" && typeof closeRecapPanel === "function") { closeRecapPanel(); return true; }
@@ -432,7 +440,8 @@ function pollGamepad() {
   };
 
   if (uiWindowOpen) {
-    if ((justPressed(11) && activeControllerWindow?.id === "inventoryPanel") ||
+    if ((justPressed(1) && activeControllerWindow?.id === "settingsOverlay") ||
+        (justPressed(11) && activeControllerWindow?.id === "inventoryPanel") ||
         (justPressed(8) && activeControllerWindow?.id === "logPanel") ||
         (justPressed(3) && activeControllerWindow?.id === "safeRoomRecap")) {
       closeActiveControllerWindowWithButton();
