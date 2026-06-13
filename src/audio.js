@@ -234,6 +234,20 @@ function createDungeonMusicManager() {
     }
   }
 
+  function stopState(state) {
+    const info = tracks.get(state);
+    if (!info) return;
+    if (currentAudio === info.audio) {
+      stopFade();
+      currentAudio = null;
+      currentState = null;
+    }
+    info.audio.volume = 0;
+    info.audio.pause();
+    info.audio.currentTime = 0;
+    if (desiredState === state) desiredState = getStateForGameState() || MUSIC_STATES.EXPLORATION;
+  }
+
   function setState(state, options = {}) {
     if (!MUSIC_TRACKS[state]) return false;
     desiredState = state;
@@ -306,6 +320,7 @@ function createDungeonMusicManager() {
     preloadAll: preloadAllTracks,
     play: startState,
     pause,
+    stopState,
     resume: startState,
     setState,
     setVolume: setAudioVolume,
@@ -347,6 +362,15 @@ function setupMusicControls() {
 }
 
 function syncMusicToGameState() {
+  dungeonMusic.syncToGameState();
+}
+
+function stopMusicState(state) {
+  dungeonMusic.stopState(state);
+}
+
+function stopCollapseMusic() {
+  dungeonMusic.stopState(MUSIC_STATES.COLLAPSE);
   dungeonMusic.syncToGameState();
 }
 

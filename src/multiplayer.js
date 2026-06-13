@@ -290,6 +290,7 @@ function returnToTitle() {
   if (typeof requestServerLeaveLobby === "function") requestServerLeaveLobby();
   resetMultiplayerState();
   setGameMode(GAME_MODES.TITLE);
+  if (typeof stopCollapseMusic === "function") stopCollapseMusic();
   hideMultiplayerPanel();
   document.getElementById("centerMessage").style.display = "none";
   showTitleScreen();

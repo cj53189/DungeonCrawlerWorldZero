@@ -1029,7 +1029,48 @@ body.inventoryOpen #game { pointer-events: none; }
 .itemBtn.danger { border-color:rgba(255,105,105,.38); color:#ffd2d2; }
 
 @media (max-width: 900px), (hover:none) and (pointer:coarse) {
+  body.inventoryOpen #hud,
+  body.inventoryOpen #touchControls,
+  body.inventoryOpen #prompt,
+  body.inventoryOpen #musicToggleBtn {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+  body.inventoryOpen #game { pointer-events: auto; }
   #inventoryPanel {
+    inset: auto auto max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    right: auto;
+    top: auto;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    left: max(8px, env(safe-area-inset-left));
+    width: min(560px, 72vw);
+    max-width: calc(100vw - 16px - env(safe-area-inset-left));
+    height: min(520px, 72dvh);
+    max-height: calc(100dvh - 16px - env(safe-area-inset-bottom));
+    grid-template-columns: minmax(150px, 34%) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    border-radius: 14px;
+    border-width: 1px;
+    padding: 7px;
+    gap: 7px;
+    overflow: hidden;
+  }
+}
+
+@media (max-width: 900px) and (orientation: portrait) {
+  #inventoryPanel {
+    width: min(360px, 92vw);
+    height: min(520px, 66dvh);
+    overflow-y: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+}
+
+
+@media (max-width: 900px), (hover:none) and (pointer:coarse) {
+  body.inventoryFullscreen #inventoryPanel {
     inset: 0;
     left: 0;
     right: auto;
@@ -1075,7 +1116,7 @@ body.inventoryOpen #game { pointer-events: none; }
 }
 
 @media (max-width: 900px) and (orientation: portrait) {
-  #inventoryPanel { overflow-y:auto; grid-template-columns:1fr; grid-template-rows:auto auto auto auto; }
+  body.inventoryFullscreen #inventoryPanel { overflow-y:auto; grid-template-columns:1fr; grid-template-rows:auto auto auto auto; }
   #equipmentStats { border-right:none; border-bottom:1px solid rgba(255,216,107,.18); padding-bottom:8px; }
   .paperDoll { min-height: 260px; }
   #inventoryList { overflow:visible; }
