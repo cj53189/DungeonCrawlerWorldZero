@@ -78,6 +78,7 @@ function resetState(options = {}) {
 
   gameWon = false; gameLost = false; frameCount = 0;
   resetFloorTimerForCurrentFloor();
+  if (typeof stopMusicState === "function") stopMusicState(MUSIC_STATES.COLLAPSE);
   lastObservationFrame = 0;
   audienceScore = 10; currentReputation = "Undeclared Menace"; roomsSeen = 0;
 

@@ -419,8 +419,25 @@ function pollGamepad() {
   const dpadDownPressed = justPressed(13);
   const uiConfirmPressed = justPressed(0) || justPressed(2); // A / Cross, or X / Square while a window is active
   const uiWindowOpen = typeof hasControllerWindowOpen === "function" && hasControllerWindowOpen();
+  const activeControllerWindow = uiWindowOpen && typeof getActiveControllerWindow === "function" ? getActiveControllerWindow() : null;
+  const closeActiveControllerWindowWithButton = () => {
+    if (!activeControllerWindow) return false;
+    if (activeControllerWindow.id === "inventoryPanel" && typeof closeInventoryPanel === "function") { closeInventoryPanel(); return true; }
+    if (activeControllerWindow.id === "logPanel" && typeof closeLogPanel === "function") { closeLogPanel(); return true; }
+    if (activeControllerWindow.id === "safeRoomRecap" && typeof closeRecapPanel === "function") { closeRecapPanel(); return true; }
+    if (activeControllerWindow.id === "multiplayerPanel" && typeof closeMultiplayerPanel === "function") { closeMultiplayerPanel(); return true; }
+    if (activeControllerWindow.id === "lootWindow" && typeof closeLootWindow === "function") { closeLootWindow(); return true; }
+    return false;
+  };
 
   if (uiWindowOpen) {
+    if ((justPressed(11) && activeControllerWindow?.id === "inventoryPanel") ||
+        (justPressed(8) && activeControllerWindow?.id === "logPanel") ||
+        (justPressed(3) && activeControllerWindow?.id === "safeRoomRecap")) {
+      closeActiveControllerWindowWithButton();
+      gamepadState.previousButtons = gp.buttons.map(button => button.pressed);
+      return;
+    }
     if (dpadLeftPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(-1, 0);
     if (dpadRightPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(1, 0);
     if (dpadUpPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(0, -1);

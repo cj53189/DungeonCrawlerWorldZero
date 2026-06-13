@@ -69,6 +69,15 @@ function recalcEquipmentStats(){
 }
 function lootBoxCount(){return player.inventory.filter(i=>i.type==="lootbox").length;}
 function escapeHtml(value){return String(value).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));}
+function shouldMoveInventoryFocusToActions() {
+ return typeof gamepadState !== "undefined" && gamepadState.connected && inputState?.lastActiveInputMethod === "gamepad";
+}
+function focusSelectedInventoryAction() {
+ const panel=document.getElementById("inventoryPanel");
+ if(!panel||!shouldMoveInventoryFocusToActions())return;
+ const action=panel.querySelector(".itemDetails .itemActions button");
+ if(action&&typeof focusControllerWindowButton==="function")focusControllerWindowButton(action);
+}
 function setupInventoryActionHandlers(){
  const panel=document.getElementById("inventoryPanel");
  if(!panel||panel.dataset.actionsBound==="true")return;
@@ -77,9 +86,9 @@ function setupInventoryActionHandlers(){
   const tab=e.target.closest("button[data-inventory-category]");
   if(tab){setActiveInventoryCategory(tab.dataset.inventoryCategory);selectedInventoryItemId=null;selectedEquipmentSlot=null;updateInventoryUI();return;}
   const inventorySlot=e.target.closest("button[data-select-item-id]");
-  if(inventorySlot){selectedInventoryItemId=inventorySlot.dataset.selectItemId;selectedEquipmentSlot=null;updateInventoryUI();return;}
+  if(inventorySlot){selectedInventoryItemId=inventorySlot.dataset.selectItemId;selectedEquipmentSlot=null;updateInventoryUI();focusSelectedInventoryAction();return;}
   const equipmentSlot=e.target.closest("button[data-select-slot]");
-  if(equipmentSlot){selectedEquipmentSlot=equipmentSlot.dataset.selectSlot;selectedInventoryItemId=null;updateInventoryUI();return;}
+  if(equipmentSlot){selectedEquipmentSlot=equipmentSlot.dataset.selectSlot;selectedInventoryItemId=null;updateInventoryUI();focusSelectedInventoryAction();return;}
   const button=e.target.closest("button[data-action]");
   if(!button)return;
   if(button.dataset.action==="unequip"&&button.dataset.slot){unequipItem(button.dataset.slot);selectedEquipmentSlot=null;return;}

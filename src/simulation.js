@@ -940,12 +940,15 @@ function floorCollapseDeath() {
   if (gameWon || gameLost) return;
   pendingFloorAdvance = false;
   gameLost = true;
+  if (typeof stopCollapseMusic === "function") stopCollapseMusic();
+  else if (typeof syncMusicToGameState === "function") syncMusicToGameState();
   achievement("FLOOR COLLAPSE", "You failed to descend before the floor collapsed. The dungeon thanks you for becoming load-bearing paste.", "collapseDeath");
   showCenter("Floor Collapse", "You failed to descend before the floor collapsed. Any crawler remaining on the floor dies. The dungeon has filed your remains under: avoidable.", "Start New Run", restartGame);
 }
 
 function startCollapse() {
   collapseStarted = true;
+  if (typeof stopCollapseMusic === "function") stopCollapseMusic();
   changeAudience(5);
   achievement("FLOOR COLLAPSE STARTED", "The dungeon has begun aggressively uninstalling this floor. Enemies are faster. The exit is now less of a suggestion.", "collapseStarted");
   for (const enemy of enemies) if (enemy.hp > 0) enemy.speed *= 1.65;
