@@ -121,7 +121,7 @@ function resetState(options = {}) {
   document.getElementById("announcer").innerHTML = "";
   document.getElementById("centerMessage").style.display = "none";
   document.getElementById("logPanel").style.display = "none";
-  const invPanel=document.getElementById("inventoryPanel"); if(invPanel){invPanel.classList.remove("open"); invPanel.style.display="";}
+  const invPanel=document.getElementById("inventoryPanel"); if(invPanel){invPanel.classList.remove("open"); invPanel.style.display="";} document.body.classList.remove("inventoryOpen");
   closeLootWindow();
   hideSafeRoomRecap();
 
