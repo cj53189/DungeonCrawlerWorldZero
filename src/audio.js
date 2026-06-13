@@ -22,6 +22,7 @@ const MUSIC_TRACK_TARGET_VOLUMES = Object.freeze({
 });
 
 const MUSIC_MUTED_STORAGE_KEY = "dcw.musicMuted";
+const MUSIC_VOLUME_STORAGE_KEY = "dcw.musicVolume";
 const DEFAULT_MUSIC_VOLUME = 0.35;
 const MUSIC_CROSSFADE_MS = 1200;
 const MUSIC_PLAY_RETRY_MS = 1000;
@@ -55,13 +56,31 @@ function saveMusicMuted(muted) {
   }
 }
 
+function readSavedMusicVolume() {
+  try {
+    const saved = localStorage.getItem(MUSIC_VOLUME_STORAGE_KEY);
+    if (saved === null) return DEFAULT_MUSIC_VOLUME;
+    return clampMusicVolume(saved);
+  } catch (error) {
+    return DEFAULT_MUSIC_VOLUME;
+  }
+}
+
+function saveMusicVolume(volume) {
+  try {
+    localStorage.setItem(MUSIC_VOLUME_STORAGE_KEY, String(clampMusicVolume(volume)));
+  } catch (error) {
+    // Storage can be unavailable in private or embedded browser contexts.
+  }
+}
+
 function createDungeonMusicManager() {
   const tracks = new Map();
   let currentState = null;
   let currentAudio = null;
   let desiredState = MUSIC_STATES.TITLE;
   let muted = readSavedMusicMuted();
-  let volume = DEFAULT_MUSIC_VOLUME;
+  let volume = readSavedMusicVolume();
   let userInteracted = false;
   let wantsPlayback = false;
   let fadeAnimationFrame = null;
@@ -112,13 +131,20 @@ function createDungeonMusicManager() {
 
   function setButtonLabel() {
     const button = document.getElementById("musicToggleBtn");
-    if (!button) return;
-    button.textContent = muted ? "Off" : "On";
-    button.setAttribute("aria-pressed", muted ? "false" : "true");
+    if (button) {
+      button.textContent = muted ? "Off" : "On";
+      button.setAttribute("aria-pressed", muted ? "false" : "true");
+    }
+    const slider = document.getElementById("musicVolumeSlider");
+    const label = document.getElementById("musicVolumeValue");
+    if (slider) slider.value = String(Math.round(volume * 100));
+    if (label) label.textContent = `${Math.round(volume * 100)}%`;
   }
 
-  function setAudioVolume(nextVolume = volume) {
+  function setAudioVolume(nextVolume = volume, persist = true) {
     volume = clampMusicVolume(nextVolume);
+    if (persist) saveMusicVolume(volume);
+    setButtonLabel();
     if (currentAudio && currentState) currentAudio.volume = muted ? 0 : getTrackTargetVolume(currentState);
   }
 
@@ -331,6 +357,7 @@ function createDungeonMusicManager() {
     updateToggleLabel: setButtonLabel,
     isMuted: () => muted,
     getCurrentState: () => currentState,
+    getVolume: () => volume,
     states: MUSIC_STATES
   };
 }
@@ -346,6 +373,15 @@ function setupMusicControls() {
       event.stopPropagation();
       dungeonMusic.markUserInteraction();
       dungeonMusic.toggleMuted();
+      dungeonMusic.syncToGameState();
+    });
+  }
+
+  const slider = document.getElementById("musicVolumeSlider");
+  if (slider) {
+    slider.addEventListener("input", event => {
+      dungeonMusic.markUserInteraction();
+      dungeonMusic.setVolume(Number(event.target.value) / 100);
       dungeonMusic.syncToGameState();
     });
   }

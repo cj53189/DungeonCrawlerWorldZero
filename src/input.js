@@ -241,7 +241,7 @@ function setupTouchControls() {
   bindButton(btnDodge, triggerDodge);
   bindButton(btnLog, toggleLogPanelMobile);
   bindButton(btnRecap, toggleRecapPanelMobile);
-  bindButton(btnNew, restartGame);
+  bindButton(btnNew, () => { if (typeof openSettingsPanel === "function") openSettingsPanel(); });
   bindButton(btnInv, toggleInventoryPanel);
   bindButton(btnWeapon, () => cyclePlayerWeapon(1));
   bindButton(btnLight, toggleLighting);
@@ -351,7 +351,6 @@ window.addEventListener("keydown", e => {
   if (e.key.toLowerCase() === "e") interact();
   if (e.key.toLowerCase() === "l") toggleLog();
   if (e.key.toLowerCase() === "r") toggleSafeRoomRecap();
-  if (e.key.toLowerCase() === "n" && gameMode !== GAME_MODES.TITLE) restartGame();
   if (e.key.toLowerCase() === "i") toggleInventoryPanel();
   if (e.key.toLowerCase() === "k") toggleLighting();
   if (e.key === "Escape" && multiplayer.enabled) closeMultiplayerPanel();
@@ -426,6 +425,7 @@ function pollGamepad() {
   const dpadUpPressed = justPressed(12);
   const dpadDownPressed = justPressed(13);
   const uiConfirmPressed = justPressed(0) || justPressed(2); // A / Cross, or X / Square while a window is active
+  const rightStickScroll = Math.abs(aimAxisY) > GAMEPAD_DEADZONE ? aimAxisY : 0;
   const uiWindowOpen = typeof hasControllerWindowOpen === "function" && hasControllerWindowOpen();
   const activeControllerWindow = uiWindowOpen && typeof getActiveControllerWindow === "function" ? getActiveControllerWindow() : null;
   const closeActiveControllerWindowWithButton = () => {
@@ -448,6 +448,16 @@ function pollGamepad() {
       gamepadState.previousButtons = gp.buttons.map(button => button.pressed);
       return;
     }
+    if (settingsOpen && rightStickScroll && typeof scrollSettingsPanel === "function") scrollSettingsPanel(rightStickScroll * 18);
+    if (settingsOpen && document.activeElement?.type === "range" && (dpadLeftPressed || dpadRightPressed)) {
+      const slider = document.activeElement;
+      const step = Number(slider.step) || 1;
+      const nextValue = Number(slider.value) + (dpadRightPressed ? step : -step);
+      slider.value = String(Math.max(Number(slider.min), Math.min(Number(slider.max), nextValue)));
+      slider.dispatchEvent(new Event("input", { bubbles: true }));
+      gamepadState.previousButtons = gp.buttons.map(button => button.pressed);
+      return;
+    }
     if (dpadLeftPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(-1, 0);
     if (dpadRightPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(1, 0);
     if (dpadUpPressed && typeof moveControllerWindowFocus === "function") moveControllerWindowFocus(0, -1);
@@ -462,7 +472,7 @@ function pollGamepad() {
     if (justPressed(11)) toggleInventoryPanel();       // Right stick
     if (justPressed(4)) cyclePlayerWeapon(-1);         // LB/L1
     if (justPressed(6)) cyclePlayerWeapon(1);          // LT/L2
-    if (justPressed(9) && gameMode !== GAME_MODES.TITLE) restartGame();                 // Menu/Start
+    if (justPressed(9) && typeof openSettingsPanel === "function") openSettingsPanel(); // Menu/Start (former new-map shortcut)
     if (justPressed(10)) toggleLighting();              // Left stick
   }
 
