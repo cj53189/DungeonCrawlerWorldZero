@@ -133,6 +133,12 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.CRAWLER_STATE:
           rooms.updateCrawlerState(playerId, message.state || message);
           break;
+        case CLIENT_MESSAGES.PARTY_INVITE:
+          rooms.requestPartyInvite(playerId, message.targetPlayerId);
+          break;
+        case CLIENT_MESSAGES.PARTY_RESPONSE:
+          rooms.respondPartyInvite(playerId, message.fromPlayerId, !!message.accepted);
+          break;
         case CLIENT_MESSAGES.FLOOR0_STAIRS_REACHED:
           rooms.markCrawlerAtFloor0Stairs(playerId);
           break;
