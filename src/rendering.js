@@ -76,6 +76,37 @@ function visibleWorldYBounds(camOffsetY) {
   };
 }
 
+
+const FLOOR_ATLAS_PATH = "./floor_atlas_16x16.png";
+const FLOOR_ATLAS_TILE_SIZE = 16;
+const FLOOR_ATLAS_IMAGE = new Image();
+FLOOR_ATLAS_IMAGE.src = FLOOR_ATLAS_PATH;
+
+function isFloorAtlasReady() {
+  return FLOOR_ATLAS_IMAGE.complete && FLOOR_ATLAS_IMAGE.naturalWidth >= 256 && FLOOR_ATLAS_IMAGE.naturalHeight >= 256;
+}
+
+function drawFloorAtlasTile(detail, px, py, isVisible) {
+  if (!detail || !Number.isFinite(detail.atlasRow) || !Number.isFinite(detail.atlasCol) || !isFloorAtlasReady()) return false;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = isVisible ? 1 : 0.48;
+  ctx.drawImage(
+    FLOOR_ATLAS_IMAGE,
+    detail.atlasCol * FLOOR_ATLAS_TILE_SIZE,
+    detail.atlasRow * FLOOR_ATLAS_TILE_SIZE,
+    FLOOR_ATLAS_TILE_SIZE,
+    FLOOR_ATLAS_TILE_SIZE,
+    px,
+    py,
+    TILE,
+    TILE
+  );
+  ctx.restore();
+  return true;
+}
+
 function drawDungeonTileBase(px, py, color, strokeColor = null) {
   ctx.fillStyle = color;
   ctx.fillRect(px, py, TILE, TILE);
@@ -1223,14 +1254,15 @@ function draw() {
 
       if (t === "#") {
         drawRaisedWallTile(px, py, isVisible);
-      } else if (t === "S") {
-        drawDungeonTileBase(px, py, isVisible ? "#203522" : "#172418");
       } else {
-        drawDungeonTileBase(px, py, collapseStarted ? (isVisible ? "#2b1c1c" : "#1d1515") : (isVisible ? "#202020" : "#161616"));
+        const floorVisual = dungeonVisuals?.floor?.[y]?.[x];
+        const fallbackColor = t === "S"
+          ? (isVisible ? "#203522" : "#172418")
+          : (collapseStarted ? (isVisible ? "#2b1c1c" : "#1d1515") : (isVisible ? "#202020" : "#161616"));
+        if (!drawFloorAtlasTile(floorVisual, px, py, isVisible)) drawDungeonTileBase(px, py, fallbackColor);
+        drawWallFloorShadow(x, y, px, py, isVisible);
+        drawFloorDetail(floorVisual, px, py, isVisible);
       }
-
-      drawWallFloorShadow(x, y, px, py, isVisible);
-      drawFloorDetail(dungeonVisuals?.floor?.[y]?.[x], px, py, isVisible);
 
       if (t === "D") {
         ctx.fillStyle = isVisible ? "#7b4a22" : "#3f2a18";

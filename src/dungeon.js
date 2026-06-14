@@ -1308,9 +1308,158 @@ function getFarthestRoom(fromRoom, excludedRooms = []) {
 }
 
 
+
+// Floor atlas row legend for floor_atlas_16x16.png (256x256, 16x16 tiles, 16 columns):
+// Rows 0-2 are default stone, 3-4 cracked/damaged, 5-6 dirty, 7-8 mossy/damp,
+// row 9 safe room, row 10 boss room, row 11 treasure room, row 12 crypt, row 13 sewer/wet,
+// and rows 14-15 are rare detail variants such as rubble, scratches, stains, bones, grates, and puddles.
+const FLOOR_ATLAS_ROWS = {
+  DEFAULT_STONE_A: 0,
+  DEFAULT_STONE_B: 1,
+  DEFAULT_STONE_C: 2,
+
+  CRACKED_DAMAGED_A: 3,
+  CRACKED_DAMAGED_B: 4,
+
+  DIRTY_FLOOR_A: 5,
+  DIRTY_FLOOR_B: 6,
+
+  MOSSY_DAMP_A: 7,
+  MOSSY_DAMP_B: 8,
+
+  SAFE_ROOM: 9,
+  BOSS_ROOM: 10,
+  TREASURE_ROOM: 11,
+  CRYPT: 12,
+  SEWER_WET: 13,
+
+  DETAIL_VARIANTS_A: 14,
+  DETAIL_VARIANTS_B: 15,
+};
+
+// Floor type configuration keeps the atlas subtle: most cells pick baseRows, some pick
+// thematic accentRows, and rows 14-15 only appear through low detailChance values.
+const FLOOR_TYPES = {
+  normal: {
+    baseRows: [0, 1, 2],
+    accentRows: [3, 4, 5, 6],
+    detailRows: [14, 15],
+    detailChance: 0.03,
+    accentChance: 0.12,
+  },
+
+  damaged: {
+    baseRows: [3, 4],
+    accentRows: [5, 6],
+    detailRows: [14, 15],
+    detailChance: 0.06,
+    accentChance: 0.18,
+  },
+
+  dirty: {
+    baseRows: [5, 6],
+    accentRows: [2, 3, 4],
+    detailRows: [14, 15],
+    detailChance: 0.05,
+    accentChance: 0.16,
+  },
+
+  mossy: {
+    baseRows: [7, 8],
+    accentRows: [3, 5, 6],
+    detailRows: [14, 15],
+    detailChance: 0.05,
+    accentChance: 0.14,
+  },
+
+  safe: {
+    baseRows: [9],
+    accentRows: [0, 1],
+    detailRows: [],
+    detailChance: 0,
+    accentChance: 0.04,
+  },
+
+  boss: {
+    baseRows: [10],
+    accentRows: [3, 4, 5],
+    detailRows: [14, 15],
+    detailChance: 0.08,
+    accentChance: 0.18,
+  },
+
+  treasure: {
+    baseRows: [11],
+    accentRows: [9],
+    detailRows: [],
+    detailChance: 0,
+    accentChance: 0.05,
+  },
+
+  crypt: {
+    baseRows: [12],
+    accentRows: [3, 4, 5],
+    detailRows: [14, 15],
+    detailChance: 0.05,
+    accentChance: 0.14,
+  },
+
+  sewer: {
+    baseRows: [13],
+    accentRows: [7, 8],
+    detailRows: [14, 15],
+    detailChance: 0.08,
+    accentChance: 0.18,
+  },
+};
+
+const FLOOR_ATLAS_COLUMNS = 16;
+
+function floorTypeKeyForRoom(room, x, y) {
+  const name = (room?.name || "").toLowerCase();
+  if (room?.type === "safe") return "safe";
+  if (room?.type === "boss") return "boss";
+  if (name.includes("treasury") || name.includes("treasure") || name.includes("reward")) return "treasure";
+  if (room?.themeId === "floodedChamber") return "sewer";
+  if (room?.themeId === "spiderDen" || name.includes("damp") || name.includes("slime") || name.includes("sewer")) return "mossy";
+  if (name.includes("crypt") || name.includes("tomb") || name.includes("burial") || name.includes("skeleton")) return "crypt";
+  if (room?.themeId === "ratNest" || name.includes("abandoned") || name.includes("nest")) return "dirty";
+  if (name.includes("collapsed") || room?.shape === "alcove" || countCardinalWallNeighbors(x, y) >= 3) return "damaged";
+  if (isHallwayOrDoorwayFloor(x, y) && countCardinalWallNeighbors(x, y) >= 3) return "damaged";
+  return "normal";
+}
+
+function pickFromRows(rows, x, y, salt) {
+  if (!rows?.length) return FLOOR_ATLAS_ROWS.DEFAULT_STONE_A;
+  return rows[Math.floor(tileHash(x, y, salt) * rows.length) % rows.length];
+}
+
+function selectFloorAtlasTile(x, y, room) {
+  const typeKey = floorTypeKeyForRoom(room, x, y);
+  const config = FLOOR_TYPES[typeKey] || FLOOR_TYPES.normal;
+  const roll = tileHash(x, y, 101);
+  let rowPool = config.baseRows;
+  let layer = "base";
+
+  if (config.detailRows.length && roll < config.detailChance) {
+    rowPool = config.detailRows;
+    layer = "detail";
+  } else if (config.accentRows.length && roll < config.detailChance + config.accentChance) {
+    rowPool = config.accentRows;
+    layer = "accent";
+  }
+
+  return {
+    atlasRow: pickFromRows(rowPool, x, y, 102),
+    atlasCol: Math.floor(tileHash(x, y, 103) * FLOOR_ATLAS_COLUMNS) % FLOOR_ATLAS_COLUMNS,
+    floorType: typeKey,
+    floorLayer: layer,
+  };
+}
+
 const VISUAL_FLOOR_TYPES = ["crack", "scratch", "rubble", "stain", "worn"];
 const VISUAL_DECAL_TYPES = ["debris", "brokenStone", "dust", "scorch", "coins", "marking"];
-const VISUAL_DECORATION_TILES = new Set([".", "S"]);
+const VISUAL_DECORATION_TILES = new Set([".", "S", "C", "E", "D", "L"]);
 const ENVIRONMENTAL_LIGHT_TYPES = ["torch", "lantern", "crystal", "campfire"];
 const ENVIRONMENTAL_LIGHT_COLORS = {
   torch: { inner: "rgba(255,182,76,", outer: "rgba(255,112,36," },
@@ -1358,14 +1507,16 @@ function weightedVisualPick(weights, roll) {
 }
 
 function createFloorDetail(x, y, room) {
+  const atlasTile = selectFloorAtlasTile(x, y, room);
   const r = tileHash(x, y, 11);
-  if (r > 0.24) return null;
+  if (r > 0.24) return atlasTile;
 
   const theme = room ? visualThemeForRoom(room) : { floorBias: null };
   let type = VISUAL_FLOOR_TYPES[Math.floor(tileHash(x, y, 12) * VISUAL_FLOOR_TYPES.length) % VISUAL_FLOOR_TYPES.length];
   if (theme.floorBias && tileHash(x, y, 13) < 0.45) type = theme.floorBias;
 
   return {
+    ...atlasTile,
     type,
     rotation: Math.floor(tileHash(x, y, 14) * 4),
     ox: Math.floor(tileHash(x, y, 15) * 12) - 6,
