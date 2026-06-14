@@ -43,6 +43,30 @@ class LobbyManager {
     });
   }
 
+  updateClientProfile(playerId, profile = {}) {
+    const client = this.requireClient(playerId);
+    client.name = this.sanitizePlayerName(profile.name || client.name);
+    client.profile = {
+      name: client.name,
+      sprite: String(profile.sprite || "default").slice(0, 32) || "default",
+      color: String(profile.color || "blue").slice(0, 32) || "blue"
+    };
+    if (client.lobbyCode) {
+      const lobby = this.lobbies.get(client.lobbyCode);
+      const player = lobby?.players.find(candidate => candidate.id === playerId);
+      if (player) {
+        player.name = client.name;
+        player.profile = client.profile;
+        this.broadcastLobbyUpdate(lobby);
+      }
+    }
+  }
+
+  sanitizePlayerName(name) {
+    const cleaned = String(name || "").trim().slice(0, 16);
+    return cleaned || "Crawler";
+  }
+
   unregisterClient(playerId) {
     this.leaveLobby(playerId, { silent: false });
     this.clients.delete(playerId);
@@ -165,6 +189,7 @@ class LobbyManager {
     lobby.players.push({
       id: client.playerId,
       name: client.name,
+      profile: client.profile || { name: client.name, sprite: "default", color: "blue" },
       joinedAt: Date.now(),
       color: PLAYER_COLORS[(lobby.players.length) % PLAYER_COLORS.length],
       partyId,
@@ -280,7 +305,8 @@ class LobbyManager {
       ...sanitized,
       id: player.id,
       name: player.name,
-      color: player.color,
+      color: player.profile?.color || sanitized.color || player.color,
+      sprite: player.profile?.sprite || sanitized.sprite || "default",
       updatedAt: Date.now()
     };
     this.broadcastCrawlerSnapshot(lobby);
@@ -319,7 +345,10 @@ class LobbyManager {
       ...(state.isDodging ? { isDodging: true } : {}),
       ...(dodgeProgress === null ? {} : { dodgeProgress: Math.max(0, Math.min(1, dodgeProgress)) }),
       ...(aimX === null ? {} : { aimX }),
-      ...(aimY === null ? {} : { aimY })
+      ...(aimY === null ? {} : { aimY }),
+      name: this.sanitizePlayerName(state.name),
+      sprite: String(state.sprite || "default").slice(0, 32) || "default",
+      color: String(state.color || "blue").slice(0, 32) || "blue"
     };
   }
 
@@ -551,7 +580,8 @@ class LobbyManager {
       players: lobby.players.map(player => ({
         id: player.id,
         name: player.name,
-        color: player.color,
+        color: player.profile?.color || player.color,
+        sprite: player.profile?.sprite || "default",
         joinedAt: player.joinedAt,
         partyId: player.partyId || null,
         isPartyLeader: !!player.isPartyLeader,
@@ -573,7 +603,8 @@ class LobbyManager {
     return {
       id: player.id,
       name: player.name,
-      color: player.color,
+      color: player.profile?.color || player.color,
+      sprite: player.profile?.sprite || "default",
       partyId: player.partyId || null,
       isPartyLeader: !!player.isPartyLeader,
       floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING,

@@ -46,6 +46,44 @@ const PVP_SAFE_ROOM_FREEZE_FRAMES = 60 * PVP_SAFE_ROOM_FREEZE_SECONDS;
 
 let gameMode = GAME_MODES.TITLE;
 
+const PLAYER_PROFILE_STORAGE_KEY = "dcwz_playerProfile";
+const DEFAULT_PLAYER_PROFILE = Object.freeze({
+  name: "Crawler",
+  sprite: "default",
+  color: "blue"
+});
+
+function sanitizePlayerName(name) {
+  const cleaned = String(name ?? "").trim().slice(0, 16);
+  return cleaned || DEFAULT_PLAYER_PROFILE.name;
+}
+
+function sanitizePlayerProfile(profile = {}) {
+  return {
+    name: sanitizePlayerName(profile.name),
+    sprite: String(profile.sprite || DEFAULT_PLAYER_PROFILE.sprite).slice(0, 32) || DEFAULT_PLAYER_PROFILE.sprite,
+    color: String(profile.color || DEFAULT_PLAYER_PROFILE.color).slice(0, 32) || DEFAULT_PLAYER_PROFILE.color
+  };
+}
+
+function readPlayerProfile() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PLAYER_PROFILE_STORAGE_KEY) || "null");
+    return sanitizePlayerProfile(saved || DEFAULT_PLAYER_PROFILE);
+  } catch {
+    return sanitizePlayerProfile(DEFAULT_PLAYER_PROFILE);
+  }
+}
+
+function writePlayerProfile(profile) {
+  const sanitized = sanitizePlayerProfile(profile);
+  try { localStorage.setItem(PLAYER_PROFILE_STORAGE_KEY, JSON.stringify(sanitized)); } catch {}
+  playerProfile = sanitized;
+  return sanitized;
+}
+
+let playerProfile = readPlayerProfile();
+
 const multiplayer = {
   enabled: false,
   targetPlayers: MULTIPLAYER_TARGET_PLAYERS,

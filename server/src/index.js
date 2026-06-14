@@ -109,15 +109,19 @@ wss.on("connection", (ws) => {
     try {
       switch (message.type) {
         case CLIENT_MESSAGES.HELLO:
+          rooms.updateClientProfile(playerId, message.profile || message);
           safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4 });
           break;
         case CLIENT_MESSAGES.CREATE_LOBBY:
+          rooms.updateClientProfile(playerId, message.profile || message);
           rooms.createPrivateLobby(playerId);
           break;
         case CLIENT_MESSAGES.JOIN_LOBBY:
+          rooms.updateClientProfile(playerId, message.profile || message);
           rooms.joinPrivateLobby(playerId, message.lobbyCode || message.code);
           break;
         case CLIENT_MESSAGES.QUICK_MATCH:
+          rooms.updateClientProfile(playerId, message.profile || message);
           rooms.joinQuickMatch(playerId);
           break;
         case CLIENT_MESSAGES.LEAVE_LOBBY:

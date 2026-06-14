@@ -1288,6 +1288,13 @@ function draw() {
   drawActivePet();
   drawPlayerSprite();
 
+  if (multiplayer.enabled) {
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.font = "10px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(playerProfile?.name || "Crawler", player.x, player.y - 43);
+  }
+
   drawAimIndicator();
   drawFloatingFeedbackTexts();
 

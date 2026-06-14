@@ -201,10 +201,32 @@
       <div class="titleActions">
         <button id="startSingleBtn" type="button">Single Player</button>
         <button id="quickMatchBtn" type="button">Multiplayer Quick Match</button>
+        <button id="characterCreatorBtn" type="button">Character Creator</button>
         <button id="createPartyBtn" type="button">Create Lobby</button>
         <button id="joinPartyBtn" type="button">Join Lobby Code</button>
         <button id="localMultiTestBtn" type="button">Local 4-Crawler Test</button>
         <button id="copyGameLinkBtn" type="button">Copy Game Link</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="characterCreatorScreen" aria-hidden="true">
+    <div class="titleBox characterCreatorBox">
+      <div class="titleEyebrow">Crawler Registry</div>
+      <h1>Character Creator</h1>
+      <p>Name the crawler that other Floor 0 delvers will see above your sprite.</p>
+      <label class="creatorField" for="creatorNameInput">Player Name</label>
+      <input id="creatorNameInput" class="creatorNameInput" type="text" maxlength="16" autocomplete="off" placeholder="Crawler" />
+      <div class="creatorPreview" aria-label="Current player sprite preview">
+        <div id="creatorSpritePreview" class="creatorSpritePreview" aria-hidden="true"></div>
+        <div>
+          <div id="creatorPreviewName" class="creatorPreviewName">Crawler</div>
+          <div class="creatorPreviewMeta">Sprite: default · Color: blue</div>
+        </div>
+      </div>
+      <div class="titleActions creatorActions">
+        <button id="saveCharacterBtn" type="button">Save</button>
+        <button id="backToTitleBtn" type="button">Back</button>
       </div>
     </div>
   </div>

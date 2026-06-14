@@ -77,7 +77,7 @@ function ensureLocalLobbyCrawler() {
   if (!multiplayer.lobbyMembers.some(member => member.id === multiplayer.playerId)) {
     multiplayer.lobbyMembers.unshift({
       id: multiplayer.playerId,
-      name: "You",
+      name: playerProfile?.name || "Crawler",
       leader: multiplayer.isPartyLeader,
       isPartyLeader: multiplayer.isPartyLeader,
       local: true,
