@@ -5,6 +5,8 @@ const CLIENT_MESSAGES = Object.freeze({
   QUICK_MATCH: "quick_match",
   LEAVE_LOBBY: "leave_lobby",
   CRAWLER_STATE: "crawler_state",
+  PARTY_INVITE: "party_invite",
+  PARTY_RESPONSE: "party_response",
   FLOOR0_STAIRS_REACHED: "floor0_stairs_reached",
   FLOOR0_WORLD_EVENT: "floor0_world_event",
   FLOOR0_ENEMY_SNAPSHOT: "floor0_enemy_snapshot"
@@ -19,6 +21,8 @@ const SERVER_MESSAGES = Object.freeze({
   STAGING_COMPLETE: "staging_complete",
   PLAYER_LEFT: "player_left",
   CRAWLER_SNAPSHOT: "crawler_snapshot",
+  PARTY_INVITE: "party_invite",
+  PARTY_RESPONSE: "party_response",
   FLOOR0_RESOLVED: "floor0_resolved",
   FLOOR_START: "floor_start",
   FLOOR0_WORLD_STATE: "floor0_world_state",
