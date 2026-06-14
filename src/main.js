@@ -80,17 +80,18 @@ function drawStairwellOverlayAfterDungeon() {
 
 // The stairwell sprite is wider than one tile. If it is drawn inside the tile loop,
 // later floor tiles paint over its right edge. Suppress the in-loop sprite and draw it
-// once after the dungeon pass so the full entrance stays visible.
+// once right before the player, so the entrance is whole but the crawler still appears on top.
 drawPortalTile = function drawStoneStairwellTile(px, py, isVisible) {
   if (!isStairwellStoneSpriteReady()) drawStairwellSpriteFallback(px, py, isVisible);
 };
 
-const drawDungeonFrame = draw;
-draw = function drawDungeonFrameWithStoneStairwell() {
-  drawDungeonFrame();
-  drawStairwellOverlayAfterDungeon();
-  if (typeof drawMinimap === "function") drawMinimap();
-};
+const drawPlayerSpriteWithoutStoneStairwell = typeof drawPlayerSprite === "function" ? drawPlayerSprite : null;
+if (drawPlayerSpriteWithoutStoneStairwell) {
+  drawPlayerSprite = function drawPlayerSpriteAboveStoneStairwell() {
+    drawStairwellOverlayAfterDungeon();
+    drawPlayerSpriteWithoutStoneStairwell();
+  };
+}
 
 function gameLoop() {
   if (typeof syncMusicToGameState === "function") syncMusicToGameState();
