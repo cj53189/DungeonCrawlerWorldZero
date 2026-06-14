@@ -47,6 +47,17 @@ function assignSoloQuickParty(manager, lobby, player) {
   return { partyCode, partyId };
 }
 
+function sendQuickPartyMatchmakingUpdate(client, lobby, partyCode, partyId) {
+  safeSend(client.ws, SERVER_MESSAGES.MATCHMAKING_UPDATE, {
+    lobbyCode: lobby.code,
+    mode: lobby.mode,
+    partyCode,
+    partyId,
+    players: lobby.players.length,
+    targetPlayers: TARGET_PLAYERS
+  });
+}
+
 function joinQuickPartyByCode(manager, playerId, requestedCode) {
   const party = findPartyByCode(manager, requestedCode);
   if (!party) return null;
@@ -67,20 +78,7 @@ function joinQuickPartyByCode(manager, playerId, requestedCode) {
     player.isPartyLeader = false;
   }
 
-  safeSend(client.ws, SERVER_MESSAGES.MATCHMAKING_UPDATE, {
-    lobbyCode: lobby.code,
-    partyCode,
-    players: lobby.players.length,
-    targetPlayers: TARGET_PLAYERS
-  });
-  safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, {
-    lobbyCode: lobby.code,
-    mode: lobby.mode,
-    partyCode,
-    partyId,
-    isPartyLeader: false,
-    joinedByPartyCode: true
-  });
+  sendQuickPartyMatchmakingUpdate(client, lobby, partyCode, partyId);
   manager.broadcastLobbyUpdate(lobby);
   return lobby;
 }
@@ -103,20 +101,7 @@ function applyQuickPartyExtension(LobbyManager) {
     const party = assignSoloQuickParty(this, lobby, player);
 
     if (party) {
-      safeSend(client.ws, SERVER_MESSAGES.MATCHMAKING_UPDATE, {
-        lobbyCode: lobby.code,
-        partyCode: party.partyCode,
-        players: lobby.players.length,
-        targetPlayers: TARGET_PLAYERS
-      });
-      safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, {
-        lobbyCode: lobby.code,
-        mode: lobby.mode,
-        partyCode: party.partyCode,
-        partyId: party.partyId,
-        isPartyLeader: true,
-        joinedByPartyCode: false
-      });
+      sendQuickPartyMatchmakingUpdate(client, lobby, party.partyCode, party.partyId);
       this.broadcastLobbyUpdate(lobby);
     }
 
