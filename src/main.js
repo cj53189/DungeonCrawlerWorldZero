@@ -103,6 +103,11 @@ function normalizeQuickPartyCode(code) {
   return String(code || "").trim().toUpperCase();
 }
 
+function ensureQuickPartyInviteState() {
+  if (!(multiplayer.pendingPartyInvites instanceof Map)) multiplayer.pendingPartyInvites = new Map();
+  if (!(multiplayer.sentPartyInvites instanceof Map)) multiplayer.sentPartyInvites = new Map();
+}
+
 function localQuickPartySize() {
   const partyId = multiplayer.partyId;
   if (!partyId) return 1;
@@ -110,17 +115,82 @@ function localQuickPartySize() {
   return Math.max(1, members.length || multiplayer.partyMembers?.length || 1);
 }
 
+function syncLocalQuickPartyMembership() {
+  const partyId = multiplayer.partyId;
+  multiplayer.partyMembers = (multiplayer.lobbyMembers || []).filter(member => partyId && member.partyId === partyId);
+  for (const member of multiplayer.lobbyMembers || []) {
+    if (member.local || member.id === multiplayer.playerId) member.partyId = partyId || member.partyId || null;
+  }
+}
+
 function rememberQuickPartyCode(message) {
-  const partyCode = normalizeQuickPartyCode(message?.partyCode);
-  if (!partyCode) return false;
-  multiplayer.partyCode = partyCode;
-  if (message.partyId) multiplayer.partyId = message.partyId;
-  if (message.mode === "quick_match") multiplayer.lobbyCode = null;
-  if (message.lobbyCode) multiplayer.roomId = message.lobbyCode;
-  return true;
+  const partyCode = normalizeQuickPartyCode(message?.partyCode || message?.fromPartyCode);
+  let changed = false;
+  if (partyCode) {
+    multiplayer.partyCode = partyCode;
+    changed = true;
+  }
+  if (message?.partyId) {
+    multiplayer.partyId = message.partyId;
+    changed = true;
+  }
+  if (message?.mode === "quick_match") multiplayer.lobbyCode = null;
+  if (message?.lobbyCode) multiplayer.roomId = message.lobbyCode;
+  if (changed) syncLocalQuickPartyMembership();
+  return changed;
+}
+
+function crawlerNameById(crawlerId) {
+  const member = multiplayer.lobbyMembers?.find(candidate => candidate.id === crawlerId);
+  const remote = multiplayer.remotePlayers?.get?.(crawlerId);
+  return member?.name || remote?.name || "Crawler";
+}
+
+function handleQuickPartyInviteMessage(message) {
+  ensureQuickPartyInviteState();
+  if (!message?.fromPlayerId) return;
+  multiplayer.pendingPartyInvites.set(message.fromPlayerId, {
+    fromPlayerId: message.fromPlayerId,
+    fromName: message.fromName || "Crawler",
+    fromPartyId: message.fromPartyId || null,
+    fromPartyCode: normalizeQuickPartyCode(message.fromPartyCode),
+    expiresAt: message.expiresAt ? Date.parse(message.expiresAt) : Date.now() + 30_000
+  });
+  announcer(`${message.fromName || "A crawler"} invited you to party up. Invite stored for the next interaction step.`);
+}
+
+function handleQuickPartyResponseMessage(message) {
+  ensureQuickPartyInviteState();
+  rememberQuickPartyCode(message);
+  if (message.pending) {
+    if (message.targetPlayerId) multiplayer.sentPartyInvites.set(message.targetPlayerId, Date.now() + 30_000);
+    announcer(`Party invite sent to ${message.targetName || crawlerNameById(message.targetPlayerId)}.`);
+    return;
+  }
+
+  if (message.targetPlayerId) multiplayer.sentPartyInvites.delete(message.targetPlayerId);
+  if (message.fromPlayerId) multiplayer.pendingPartyInvites.delete(message.fromPlayerId);
+
+  if (message.accepted) announcer(`Party formed with ${message.targetName || message.fromName || "Crawler"}. Friendly fire rules come later.`);
+  else announcer(`Party invite declined by ${message.targetName || message.fromName || "Crawler"}.`);
+}
+
+function requestQuickPartyInvite(targetPlayerId) {
+  ensureQuickPartyInviteState();
+  if (!targetPlayerId || !isMultiplayerNetworkReady?.()) return false;
+  multiplayer.sentPartyInvites.set(targetPlayerId, Date.now() + 30_000);
+  return sendMultiplayerMessage("party_invite", { targetPlayerId });
+}
+
+function respondQuickPartyInvite(fromPlayerId, accepted = true) {
+  ensureQuickPartyInviteState();
+  if (!fromPlayerId || !isMultiplayerNetworkReady?.()) return false;
+  if (!accepted) multiplayer.pendingPartyInvites.delete(fromPlayerId);
+  return sendMultiplayerMessage("party_response", { fromPlayerId, accepted: !!accepted });
 }
 
 function installQuickPartyCodeClient() {
+  ensureQuickPartyInviteState();
   const createLobbyButton = document.getElementById("createPartyBtn");
   if (createLobbyButton) createLobbyButton.textContent = "Quick Match + Party Code";
   const joinButton = document.getElementById("joinPartyBtn");
@@ -135,6 +205,19 @@ function installQuickPartyCodeClient() {
   const handleServerMessageWithoutQuickParty = typeof handleMultiplayerServerMessage === "function" ? handleMultiplayerServerMessage : null;
   if (handleServerMessageWithoutQuickParty && !handleServerMessageWithoutQuickParty.__quickPartyWrapped) {
     handleMultiplayerServerMessage = function handleMultiplayerServerMessageWithQuickParty(message) {
+      if (message?.type === "party_invite") {
+        handleQuickPartyInviteMessage(message);
+        if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+        if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
+        return;
+      }
+      if (message?.type === "party_response") {
+        handleQuickPartyResponseMessage(message);
+        if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+        if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
+        return;
+      }
+
       const hadPartyCode = rememberQuickPartyCode(message);
       handleServerMessageWithoutQuickParty(message);
       if (hadPartyCode || rememberQuickPartyCode(message)) {
@@ -151,6 +234,7 @@ function installQuickPartyCodeClient() {
       const previousPartyCode = multiplayer.partyCode;
       applyLobbyUpdateWithoutQuickParty(update);
       if (update?.mode === "quick_match" && previousPartyCode) multiplayer.partyCode = previousPartyCode;
+      syncLocalQuickPartyMembership();
     };
     applyServerLobbyUpdate.__quickPartyWrapped = true;
   }
