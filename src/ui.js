@@ -720,11 +720,45 @@ function hideTitleScreen() {
   updateTesterReadinessUI();
 }
 
+function getSelectedCreatorCharacterId() {
+  const selected = document.querySelector('input[name="creatorCharacterId"]:checked');
+  return getCharacterDef(selected?.value || playerProfile.characterId).id;
+}
+
 function updateCharacterCreatorPreview() {
   const input = document.getElementById("creatorNameInput");
   const name = sanitizePlayerName(input?.value ?? playerProfile.name);
+  const characterDef = getCharacterDef(getSelectedCreatorCharacterId());
   const previewName = document.getElementById("creatorPreviewName");
   if (previewName) previewName.textContent = name;
+  const previewMeta = document.getElementById("creatorPreviewMeta");
+  if (previewMeta) previewMeta.textContent = `${characterDef.label} · ${characterDef.mode} sprite`;
+  const preview = document.getElementById("creatorSpritePreview");
+  if (preview && characterDef.mode === "baked") {
+    preview.style.setProperty("--creator-sprite-image", `url(${characterDef.image})`);
+    preview.style.setProperty("--creator-frame-width", `${characterDef.frameWidth}px`);
+    preview.style.setProperty("--creator-preview-scale", "2");
+  }
+}
+
+function renderCharacterCreatorOptions() {
+  const options = document.getElementById("creatorCharacterOptions");
+  if (!options) return;
+  options.innerHTML = "";
+  for (const characterDef of Object.values(CHARACTER_DEFS)) {
+    const label = document.createElement("label");
+    label.className = "creatorCharacterOption";
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = "creatorCharacterId";
+    input.value = characterDef.id;
+    input.checked = getCharacterDef(playerProfile.characterId).id === characterDef.id;
+    input.addEventListener("change", updateCharacterCreatorPreview);
+    const text = document.createElement("span");
+    text.textContent = characterDef.label;
+    label.append(input, text);
+    options.appendChild(label);
+  }
 }
 
 function showCharacterCreator() {
@@ -732,6 +766,7 @@ function showCharacterCreator() {
   const creator = document.getElementById("characterCreatorScreen");
   const input = document.getElementById("creatorNameInput");
   if (input) input.value = playerProfile.name;
+  renderCharacterCreatorOptions();
   updateCharacterCreatorPreview();
   if (title) title.style.display = "none";
   if (creator) {
@@ -743,7 +778,7 @@ function showCharacterCreator() {
 
 function saveCharacterProfileFromCreator() {
   const input = document.getElementById("creatorNameInput");
-  writePlayerProfile({ ...playerProfile, name: input?.value });
+  writePlayerProfile({ name: input?.value, characterId: getSelectedCreatorCharacterId() });
   updateCharacterCreatorPreview();
   if (typeof announcer === "function") announcer(`Crawler profile saved: ${playerProfile.name}.`);
   showTitleScreen();

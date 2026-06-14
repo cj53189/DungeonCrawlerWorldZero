@@ -47,11 +47,30 @@ const PVP_SAFE_ROOM_FREEZE_FRAMES = 60 * PVP_SAFE_ROOM_FREEZE_SECONDS;
 let gameMode = GAME_MODES.TITLE;
 
 const PLAYER_PROFILE_STORAGE_KEY = "dcwz_playerProfile";
+const DEFAULT_CHARACTER_ID = "player_base";
+const CHARACTER_DEFS = Object.freeze({
+  player_base: Object.freeze({
+    id: "player_base",
+    label: "Classic Crawler",
+    mode: "baked",
+    image: "./assets/sprites/player_base.png",
+    frameWidth: 32,
+    frameHeight: 32,
+    columns: 3,
+    rows: 4,
+    supportsSkinColor: false,
+    supportsHairColor: false,
+    supportsHair: false
+  })
+});
 const DEFAULT_PLAYER_PROFILE = Object.freeze({
   name: "Crawler",
-  sprite: "default",
-  color: "blue"
+  characterId: DEFAULT_CHARACTER_ID
 });
+
+function getCharacterDef(characterId) {
+  return CHARACTER_DEFS[String(characterId || DEFAULT_CHARACTER_ID)] || CHARACTER_DEFS[DEFAULT_CHARACTER_ID];
+}
 
 function sanitizePlayerName(name) {
   const cleaned = String(name ?? "").trim().slice(0, 16);
@@ -59,10 +78,11 @@ function sanitizePlayerName(name) {
 }
 
 function sanitizePlayerProfile(profile = {}) {
+  const requestedCharacterId = profile.characterId || profile.sprite || DEFAULT_PLAYER_PROFILE.characterId;
+  const character = getCharacterDef(requestedCharacterId);
   return {
     name: sanitizePlayerName(profile.name),
-    sprite: String(profile.sprite || DEFAULT_PLAYER_PROFILE.sprite).slice(0, 32) || DEFAULT_PLAYER_PROFILE.sprite,
-    color: String(profile.color || DEFAULT_PLAYER_PROFILE.color).slice(0, 32) || DEFAULT_PLAYER_PROFILE.color
+    characterId: character.id
   };
 }
 
