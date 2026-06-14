@@ -344,6 +344,12 @@ function applyServerCrawlerSnapshot(snapshot) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
 
     const member = rosterById.get(crawler.id);
+    const previousCrawler = multiplayer.remotePlayers?.get(crawler.id);
+    const previousUpdatedAt = Number(previousCrawler?.updatedAt) || 0;
+    const updatedAt = crawler.updatedAt || Date.now();
+    const movedDistance = previousCrawler ? Math.hypot(x - previousCrawler.x, y - previousCrawler.y) : 0;
+    const moving = movedDistance > 0.5 && updatedAt !== previousUpdatedAt;
+
     nextRemotePlayers.set(crawler.id, {
       id: crawler.id,
       name: member?.name || crawler.name || "Crawler",
@@ -360,7 +366,8 @@ function applyServerCrawlerSnapshot(snapshot) {
       isDodging: !!crawler.isDodging,
       dodgeProgress: Math.max(0, Math.min(1, Number(crawler.dodgeProgress) || 0)),
       color: member?.color || crawler.color || "#75c7ff",
-      updatedAt: crawler.updatedAt || Date.now()
+      moving,
+      updatedAt
     });
   }
 

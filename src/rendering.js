@@ -18,6 +18,17 @@ const PLAYER_SPRITE_ANIMATION_SEQUENCE = [0, 1, 2, 1];
 const PLAYER_SPRITE_WALK_FRAME_DELAY = 14;
 const PLAYER_SPRITE_MOVEMENT_THRESHOLD = 0.12;
 
+const SPRITE_FRAME_W = 52;
+const SPRITE_FRAME_H = 52;
+const OTHER_CRAWLER_SPRITE = "./assets/sprites/other_crawler_armored_52x52.png";
+const OTHER_CRAWLER_SPRITE_SHEET = new Image();
+OTHER_CRAWLER_SPRITE_SHEET.src = OTHER_CRAWLER_SPRITE;
+const OTHER_CRAWLER_SPRITE_COLS = 3;
+const OTHER_CRAWLER_SPRITE_ROWS = 5;
+const OTHER_CRAWLER_RENDER_WIDTH = SPRITE_FRAME_W;
+const OTHER_CRAWLER_RENDER_HEIGHT = SPRITE_FRAME_H;
+const OTHER_CRAWLER_IDLE_FRAME = 1;
+
 const ENEMY_SPRITE_CACHE = new Map();
 
 function getEnemySpriteSheet(enemy) {
@@ -248,6 +259,12 @@ function isPlayerSpriteLoaded(sheet = PLAYER_SPRITE_SHEET) {
     sheet.naturalHeight >= PLAYER_SPRITE_FRAME_HEIGHT * 4;
 }
 
+function isOtherCrawlerSpriteLoaded() {
+  return OTHER_CRAWLER_SPRITE_SHEET.complete &&
+    OTHER_CRAWLER_SPRITE_SHEET.naturalWidth >= SPRITE_FRAME_W * OTHER_CRAWLER_SPRITE_COLS &&
+    OTHER_CRAWLER_SPRITE_SHEET.naturalHeight >= SPRITE_FRAME_H * OTHER_CRAWLER_SPRITE_ROWS;
+}
+
 function getEntitySpriteRowForAim(entity) {
   const aimX = Number.isFinite(entity?.aimX) ? entity.aimX : 0;
   const aimY = Number.isFinite(entity?.aimY) ? entity.aimY : 1;
@@ -328,6 +345,63 @@ function drawPlayerSprite() {
   ctx.restore();
 }
 
+function drawRemoteCrawlerBadge(crawler) {
+  const color = crawler.color || "#75c7ff";
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(crawler.x, crawler.y + (crawler.r || player.r) * 0.72, (crawler.r || player.r) + 7, Math.max(5, (crawler.r || player.r) * 0.5), 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = "rgba(0,0,0,0.55)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(crawler.x + (crawler.r || player.r) + 8, crawler.y - (crawler.r || player.r) - 2, 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
+  if (!isOtherCrawlerSpriteLoaded()) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    drawStandingFigure(crawler, {
+      color: crawler.status === "stasis" ? "#9db1ff" : crawler.status === "downed" ? "#555" : (crawler.color || "#75c7ff"),
+      outline: "rgba(255,255,255,0.76)",
+      height: 22
+    });
+    drawRemoteCrawlerBadge(crawler);
+    ctx.restore();
+    return;
+  }
+
+  const moving = !!crawler.moving || !!crawler.isDodging;
+  const frame = moving
+    ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
+    : OTHER_CRAWLER_IDLE_FRAME;
+  const row = Math.min(OTHER_CRAWLER_SPRITE_ROWS - 1, getEntitySpriteRowForAim(crawler));
+  const dx = Math.round(crawler.x - OTHER_CRAWLER_RENDER_WIDTH / 2);
+  const dy = Math.round(crawler.y + (crawler.r || player.r) - OTHER_CRAWLER_RENDER_HEIGHT);
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath();
+  ctx.ellipse(crawler.x, crawler.y + (crawler.r || player.r) * 0.72, (crawler.r || player.r) * 1.08, Math.max(4, (crawler.r || player.r) * 0.42), 0, 0, Math.PI * 2);
+  ctx.fill();
+  drawRemoteCrawlerBadge(crawler);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(OTHER_CRAWLER_SPRITE_SHEET, frame * SPRITE_FRAME_W, row * SPRITE_FRAME_H, SPRITE_FRAME_W, SPRITE_FRAME_H, dx, dy, OTHER_CRAWLER_RENDER_WIDTH, OTHER_CRAWLER_RENDER_HEIGHT);
+  if (tint) {
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.fillStyle = tint;
+    ctx.fillRect(dx, dy, OTHER_CRAWLER_RENDER_WIDTH, OTHER_CRAWLER_RENDER_HEIGHT);
+  }
+  ctx.restore();
+}
+
 function drawPlayerSpriteAt(entity, alpha = 1, tint = null) {
   if (!isPlayerSpriteLoaded()) {
     ctx.save();
@@ -385,7 +459,7 @@ function drawRemoteDodgeEffects(crawler) {
   const dirX = Number.isFinite(crawler.aimX) ? crawler.aimX : 1;
   const dirY = Number.isFinite(crawler.aimY) ? crawler.aimY : 0;
   for (let i = 1; i <= 2; i++) {
-    drawPlayerSpriteAt({ ...crawler, x: crawler.x - dirX * i * 12, y: crawler.y - dirY * i * 12, frame: i }, 0.2 / i, "rgba(117,199,255,0.42)");
+    drawRemoteCrawlerSprite({ ...crawler, x: crawler.x - dirX * i * 12, y: crawler.y - dirY * i * 12, moving: true }, 0.2 / i, "rgba(117,199,255,0.42)");
   }
 }
 
@@ -1134,11 +1208,7 @@ function draw() {
       if (!visible[ty]?.[tx]) continue;
 
       drawRemoteDodgeEffects(crawler);
-      drawStandingFigure(crawler, {
-        color: crawler.status === "stasis" ? "#9db1ff" : crawler.status === "downed" ? "#555" : (crawler.color || "#75c7ff"),
-        outline: "rgba(255,255,255,0.76)",
-        height: 22
-      });
+      drawRemoteCrawlerSprite(crawler);
 
       if (crawler.maxHp && crawler.status === "active") {
         ctx.fillStyle = "#75c7ff";
