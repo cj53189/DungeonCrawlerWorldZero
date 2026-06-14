@@ -134,6 +134,63 @@ function updateDodgeMovement() {
   return true;
 }
 
+
+function getLocalCrawler() {
+  return player;
+}
+
+function getRemoteCrawlers() {
+  if (!multiplayer?.remotePlayers) return [];
+  return Array.from(multiplayer.remotePlayers.values()).filter(Boolean);
+}
+
+function isCrawlerActive(crawler) {
+  return !!crawler && crawler.status !== "downed" && crawler.status !== "failed" && (crawler.hp ?? 0) > 0;
+}
+
+function getActiveCrawlers({ includeRemote = true } = {}) {
+  const crawlers = [getLocalCrawler()];
+  if (includeRemote) crawlers.push(...getRemoteCrawlers());
+  return crawlers.filter(isCrawlerActive);
+}
+
+function getNearestActiveCrawler(x, y, options = {}) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const crawler of getActiveCrawlers(options)) {
+    const cx = Number(crawler.x);
+    const cy = Number(crawler.y);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+    const dist = Math.hypot(cx - x, cy - y);
+    if (dist < bestDist) {
+      best = crawler;
+      bestDist = dist;
+    }
+  }
+  return best ? { crawler: best, dist: bestDist } : null;
+}
+
+function getNearestVisibleCrawler(x, y, maxDistance = Infinity, options = {}) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const crawler of getActiveCrawlers(options)) {
+    if (crawler.safe) continue;
+    const cx = Number(crawler.x);
+    const cy = Number(crawler.y);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
+    const dist = Math.hypot(cx - x, cy - y);
+    if (dist > maxDistance || dist >= bestDist) continue;
+    if (!hasLineOfSight(x, y, cx, cy)) continue;
+    best = crawler;
+    bestDist = dist;
+  }
+  return best ? { crawler: best, dist: bestDist } : null;
+}
+
+function getCrawlerRadius(crawler) {
+  return Number.isFinite(Number(crawler?.r)) ? Number(crawler.r) : player.r;
+}
+
 function tileAt(px, py) {
   const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
   if (tx < 0 || tx >= MAP_COLS || ty < 0 || ty >= MAP_ROWS) return "#";
@@ -301,7 +358,7 @@ function countNearbySwarmAllies(enemy) {
   return enemies.filter(other => other !== enemy && other.hp > 0 && other.behaviorTag === "rat_swarm" && Math.hypot(other.x - enemy.x, other.y - enemy.y) < 76).length;
 }
 
-function updateSpiderLungeState(enemy, dist, canSeePlayer, tag) {
+function updateSpiderLungeState(enemy, targetCrawler, dist, canSeeTarget, tag) {
   const state = enemy.behaviorState || (enemy.behaviorState = {});
   state.lungeCooldown = Math.max(0, (state.lungeCooldown || 0) - 1);
   state.windup = Math.max(0, state.windup || 0);
@@ -312,7 +369,7 @@ function updateSpiderLungeState(enemy, dist, canSeePlayer, tag) {
     state.windup--;
     enemy.animationState = "windup";
     if (state.windup === 0) {
-      const dir = normalizeVector(player.x - enemy.x, player.y - enemy.y);
+      const dir = normalizeVector(targetCrawler.x - enemy.x, targetCrawler.y - enemy.y);
       state.lungeDirX = dir.x;
       state.lungeDirY = dir.y;
       state.lungeFrames = tag === "spider_hit_and_run" ? 11 : 14;
@@ -331,7 +388,7 @@ function updateSpiderLungeState(enemy, dist, canSeePlayer, tag) {
   if (tag === "spider_hit_and_run" && state.repositionFrames > 0) {
     state.repositionFrames--;
     enemy.animationState = "reposition";
-    const away = normalizeVector(enemy.x - player.x, enemy.y - player.y);
+    const away = normalizeVector(enemy.x - targetCrawler.x, enemy.y - targetCrawler.y);
     const side = state.repositionSide || 1;
     return {
       dx: (away.x * 0.72 + -away.y * side * 0.58) * enemy.speed * 1.22,
@@ -339,7 +396,7 @@ function updateSpiderLungeState(enemy, dist, canSeePlayer, tag) {
     };
   }
 
-  if (canSeePlayer && dist < (tag === "spider_hit_and_run" ? 168 : 148) && state.lungeCooldown <= 0) {
+  if (canSeeTarget && dist < (tag === "spider_hit_and_run" ? 168 : 148) && state.lungeCooldown <= 0) {
     state.windup = tag === "spider_hit_and_run" ? 12 : 16;
     state.repositionSide = Math.random() < 0.5 ? -1 : 1;
     enemy.animationState = "windup";
@@ -349,25 +406,25 @@ function updateSpiderLungeState(enemy, dist, canSeePlayer, tag) {
   return null;
 }
 
-function calculateEnemyMovement(enemy, canSeePlayer, bossCanAlwaysTrack, dist) {
+function calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist) {
   const tag = enemy.behaviorTag || "";
   const state = enemy.behaviorState || (enemy.behaviorState = {});
   enemy.animationState = "walk";
 
-  if (canSeePlayer || bossCanAlwaysTrack) {
+  if (targetCrawler && (canSeeTarget || bossCanAlwaysTrack)) {
     if (tag === "spider_lunge" || tag === "spider_hit_and_run") {
-      const spiderMove = updateSpiderLungeState(enemy, dist, canSeePlayer || bossCanAlwaysTrack, tag);
+      const spiderMove = updateSpiderLungeState(enemy, targetCrawler, dist, canSeeTarget || bossCanAlwaysTrack, tag);
       if (spiderMove) return spiderMove;
     }
 
-    const dir = normalizeVector(player.x - enemy.x, player.y - enemy.y);
+    const dir = normalizeVector(targetCrawler.x - enemy.x, targetCrawler.y - enemy.y);
     let speed = enemy.speed;
     let strafe = 0;
 
     if (tag === "rat_swarm") {
       const allies = countNearbySwarmAllies(enemy);
       speed *= 1.08 + Math.min(0.08, allies * 0.025);
-      if (allies > 0 && dist > player.r + enemy.r + 18) strafe = (state.swarmSide || (state.swarmSide = Math.random() < 0.5 ? -1 : 1)) * 0.12;
+      if (allies > 0 && dist > getCrawlerRadius(targetCrawler) + enemy.r + 18) strafe = (state.swarmSide || (state.swarmSide = Math.random() < 0.5 ? -1 : 1)) * 0.12;
     } else if (tag === "rat_bruiser") {
       speed *= 0.92;
     } else if (tag === "bot_patrol") {
@@ -409,6 +466,38 @@ function enemyPlayerKnockbackMultiplier(enemy) {
 }
 
 
+function damageCrawlerFromEnemy(crawler, enemy) {
+  if (!crawler || enemy.damageCooldown > 0) return false;
+  if (crawler === player) {
+    if (isPlayerDodgeInvulnerable()) return false;
+    const rawDmg = enemy.damage || 8;
+    const dmg = Math.max(1, rawDmg - player.defense);
+    player.hp -= dmg;
+    addPlayerFeedbackText(`-${dmg} HP`, { color: "#ff6b6b", size: 16 });
+    applyKnockback(player, enemy.x, enemy.y, (5 + Math.min(4, dmg * 0.18)) * enemyPlayerKnockbackMultiplier(enemy));
+    stats.damageTaken += dmg;
+    stats.riskyMoments++;
+    changeAudience(1);
+    enemy.damageCooldown = 70;
+    if (enemy.behaviorTag === "spider_hit_and_run") {
+      enemy.behaviorState = enemy.behaviorState || {};
+      enemy.behaviorState.repositionFrames = 36;
+    }
+    updateHUD();
+    if (!achievements.has("firstHit")) achievement("NEW ACHIEVEMENT: Physical Contact", "A dungeon creature touched you without consent. Human resources has been eaten.", "firstHit");
+    if (player.hp <= 0) loseGame();
+    return true;
+  }
+
+  // Remote/mock crawlers are non-authoritative here; keep local previews minimal and never end the local run.
+  const rawDmg = enemy.damage || 8;
+  const dmg = Math.max(1, rawDmg - (crawler.defense || 0));
+  crawler.hp = Math.max(0, (crawler.hp ?? crawler.maxHp ?? player.maxHp) - dmg);
+  if (crawler.hp <= 0) crawler.status = "downed";
+  enemy.damageCooldown = 70;
+  return true;
+}
+
 function updateEnemies() {
   processPendingBossLocks();
   for (const corpse of corpses) {
@@ -429,7 +518,7 @@ function updateEnemies() {
 for (const enemy of enemies) {
     if (enemy.hp <= 0) continue;
     enemy.damageCooldown = Math.max(0, enemy.damageCooldown - 1);
-    if (player.safe) continue;
+    if (!getActiveCrawlers().some(crawler => !crawler.safe)) continue;
 
     const exTile = Math.floor(enemy.x / TILE), eyTile = Math.floor(enemy.y / TILE);
     if (!seen[eyTile]?.[exTile] && !collapseStarted) continue;
@@ -437,13 +526,17 @@ for (const enemy of enemies) {
     const remoteSynced = typeof updateFloor0EnemySyncInterpolation === "function" && updateFloor0EnemySyncInterpolation(enemy);
 
     if (!remoteSynced) {
-      const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-      const canSeePlayer = dist < 210 && hasLineOfSight(enemy.x, enemy.y, player.x, player.y);
-      if (enemy.boss && !bossAggroed && canSeePlayer) {
+      const visibleTarget = getNearestVisibleCrawler(enemy.x, enemy.y, 210);
+      const fallbackTarget = enemy.boss && bossAggroed ? getNearestActiveCrawler(enemy.x, enemy.y) : null;
+      const targetInfo = visibleTarget || fallbackTarget;
+      const targetCrawler = targetInfo?.crawler || null;
+      const dist = targetInfo?.dist ?? Infinity;
+      const canSeeTarget = !!visibleTarget;
+      if (enemy.boss && !bossAggroed && canSeeTarget) {
         triggerBossAggro("seen");
       }
       const bossCanAlwaysTrack = enemy.boss && bossAggroed;
-      const movement = calculateEnemyMovement(enemy, canSeePlayer, bossCanAlwaysTrack, dist);
+      const movement = calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist);
       updateEnemyFacing(enemy, movement.dx, movement.dy);
       moveEntity(enemy, movement.dx, movement.dy);
     }
@@ -452,24 +545,12 @@ for (const enemy of enemies) {
       if (Number.isFinite(Number(roomId))) enemy.roomId = Math.trunc(Number(roomId));
     }
 
-    const newDist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
-    if (newDist < player.r + enemy.r + 4 && enemy.damageCooldown <= 0 && !isPlayerDodgeInvulnerable()) {
-      const rawDmg = enemy.damage || 8;
-      const dmg = Math.max(1, rawDmg - player.defense);
-      player.hp -= dmg;
-      addPlayerFeedbackText(`-${dmg} HP`, { color: "#ff6b6b", size: 16 });
-      applyKnockback(player, enemy.x, enemy.y, (5 + Math.min(4, dmg * 0.18)) * enemyPlayerKnockbackMultiplier(enemy));
-      stats.damageTaken += dmg;
-      stats.riskyMoments++;
-      changeAudience(1);
-      enemy.damageCooldown = 70;
-      if (enemy.behaviorTag === "spider_hit_and_run") {
-        enemy.behaviorState = enemy.behaviorState || {};
-        enemy.behaviorState.repositionFrames = 36;
+    for (const crawler of getActiveCrawlers()) {
+      const newDist = Math.hypot(crawler.x - enemy.x, crawler.y - enemy.y);
+      if (newDist < getCrawlerRadius(crawler) + enemy.r + 4) {
+        damageCrawlerFromEnemy(crawler, enemy);
+        break;
       }
-      updateHUD();
-      if (!achievements.has("firstHit")) achievement("NEW ACHIEVEMENT: Physical Contact", "A dungeon creature touched you without consent. Human resources has been eaten.", "firstHit");
-      if (player.hp <= 0) loseGame();
     }
   }
 }
@@ -490,13 +571,13 @@ function getWeaponDamage(weapon) {
   return Math.round(base * skillMult * meleeMult * critMult);
 }
 
-function damageEnemy(enemy, damage, sourceWeapon = null) {
+function damageEnemy(enemy, damage, sourceWeapon = null, attacker = player) {
   if (!enemy || enemy.hp <= 0) return false;
   if (enemy.boss) triggerBossAggro("attack");
   const dealt = Math.max(0, Math.min(enemy.hp, damage));
   enemy.hp -= damage;
   addFloatingFeedbackText(`-${Math.round(dealt)}`, enemy.x, enemy.y - enemy.r, { anchor: enemy, color: enemy.boss ? "#ff9df8" : "#ffb86b", size: enemy.boss ? 17 : 15 });
-  applyKnockback(enemy, player.x, player.y, (enemy.boss ? 0.45 : 1) * Math.min(18, 4 + dealt * 0.32));
+  applyKnockback(enemy, attacker.x, attacker.y, (enemy.boss ? 0.45 : 1) * Math.min(18, 4 + dealt * 0.32));
   if (dealt > 0 && typeof awardWeaponSkillXpForHit === "function") awardWeaponSkillXpForHit(sourceWeapon || getCurrentWeapon(), dealt);
   if (typeof sendFloor0EnemyEvent === "function") sendFloor0EnemyEvent(enemy.hp <= 0 ? "enemy_killed" : "enemy_damaged", enemy);
   if (enemy.hp <= 0) {
@@ -510,35 +591,47 @@ function damageEnemy(enemy, damage, sourceWeapon = null) {
   return true;
 }
 
-function enemyInCircle(enemy, radius) {
-  return Math.hypot(player.x - enemy.x, player.y - enemy.y) <= radius + enemy.r;
+function resolveAttackShapeArgs(attacker, firstValue, secondValue) {
+  if (typeof attacker === "number") return { attacker: player, firstValue: attacker, secondValue: firstValue };
+  return { attacker: attacker || player, firstValue, secondValue };
 }
 
-function enemyInArc(enemy, radius, arcAngle) {
-  const dx = enemy.x - player.x;
-  const dy = enemy.y - player.y;
+function enemyInCircle(enemy, attacker = player, radius) {
+  const args = resolveAttackShapeArgs(attacker, radius);
+  return Math.hypot(args.attacker.x - enemy.x, args.attacker.y - enemy.y) <= args.firstValue + enemy.r;
+}
+
+function enemyInArc(enemy, attacker = player, radius, arcAngle) {
+  const args = resolveAttackShapeArgs(attacker, radius, arcAngle);
+  const dx = enemy.x - args.attacker.x;
+  const dy = enemy.y - args.attacker.y;
   const dist = Math.hypot(dx, dy);
-  if (dist > radius + enemy.r) return false;
+  if (dist > args.firstValue + enemy.r) return false;
   const enemyAngle = Math.atan2(dy, dx);
-  const aimAngle = Math.atan2(player.aimY, player.aimX);
-  return angleDifference(enemyAngle, aimAngle) <= arcAngle / 2;
+  const aimAngle = Math.atan2(args.attacker.aimY, args.attacker.aimX);
+  return angleDifference(enemyAngle, aimAngle) <= args.secondValue / 2;
 }
 
-function enemyInLine(enemy, length, width) {
-  const dx = enemy.x - player.x;
-  const dy = enemy.y - player.y;
-  const forward = dx * player.aimX + dy * player.aimY;
-  if (forward < -enemy.r || forward > length + enemy.r) return false;
-  const side = Math.abs(dx * player.aimY - dy * player.aimX);
-  return side <= width / 2 + enemy.r;
+function enemyInLine(enemy, attacker = player, length, width) {
+  const args = resolveAttackShapeArgs(attacker, length, width);
+  const dx = enemy.x - args.attacker.x;
+  const dy = enemy.y - args.attacker.y;
+  const forward = dx * args.attacker.aimX + dy * args.attacker.aimY;
+  if (forward < -enemy.r || forward > args.firstValue + enemy.r) return false;
+  const side = Math.abs(dx * args.attacker.aimY - dy * args.attacker.aimX);
+  return side <= args.secondValue / 2 + enemy.r;
 }
 
-function addAttackTelegraph(weapon) {
+function addAttackTelegraph(attacker = player, weapon) {
+  if (!weapon) {
+    weapon = attacker;
+    attacker = player;
+  }
   attackTelegraphs.push({
-    x: player.x,
-    y: player.y,
-    aimX: player.aimX,
-    aimY: player.aimY,
+    x: attacker.x,
+    y: attacker.y,
+    aimX: attacker.aimX,
+    aimY: attacker.aimY,
     shape: { ...weapon.attackShape },
     color: weapon.telegraphColor,
     life: 12,
@@ -546,7 +639,8 @@ function addAttackTelegraph(weapon) {
   });
 }
 
-function attack() {
+function attack(attacker = player) {
+  if (attacker !== player) return;
   if (player.attackCooldown > 0 || player.pvpFreezeFrames > 0 || isPlayerDodging() || gameWon || gameLost) return;
   if (isPvpFloorActive() && isCrawlerInSafeRoom(player)) {
     applySafeRoomPvpFreeze();
@@ -556,7 +650,7 @@ function attack() {
   const shape = weapon.attackShape;
   const damage = getWeaponDamage(weapon);
   player.attackCooldown = weapon.cooldown;
-  addAttackTelegraph(weapon);
+  addAttackTelegraph(attacker, weapon);
 
   if (shape.type === "projectile") {
     projectiles.push({
@@ -581,19 +675,19 @@ function attack() {
   for (const enemy of enemies) {
     if (enemy.hp <= 0) continue;
     let inShape = false;
-    if (shape.type === "circle") inShape = enemyInCircle(enemy, shape.radius);
-    if (shape.type === "arc") inShape = enemyInArc(enemy, shape.radius, shape.angle);
-    if (shape.type === "line") inShape = enemyInLine(enemy, shape.length, shape.width);
-    if (inShape) hit = damageEnemy(enemy, damage, weapon) || hit;
+    if (shape.type === "circle") inShape = enemyInCircle(enemy, attacker, shape.radius);
+    if (shape.type === "arc") inShape = enemyInArc(enemy, attacker, shape.radius, shape.angle);
+    if (shape.type === "line") inShape = enemyInLine(enemy, attacker, shape.length, shape.width);
+    if (inShape) hit = damageEnemy(enemy, damage, weapon, attacker) || hit;
   }
 
   if (canCrawlerInitiatePvp(player) && multiplayer.remotePlayers?.size) {
     for (const crawler of multiplayer.remotePlayers.values()) {
       if (crawler.status !== "active") continue;
       let inShape = false;
-      if (shape.type === "circle") inShape = enemyInCircle(crawler, shape.radius);
-      if (shape.type === "arc") inShape = enemyInArc(crawler, shape.radius, shape.angle);
-      if (shape.type === "line") inShape = enemyInLine(crawler, shape.length, shape.width);
+      if (shape.type === "circle") inShape = enemyInCircle(crawler, attacker, shape.radius);
+      if (shape.type === "arc") inShape = enemyInArc(crawler, attacker, shape.radius, shape.angle);
+      if (shape.type === "line") inShape = enemyInLine(crawler, attacker, shape.length, shape.width);
       if (inShape) hit = damageRemoteCrawler(crawler, damage) || hit;
     }
   }
