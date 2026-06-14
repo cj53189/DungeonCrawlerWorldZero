@@ -99,6 +99,94 @@ function applyRatDirectionHotfix() {
   ENEMY_SPRITE_DEFINITIONS.rat.directionRows = { up: 0, right: 3, down: 2, left: 1 };
 }
 
+function normalizeQuickPartyCode(code) {
+  return String(code || "").trim().toUpperCase();
+}
+
+function localQuickPartySize() {
+  const partyId = multiplayer.partyId;
+  if (!partyId) return 1;
+  const members = multiplayer.lobbyMembers?.filter(member => member.partyId && member.partyId === partyId) || [];
+  return Math.max(1, members.length || multiplayer.partyMembers?.length || 1);
+}
+
+function rememberQuickPartyCode(message) {
+  const partyCode = normalizeQuickPartyCode(message?.partyCode);
+  if (!partyCode) return false;
+  multiplayer.partyCode = partyCode;
+  if (message.partyId) multiplayer.partyId = message.partyId;
+  if (message.mode === "quick_match") multiplayer.lobbyCode = null;
+  if (message.lobbyCode) multiplayer.roomId = message.lobbyCode;
+  return true;
+}
+
+function installQuickPartyCodeClient() {
+  const createLobbyButton = document.getElementById("createPartyBtn");
+  if (createLobbyButton) createLobbyButton.textContent = "Quick Match + Party Code";
+  const joinButton = document.getElementById("joinPartyBtn");
+  if (joinButton) joinButton.textContent = "Join Party Code";
+
+  if (typeof createLobby === "function") {
+    createLobby = function createQuickMatchParty() {
+      startQuickMatch();
+    };
+  }
+
+  const handleServerMessageWithoutQuickParty = typeof handleMultiplayerServerMessage === "function" ? handleMultiplayerServerMessage : null;
+  if (handleServerMessageWithoutQuickParty && !handleServerMessageWithoutQuickParty.__quickPartyWrapped) {
+    handleMultiplayerServerMessage = function handleMultiplayerServerMessageWithQuickParty(message) {
+      const hadPartyCode = rememberQuickPartyCode(message);
+      handleServerMessageWithoutQuickParty(message);
+      if (hadPartyCode || rememberQuickPartyCode(message)) {
+        if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+        if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
+      }
+    };
+    handleMultiplayerServerMessage.__quickPartyWrapped = true;
+  }
+
+  const applyLobbyUpdateWithoutQuickParty = typeof applyServerLobbyUpdate === "function" ? applyServerLobbyUpdate : null;
+  if (applyLobbyUpdateWithoutQuickParty && !applyLobbyUpdateWithoutQuickParty.__quickPartyWrapped) {
+    applyServerLobbyUpdate = function applyServerLobbyUpdateWithQuickParty(update) {
+      const previousPartyCode = multiplayer.partyCode;
+      applyLobbyUpdateWithoutQuickParty(update);
+      if (update?.mode === "quick_match" && previousPartyCode) multiplayer.partyCode = previousPartyCode;
+    };
+    applyServerLobbyUpdate.__quickPartyWrapped = true;
+  }
+
+  const getInviteTextWithoutQuickParty = typeof getInviteText === "function" ? getInviteText : null;
+  if (getInviteTextWithoutQuickParty && !getInviteTextWithoutQuickParty.__quickPartyWrapped) {
+    getInviteText = function getInviteTextWithQuickPartyCode() {
+      if (multiplayer.partyCode) return `Join my Dungeon Crawler World party ${multiplayer.partyCode}: ${getGameLink()}`;
+      return getInviteTextWithoutQuickParty();
+    };
+    getInviteText.__quickPartyWrapped = true;
+  }
+
+  const updatePanelWithoutQuickParty = typeof updateMultiplayerPanel === "function" ? updateMultiplayerPanel : null;
+  if (updatePanelWithoutQuickParty && !updatePanelWithoutQuickParty.__quickPartyWrapped) {
+    updateMultiplayerPanel = function updateMultiplayerPanelWithQuickPartyCode() {
+      updatePanelWithoutQuickParty();
+      if (!multiplayer.partyCode) return;
+
+      const partySummary = `Party: Connected (${localQuickPartySize()})`;
+      const partyCode = document.getElementById("mpPartyCode");
+      if (partyCode) partyCode.textContent = `Party Code: ${multiplayer.partyCode} · ${partySummary}`;
+
+      const copyInvite = document.getElementById("mpCopyInviteBtn");
+      if (copyInvite && !copyInvite.classList.contains("copyStatusOk") && !copyInvite.classList.contains("copyStatusWarn")) {
+        copyInvite.textContent = "Copy Party Code";
+      }
+      const copyGame = document.getElementById("copyGameLinkBtn");
+      if (copyGame && !copyGame.classList.contains("copyStatusOk") && !copyGame.classList.contains("copyStatusWarn")) {
+        copyGame.textContent = "Copy Party Code";
+      }
+    };
+    updateMultiplayerPanel.__quickPartyWrapped = true;
+  }
+}
+
 function gameLoop() {
   if (typeof syncMusicToGameState === "function") syncMusicToGameState();
   pollGamepad();
@@ -124,6 +212,7 @@ function gameLoop() {
 initInputControls();
 setupMusicControls();
 setupLootWindowHandlers();
+installQuickPartyCodeClient();
 setupTitleScreenHandlers();
 applyRatDirectionHotfix();
 resetState();
