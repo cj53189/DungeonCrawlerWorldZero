@@ -1342,10 +1342,10 @@ const FLOOR_ATLAS_ROWS = {
 const FLOOR_TYPES = {
   normal: {
     baseRows: [0, 1, 2],
-    accentRows: [3, 4, 5, 6],
+    accentRows: [0, 1, 2],
     detailRows: [14, 15],
-    detailChance: 0.03,
-    accentChance: 0.12,
+    detailChance: 0.005,
+    accentChance: 0.04,
   },
 
   damaged: {
@@ -1374,7 +1374,7 @@ const FLOOR_TYPES = {
 
   safe: {
     baseRows: [9],
-    accentRows: [0, 1],
+    accentRows: [9],
     detailRows: [],
     detailChance: 0,
     accentChance: 0.04,
@@ -1382,15 +1382,15 @@ const FLOOR_TYPES = {
 
   boss: {
     baseRows: [10],
-    accentRows: [3, 4, 5],
-    detailRows: [14, 15],
-    detailChance: 0.08,
-    accentChance: 0.18,
+    accentRows: [10],
+    detailRows: [],
+    detailChance: 0,
+    accentChance: 0.12,
   },
 
   treasure: {
     baseRows: [11],
-    accentRows: [9],
+    accentRows: [11],
     detailRows: [],
     detailChance: 0,
     accentChance: 0.05,
@@ -1398,18 +1398,18 @@ const FLOOR_TYPES = {
 
   crypt: {
     baseRows: [12],
-    accentRows: [3, 4, 5],
-    detailRows: [14, 15],
-    detailChance: 0.05,
-    accentChance: 0.14,
+    accentRows: [12],
+    detailRows: [],
+    detailChance: 0,
+    accentChance: 0.10,
   },
 
   sewer: {
     baseRows: [13],
-    accentRows: [7, 8],
-    detailRows: [14, 15],
-    detailChance: 0.08,
-    accentChance: 0.18,
+    accentRows: [13],
+    detailRows: [],
+    detailChance: 0,
+    accentChance: 0.12,
   },
 };
 

@@ -91,7 +91,7 @@ function drawFloorAtlasTile(detail, px, py, isVisible) {
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.globalAlpha = isVisible ? 1 : 0.48;
+  ctx.globalAlpha = isVisible ? 0.62 : 0.30;
   ctx.drawImage(
     FLOOR_ATLAS_IMAGE,
     detail.atlasCol * FLOOR_ATLAS_TILE_SIZE,
@@ -713,6 +713,13 @@ function chooseEngravingPlacement(room) {
   };
 }
 
+function isEngravingRoomType(room) {
+  const name = (room?.name || "").toLowerCase();
+  return room?.type === "safe" || room?.type === "boss" ||
+    name.includes("treasury") || name.includes("treasure") || name.includes("reward") ||
+    name.includes("crypt") || name.includes("tomb") || name.includes("burial") || name.includes("sewer");
+}
+
 function drawEngravedRoomNames(camX, camY) {
   if (!rooms || !visible) return;
 
@@ -721,7 +728,7 @@ function drawEngravedRoomNames(camX, camY) {
   ctx.textBaseline = "middle";
 
   for (const room of rooms) {
-    if (!room.seen || !room.name) continue;
+    if (!room.seen || !room.name || !isEngravingRoomType(room)) continue;
 
     const placement = chooseEngravingPlacement(room);
     const cx = placement.cx;
@@ -780,7 +787,7 @@ function drawEngravedRoomNames(camX, camY) {
     ctx.font = `900 ${fontSize}px Arial`;
     ctx.lineWidth = Math.max(1, Math.floor(fontSize / 18));
 
-    const alpha = revealProgress;
+    const alpha = revealProgress * 0.30;
 
     for (let i = 0; i < lines.length; i++) {
       const label = lines[i];
@@ -1259,9 +1266,10 @@ function draw() {
         const fallbackColor = t === "S"
           ? (isVisible ? "#203522" : "#172418")
           : (collapseStarted ? (isVisible ? "#2b1c1c" : "#1d1515") : (isVisible ? "#202020" : "#161616"));
-        if (!drawFloorAtlasTile(floorVisual, px, py, isVisible)) drawDungeonTileBase(px, py, fallbackColor);
+        drawDungeonTileBase(px, py, fallbackColor);
+        const atlasDrawn = drawFloorAtlasTile(floorVisual, px, py, isVisible);
         drawWallFloorShadow(x, y, px, py, isVisible);
-        drawFloorDetail(floorVisual, px, py, isVisible);
+        if (!atlasDrawn) drawFloorDetail(floorVisual, px, py, isVisible);
       }
 
       if (t === "D") {
