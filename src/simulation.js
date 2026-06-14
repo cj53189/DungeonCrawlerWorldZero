@@ -460,7 +460,9 @@ function setEnemyAnimationState(enemy, state) {
 }
 
 function updateEnemyFacing(enemy, dx, dy) {
-  if (!enemy?.spriteKey || Math.hypot(dx, dy) < 0.05) return;
+  if (!enemy?.spriteKey) return;
+  enemy.visualMoving = Math.hypot(dx, dy) >= 0.05;
+  if (!enemy.visualMoving) return;
   enemy.facingX = dx;
   enemy.facingY = dy;
 }
@@ -542,6 +544,7 @@ for (const enemy of enemies) {
     if (enemy.hp <= 0) continue;
     enemy.damageCooldown = Math.max(0, enemy.damageCooldown - 1);
     if (enemy.pendingAttack) {
+      enemy.visualMoving = false;
       const attack = enemy.animations?.attack;
       const ticksPerFrame = attack?.fps ? Math.max(1, Math.round(60 / attack.fps)) : 5;
       const damageFrame = attack?.damageFrame ?? Math.max(0, Math.floor((attack?.frames?.length || 1) * 0.65));
@@ -559,7 +562,10 @@ for (const enemy of enemies) {
       }
       continue;
     }
-    if (!getActiveCrawlers().some(crawler => !crawler.safe)) continue;
+    if (!getActiveCrawlers().some(crawler => !crawler.safe)) {
+      enemy.visualMoving = false;
+      continue;
+    }
 
     const exTile = Math.floor(enemy.x / TILE), eyTile = Math.floor(enemy.y / TILE);
     if (!seen[eyTile]?.[exTile] && !collapseStarted) continue;

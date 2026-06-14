@@ -23,17 +23,18 @@ const ENEMY_SPRITE_DEFINITIONS = {
     displayName: "Skeleton Boss",
     src: "./assets/sprites/enemies/skeletonboss/skeletonboss.png",
     missingWarning: "Skeleton Boss sprite missing: assets/sprites/enemies/skeletonboss/skeletonboss.png",
-    columns: 10,
-    rows: 5,
-    frameCount: 10,
-    rowCount: 5,
-    facesRightByDefault: true,
+    frameWidth: 64,
+    frameHeight: 64,
+    columns: 4,
+    rows: 4,
+    frameCount: 4,
+    rowCount: 4,
+    directionRows: { down: 0, up: 1, left: 2, right: 3 },
+    directionalFrameRows: true,
+    animationSpeed: 14,
     animations: {
-      idle: { row: 0, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 6, loop: true },
-      walk: { row: 1, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 10, loop: true },
-      attack: { row: 2, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 12, loop: false, damageFrame: 7 },
-      death: { row: 3, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 8, loop: false, holdFinalFrame: true },
-      revive: { row: 4, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 8, loop: false }
+      attack: { frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 12, loop: false, damageFrame: 7 },
+      death: { frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 8, loop: false, holdFinalFrame: true }
     }
   }
 };
@@ -67,6 +68,7 @@ function enemySpriteMetadataForKey(spriteKey) {
     frameCount: definition.frameCount,
     rowCount: definition.rowCount || 1,
     directionRows: definition.directionRows || null,
+    directionalFrameRows: !!definition.directionalFrameRows,
     animationSpeed: definition.animationSpeed,
     animations: definition.animations || null,
     facesRightByDefault: !!definition.facesRightByDefault,
