@@ -74,10 +74,16 @@ function makeLobbyCode() {
 }
 
 function ensureLocalLobbyCrawler() {
-  if (!multiplayer.lobbyMembers.some(member => member.id === multiplayer.playerId)) {
+  const existingLocalMember = multiplayer.lobbyMembers.find(member => member.id === multiplayer.playerId);
+  if (existingLocalMember) {
+    existingLocalMember.name = playerProfile?.name || "Crawler";
+    existingLocalMember.characterId = getCharacterDef(playerProfile?.characterId).id;
+    existingLocalMember.floor0Status = multiplayer.localFloor0Status || existingLocalMember.floor0Status || "exploring";
+  } else {
     multiplayer.lobbyMembers.unshift({
       id: multiplayer.playerId,
       name: playerProfile?.name || "Crawler",
+      characterId: getCharacterDef(playerProfile?.characterId).id,
       leader: multiplayer.isPartyLeader,
       isPartyLeader: multiplayer.isPartyLeader,
       local: true,
@@ -153,7 +159,7 @@ function addMockLobbyCrawler() {
   if (!multiplayer.enabled) return;
   if (getLobbyMembers().length >= multiplayer.targetPlayers) return;
   const nextNumber = getLobbyMembers().length + 1;
-  const mockMember = { id: `mock_${nextNumber}`, name: `Crawler ${nextNumber}`, leader: false, isPartyLeader: false, local: false, partyId: multiplayer.partyId, floor0Status: "exploring" };
+  const mockMember = { id: `mock_${nextNumber}`, name: `Crawler ${nextNumber}`, characterId: DEFAULT_CHARACTER_ID, leader: false, isPartyLeader: false, local: false, partyId: multiplayer.partyId, floor0Status: "exploring" };
   multiplayer.lobbyMembers.push(mockMember);
   syncLocalPartyMembersFromLobby();
   multiplayer.status = getLobbyMembers().length >= multiplayer.targetPlayers ? "ready" : multiplayer.status;
@@ -216,6 +222,7 @@ function placeMockRemoteCrawlers() {
     multiplayer.remotePlayers.set(member.id, {
       id: member.id,
       name: member.name,
+      characterId: getCharacterDef(member.characterId).id,
       x: (room.cx + 0.5) * TILE,
       y: (room.cy + 0.5) * TILE,
       r: player.r,

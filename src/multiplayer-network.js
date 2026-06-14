@@ -286,6 +286,8 @@ function crawlerStateSignature(state) {
     Math.round(state.hp || 0),
     state.status || "",
     state.floor0Status || "",
+    state.name || "",
+    state.characterId || DEFAULT_CHARACTER_ID,
     state.isDodging ? "dodge" : "still",
     networkNumberSignature(state.dodgeProgress, 2),
     state.currentRoomId ?? ""
@@ -307,8 +309,7 @@ function captureLocalCrawlerNetworkState() {
     dodgeProgress: player.dodgeMaxFrames > 0 ? 1 - (player.dodgeFrames / player.dodgeMaxFrames) : 0,
     currentRoomId: Number.isFinite(Number(player.currentRoomId)) ? Math.trunc(Number(player.currentRoomId)) : undefined,
     name: playerProfile?.name || "Crawler",
-    sprite: playerProfile?.sprite || "default",
-    color: playerProfile?.color || "blue"
+    characterId: getCharacterDef(playerProfile?.characterId).id
   };
 }
 
@@ -356,6 +357,7 @@ function applyServerCrawlerSnapshot(snapshot) {
     nextRemotePlayers.set(crawler.id, {
       id: crawler.id,
       name: member?.name || crawler.name || "Crawler",
+      characterId: getCharacterDef(crawler.characterId || member?.characterId).id,
       x,
       y,
       r: player.r,
@@ -392,6 +394,7 @@ function applyServerLobbyUpdate(update) {
   multiplayer.lobbyMembers = (update.players || []).map((player, index) => ({
     id: player.id,
     name: player.id === multiplayer.playerId ? (playerProfile?.name || player.name || "Crawler") : (player.name || `Crawler ${index + 1}`),
+    characterId: getCharacterDef(player.id === multiplayer.playerId ? playerProfile?.characterId : player.characterId).id,
     leader: !!player.isPartyLeader,
     isPartyLeader: !!player.isPartyLeader,
     local: player.id === multiplayer.playerId,

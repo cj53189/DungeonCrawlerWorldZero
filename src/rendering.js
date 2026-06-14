@@ -3,10 +3,8 @@ const CAMERA_TILT_SCALE = 0.72;
 const WALL_RISE = 18;
 const ENTITY_RISE = 10;
 
-const PLAYER_SPRITE_PATH = "./assets/sprites/player_base.png";
 const PLAYER_DODGE_SPRITE_PATH = "./assets/sprites/player_dodge_roll.png";
-const PLAYER_SPRITE_SHEET = new Image();
-PLAYER_SPRITE_SHEET.src = PLAYER_SPRITE_PATH;
+const CHARACTER_SPRITE_CACHE = new Map();
 const PLAYER_DODGE_SPRITE_SHEET = new Image();
 PLAYER_DODGE_SPRITE_SHEET.src = PLAYER_DODGE_SPRITE_PATH;
 
@@ -288,10 +286,26 @@ function playerSpriteRowForAim() {
   return aimY < 0 ? 1 : 0;
 }
 
-function isPlayerSpriteLoaded(sheet = PLAYER_SPRITE_SHEET) {
-  return sheet.complete &&
-    sheet.naturalWidth >= PLAYER_SPRITE_FRAME_WIDTH * 3 &&
-    sheet.naturalHeight >= PLAYER_SPRITE_FRAME_HEIGHT * 4;
+function getCharacterSpriteSheet(characterId) {
+  const def = typeof getCharacterDef === "function" ? getCharacterDef(characterId) : null;
+  if (!def || def.mode !== "baked" || !def.image) return null;
+  let sheet = CHARACTER_SPRITE_CACHE.get(def.id);
+  if (!sheet) {
+    sheet = new Image();
+    sheet.src = def.image;
+    CHARACTER_SPRITE_CACHE.set(def.id, sheet);
+  }
+  return sheet;
+}
+
+function isCharacterSpriteLoaded(def, sheet) {
+  return !!def && !!sheet && sheet.complete &&
+    sheet.naturalWidth >= def.frameWidth * def.columns &&
+    sheet.naturalHeight >= def.frameHeight * def.rows;
+}
+
+function isPlayerSpriteLoaded(sheet = getCharacterSpriteSheet(playerProfile?.characterId), def = getCharacterDef(playerProfile?.characterId)) {
+  return isCharacterSpriteLoaded(def, sheet);
 }
 
 function isOtherCrawlerSpriteLoaded() {
@@ -344,14 +358,16 @@ function drawPlayerSpriteStatusRing() {
 }
 
 function drawPlayerSprite() {
-  if (!isPlayerSpriteLoaded()) {
+  const characterDef = getCharacterDef(playerProfile?.characterId);
+  const characterSheet = getCharacterSpriteSheet(characterDef.id);
+  if (!isCharacterSpriteLoaded(characterDef, characterSheet)) {
     drawPlayerFallbackFigure();
     return;
   }
 
   const dodging = typeof isPlayerDodging === "function" && isPlayerDodging();
-  const dodgeSheetReady = dodging && isPlayerSpriteLoaded(PLAYER_DODGE_SPRITE_SHEET);
-  const sheet = dodgeSheetReady ? PLAYER_DODGE_SPRITE_SHEET : PLAYER_SPRITE_SHEET;
+  const dodgeSheetReady = dodging && isPlayerSpriteLoaded(PLAYER_DODGE_SPRITE_SHEET, characterDef);
+  const sheet = dodgeSheetReady ? PLAYER_DODGE_SPRITE_SHEET : characterSheet;
   const moving = isPlayerTryingToMove();
   const frame = dodgeSheetReady
     ? Math.floor((player.dodgeVisualFrame || 0) / 4) % 3
@@ -359,8 +375,8 @@ function drawPlayerSprite() {
       ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor((dodging ? (player.dodgeVisualFrame || frameCount) : frameCount) / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
       : 0;
   const row = playerSpriteRowForAim();
-  const sx = frame * PLAYER_SPRITE_FRAME_WIDTH;
-  const sy = row * PLAYER_SPRITE_FRAME_HEIGHT;
+  const sx = frame * characterDef.frameWidth;
+  const sy = row * characterDef.frameHeight;
   const dx = player.x - PLAYER_SPRITE_RENDER_WIDTH / 2;
   const dy = player.y + player.r - PLAYER_SPRITE_RENDER_HEIGHT;
 
@@ -386,8 +402,8 @@ function drawPlayerSprite() {
     sheet,
     sx,
     sy,
-    PLAYER_SPRITE_FRAME_WIDTH,
-    PLAYER_SPRITE_FRAME_HEIGHT,
+    characterDef.frameWidth,
+    characterDef.frameHeight,
     dx,
     dy,
     PLAYER_SPRITE_RENDER_WIDTH,
@@ -424,6 +440,13 @@ function drawRemoteCrawlerBadge(crawler) {
 }
 
 function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
+  const characterDef = getCharacterDef(crawler?.characterId);
+  const characterSheet = getCharacterSpriteSheet(characterDef.id);
+  if (characterDef.mode === "baked" && isCharacterSpriteLoaded(characterDef, characterSheet)) {
+    drawPlayerSpriteAt({ ...crawler, characterId: characterDef.id, frame: crawler.moving ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length] : 0 }, alpha, tint);
+    drawRemoteCrawlerBadge(crawler);
+    return;
+  }
   if (!isOtherCrawlerSpriteLoaded()) {
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -465,7 +488,9 @@ function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
 }
 
 function drawPlayerSpriteAt(entity, alpha = 1, tint = null) {
-  if (!isPlayerSpriteLoaded()) {
+  const characterDef = getCharacterDef(entity.characterId);
+  const sheet = getCharacterSpriteSheet(characterDef.id);
+  if (!isCharacterSpriteLoaded(characterDef, sheet)) {
     ctx.save();
     ctx.globalAlpha = alpha;
     drawStandingFigure(entity, { color: tint || entity.color || "#75c7ff", outline: "rgba(255,255,255,0.55)", height: 22 });
@@ -479,7 +504,7 @@ function drawPlayerSpriteAt(entity, alpha = 1, tint = null) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(PLAYER_SPRITE_SHEET, frame * PLAYER_SPRITE_FRAME_WIDTH, row * PLAYER_SPRITE_FRAME_HEIGHT, PLAYER_SPRITE_FRAME_WIDTH, PLAYER_SPRITE_FRAME_HEIGHT, dx, dy, PLAYER_SPRITE_RENDER_WIDTH, PLAYER_SPRITE_RENDER_HEIGHT);
+  ctx.drawImage(sheet, frame * characterDef.frameWidth, row * characterDef.frameHeight, characterDef.frameWidth, characterDef.frameHeight, dx, dy, PLAYER_SPRITE_RENDER_WIDTH, PLAYER_SPRITE_RENDER_HEIGHT);
   if (tint) {
     ctx.globalCompositeOperation = "source-atop";
     ctx.fillStyle = tint;
