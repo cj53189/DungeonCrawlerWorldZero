@@ -195,14 +195,18 @@ function drawEnemyFallbackFigure(enemy) {
 }
 
 function enemySpriteRow(enemy) {
-  const animation = enemy?.animations?.[enemy.animationState || "walk"];
-  if (animation) return animation.row || 0;
   const rows = enemy?.directionRows;
-  if (!rows) return 0;
-  const facingX = Number(enemy.facingX || 0);
-  const facingY = Number(enemy.facingY || 0);
-  if (Math.abs(facingX) > Math.abs(facingY)) return facingX < 0 ? (rows.left || 0) : (rows.right || 0);
-  return facingY < 0 ? (rows.up || 0) : (rows.down || 0);
+  const animation = enemy?.animations?.[enemy.animationState || "walk"];
+  if (rows) {
+    const facingX = Number(enemy.facingX || 0);
+    const facingY = Number(enemy.facingY || 0);
+    if (Math.abs(facingX) > Math.abs(facingY)) {
+      return facingX < 0 ? (rows.left ?? 0) : (rows.right ?? 0);
+    }
+    return facingY < 0 ? (rows.up ?? 0) : (rows.down ?? 0);
+  }
+  if (animation) return animation.row || 0;
+  return 0;
 }
 
 function drawEnemySprite(enemy) {

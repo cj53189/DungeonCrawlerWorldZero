@@ -12,7 +12,19 @@ const ENEMY_BEHAVIOR_TAGS = {
 };
 
 const ENEMY_SPRITE_DEFINITIONS = {
-  rat: { spriteKey: "rat", src: "./assets/sprites/enemies/rat.png", frameWidth: 32, frameHeight: 32, frameCount: 3, rowCount: 4, directionRows: { down: 0, up: 1, left: 2, right: 3 }, animationSpeed: 10 },
+  rat: {
+    spriteKey: "rat",
+    src: "./assets/sprites/enemies/rat.png",
+    frameWidth: 32,
+    frameHeight: 32,
+    columns: 4,
+    rows: 4,
+    frameCount: 4,
+    rowCount: 4,
+    directionRows: { up: 0, right: 1, down: 2, left: 3 },
+    directionalFrameRows: true,
+    animationSpeed: 10
+  },
   spider: { spriteKey: "spider", src: "./assets/sprites/enemies/spider.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 9 },
   janitor_bot: { spriteKey: "janitor_bot", src: "./assets/sprites/enemies/janitor_bot.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 12 },
   maintenance_guard: { spriteKey: "maintenance_guard", src: "./assets/sprites/enemies/maintenance_guard.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 11 },
