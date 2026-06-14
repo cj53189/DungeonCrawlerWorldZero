@@ -29,6 +29,8 @@ const OTHER_CRAWLER_RENDER_WIDTH = SPRITE_FRAME_W;
 const OTHER_CRAWLER_RENDER_HEIGHT = SPRITE_FRAME_H;
 const REMOTE_PLAYER_SPRITE_VISUAL_SCALE = 0.72;
 const OTHER_CRAWLER_IDLE_FRAME = 1;
+const OTHER_CRAWLER_DIRECTION_ROWS = { down: 0, up: 1, left: 3, right: 4 };
+const NETWORK_DIRECTION_VALUES = { 0: "down", 1: "up", 2: "left", 3: "right" };
 
 const ENEMY_SPRITE_CACHE = new Map();
 
@@ -273,6 +275,31 @@ function getEntitySpriteRowForAim(entity) {
   return aimY < 0 ? 1 : 0;
 }
 
+function normalizeNetworkDirection(direction) {
+  if (typeof direction === "string") {
+    const normalized = direction.trim().toLowerCase();
+    if (normalized in OTHER_CRAWLER_DIRECTION_ROWS) return normalized;
+  }
+
+  if (Number.isFinite(Number(direction))) {
+    return NETWORK_DIRECTION_VALUES[Math.trunc(Number(direction))] || null;
+  }
+
+  return null;
+}
+
+function getRemoteArmoredCrawlerSpriteRow(crawler) {
+  const networkDirection = normalizeNetworkDirection(crawler?.direction);
+  if (networkDirection) return OTHER_CRAWLER_DIRECTION_ROWS[networkDirection];
+
+  const aimX = Number.isFinite(crawler?.aimX) ? crawler.aimX : 0;
+  const aimY = Number.isFinite(crawler?.aimY) ? crawler.aimY : 1;
+  if (Math.abs(aimX) > Math.abs(aimY)) {
+    return aimX < 0 ? OTHER_CRAWLER_DIRECTION_ROWS.left : OTHER_CRAWLER_DIRECTION_ROWS.right;
+  }
+  return aimY < 0 ? OTHER_CRAWLER_DIRECTION_ROWS.up : OTHER_CRAWLER_DIRECTION_ROWS.down;
+}
+
 function drawPlayerSpriteStatusRing() {
   if (!player.safe && player.pvpFreezeFrames <= 0) return;
 
@@ -382,7 +409,7 @@ function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
   const frame = moving
     ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
     : OTHER_CRAWLER_IDLE_FRAME;
-  const row = Math.min(OTHER_CRAWLER_SPRITE_ROWS - 1, getEntitySpriteRowForAim(crawler));
+  const row = Math.min(OTHER_CRAWLER_SPRITE_ROWS - 1, getRemoteArmoredCrawlerSpriteRow(crawler));
   const drawW = OTHER_CRAWLER_RENDER_WIDTH * REMOTE_PLAYER_SPRITE_VISUAL_SCALE;
   const drawH = OTHER_CRAWLER_RENDER_HEIGHT * REMOTE_PLAYER_SPRITE_VISUAL_SCALE;
   const dx = Math.round(crawler.x - drawW / 2);

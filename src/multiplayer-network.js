@@ -358,6 +358,7 @@ function applyServerCrawlerSnapshot(snapshot) {
       r: player.r,
       aimX: Number.isFinite(Number(crawler.aimX)) ? Number(crawler.aimX) : undefined,
       aimY: Number.isFinite(Number(crawler.aimY)) ? Number(crawler.aimY) : undefined,
+      direction: crawler.direction,
       hp: Math.max(0, Number(crawler.hp) || 0),
       maxHp: Math.max(1, Number(crawler.maxHp) || player.maxHp),
       currentFloor: 0,
