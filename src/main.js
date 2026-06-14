@@ -94,6 +94,11 @@ if (drawPlayerSpriteWithoutStoneStairwell) {
   };
 }
 
+function applyRatDirectionHotfix() {
+  if (typeof ENEMY_SPRITE_DEFINITIONS === "undefined" || !ENEMY_SPRITE_DEFINITIONS.rat) return;
+  ENEMY_SPRITE_DEFINITIONS.rat.directionRows = { up: 0, right: 3, down: 2, left: 1 };
+}
+
 function gameLoop() {
   if (typeof syncMusicToGameState === "function") syncMusicToGameState();
   pollGamepad();
@@ -120,6 +125,7 @@ initInputControls();
 setupMusicControls();
 setupLootWindowHandlers();
 setupTitleScreenHandlers();
+applyRatDirectionHotfix();
 resetState();
 showTitleScreen();
 gameLoop();
