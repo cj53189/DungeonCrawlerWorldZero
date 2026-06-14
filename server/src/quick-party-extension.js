@@ -1,7 +1,8 @@
-const { LOBBY_MODES, LOBBY_STATUS, SERVER_MESSAGES, TARGET_PLAYERS, safeSend } = require("./protocol");
+const { LOBBY_MODES, LOBBY_STATUS, SERVER_MESSAGES, TARGET_PLAYERS, FLOOR0_COLLAPSE_CAPS_MS, safeSend } = require("./protocol");
 
 const PARTY_CODE_PREFIX = "RUNE";
 const PARTY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const PARTY_INVITE_TTL_MS = 30_000;
 
 function normalizePartyCode(code) {
   return String(code || "").trim().toUpperCase();
@@ -22,6 +23,15 @@ function ensurePartyCodeMap(lobby) {
   return lobby.partyCodes;
 }
 
+function ensurePartyInviteMap(lobby) {
+  if (!lobby.partyInvites) lobby.partyInvites = new Map();
+  return lobby.partyInvites;
+}
+
+function inviteKey(fromPlayerId, toPlayerId) {
+  return `${fromPlayerId}->${toPlayerId}`;
+}
+
 function findPartyByCode(manager, requestedCode) {
   const code = normalizePartyCode(requestedCode);
   if (!code) return null;
@@ -32,6 +42,16 @@ function findPartyByCode(manager, requestedCode) {
   }
 
   return null;
+}
+
+function getPartySize(lobby, partyId) {
+  if (!partyId) return 0;
+  return lobby.players.filter(player => player.partyId === partyId).length;
+}
+
+function cleanupSoloPartyCode(lobby, player) {
+  if (!lobby || !player?.partyCode || getPartySize(lobby, player.partyId) > 1) return;
+  lobby.partyCodes?.delete(player.partyCode);
 }
 
 function assignSoloQuickParty(manager, lobby, player) {
@@ -58,6 +78,17 @@ function sendQuickPartyMatchmakingUpdate(client, lobby, partyCode, partyId) {
   });
 }
 
+function sendQuickPartyJoined(client, lobby, partyCode, partyId, { isPartyLeader = false, joinedByPartyCode = false } = {}) {
+  safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, {
+    lobbyCode: lobby.code,
+    mode: lobby.mode,
+    partyCode,
+    partyId,
+    isPartyLeader: !!isPartyLeader,
+    joinedByPartyCode
+  });
+}
+
 function joinQuickPartyByCode(manager, playerId, requestedCode) {
   const party = findPartyByCode(manager, requestedCode);
   if (!party) return null;
@@ -79,8 +110,25 @@ function joinQuickPartyByCode(manager, playerId, requestedCode) {
   }
 
   sendQuickPartyMatchmakingUpdate(client, lobby, partyCode, partyId);
+  sendQuickPartyJoined(client, lobby, partyCode, partyId, { isPartyLeader: false, joinedByPartyCode: true });
   manager.broadcastLobbyUpdate(lobby);
   return lobby;
+}
+
+function findPlayerLobby(manager, playerId) {
+  const client = manager.requireClient(playerId);
+  if (!client.lobbyCode) return { client, lobby: null, player: null };
+  const lobby = manager.lobbies.get(client.lobbyCode);
+  const player = lobby?.players.find(candidate => candidate.id === playerId) || null;
+  return { client, lobby, player };
+}
+
+function expireOldInvites(lobby) {
+  const invites = ensurePartyInviteMap(lobby);
+  const now = Date.now();
+  for (const [key, invite] of invites.entries()) {
+    if (invite.expiresAt <= now) invites.delete(key);
+  }
 }
 
 function applyQuickPartyExtension(LobbyManager) {
@@ -90,21 +138,32 @@ function applyQuickPartyExtension(LobbyManager) {
   proto.createLobby = function createLobbyWithPartyCodes(args) {
     const lobby = originalCreateLobby.call(this, args);
     ensurePartyCodeMap(lobby);
+    ensurePartyInviteMap(lobby);
     return lobby;
   };
 
-  const originalJoinQuickMatch = proto.joinQuickMatch;
   proto.joinQuickMatch = function joinQuickMatchWithSoloParty(playerId) {
-    const lobby = originalJoinQuickMatch.call(this, playerId);
     const client = this.requireClient(playerId);
+    this.leaveLobby(playerId, { silent: true });
+
+    let lobby = Array.from(this.lobbies.values()).find(candidate => (
+      candidate.mode === LOBBY_MODES.QUICK_MATCH &&
+      candidate.status === LOBBY_STATUS.STAGING &&
+      candidate.players.length < TARGET_PLAYERS
+    ));
+
+    if (!lobby) {
+      const code = `QUICK-${String(this.quickLobbyCounter++).padStart(4, "0")}`;
+      lobby = this.createLobby({ code, mode: LOBBY_MODES.QUICK_MATCH });
+    }
+
+    this.addPlayerToLobby(lobby, client, { partyId: null, isPartyLeader: false });
     const player = lobby.players.find(candidate => candidate.id === playerId);
     const party = assignSoloQuickParty(this, lobby, player);
 
-    if (party) {
-      sendQuickPartyMatchmakingUpdate(client, lobby, party.partyCode, party.partyId);
-      this.broadcastLobbyUpdate(lobby);
-    }
-
+    sendQuickPartyMatchmakingUpdate(client, lobby, party.partyCode, party.partyId);
+    sendQuickPartyJoined(client, lobby, party.partyCode, party.partyId, { isPartyLeader: true });
+    this.broadcastLobbyUpdate(lobby);
     return lobby;
   };
 
@@ -113,6 +172,132 @@ function applyQuickPartyExtension(LobbyManager) {
     const quickPartyLobby = joinQuickPartyByCode(this, playerId, requestedCode);
     if (quickPartyLobby) return quickPartyLobby;
     return originalJoinPrivateLobby.call(this, playerId, requestedCode);
+  };
+
+  proto.requestPartyInvite = function requestPartyInvite(playerId, targetPlayerId) {
+    if (!targetPlayerId || targetPlayerId === playerId) return false;
+    const { client, lobby, player: from } = findPlayerLobby(this, playerId);
+    if (!lobby || !from || lobby.status !== LOBBY_STATUS.STAGING) return false;
+    if (lobby.mode !== LOBBY_MODES.QUICK_MATCH) throw new Error("Party invites are only available in Quick Match.");
+
+    const to = lobby.players.find(candidate => candidate.id === targetPlayerId);
+    if (!to) throw new Error("That crawler is not in your Quick Match room.");
+
+    assignSoloQuickParty(this, lobby, from);
+    assignSoloQuickParty(this, lobby, to);
+    if (from.partyId === to.partyId) {
+      safeSend(client.ws, SERVER_MESSAGES.PARTY_RESPONSE, {
+        lobbyCode: lobby.code,
+        accepted: true,
+        alreadyParty: true,
+        partyCode: from.partyCode,
+        partyId: from.partyId,
+        targetPlayerId: to.id,
+        targetName: to.name
+      });
+      return true;
+    }
+
+    if (getPartySize(lobby, to.partyId) > 1) throw new Error(`${to.name} is already in another party.`);
+
+    expireOldInvites(lobby);
+    const invite = {
+      fromPlayerId: from.id,
+      fromName: from.name,
+      toPlayerId: to.id,
+      fromPartyId: from.partyId,
+      fromPartyCode: from.partyCode,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + PARTY_INVITE_TTL_MS
+    };
+    ensurePartyInviteMap(lobby).set(inviteKey(from.id, to.id), invite);
+
+    const targetClient = this.clients.get(to.id);
+    if (targetClient) safeSend(targetClient.ws, SERVER_MESSAGES.PARTY_INVITE, {
+      lobbyCode: lobby.code,
+      fromPlayerId: from.id,
+      fromName: from.name,
+      fromPartyId: from.partyId,
+      fromPartyCode: from.partyCode,
+      expiresAt: new Date(invite.expiresAt).toISOString()
+    });
+
+    safeSend(client.ws, SERVER_MESSAGES.PARTY_RESPONSE, {
+      lobbyCode: lobby.code,
+      pending: true,
+      accepted: false,
+      partyCode: from.partyCode,
+      partyId: from.partyId,
+      targetPlayerId: to.id,
+      targetName: to.name
+    });
+    return true;
+  };
+
+  proto.respondPartyInvite = function respondPartyInvite(playerId, fromPlayerId, accepted = false) {
+    if (!fromPlayerId || fromPlayerId === playerId) return false;
+    const { client, lobby, player: to } = findPlayerLobby(this, playerId);
+    if (!lobby || !to || lobby.status !== LOBBY_STATUS.STAGING) return false;
+
+    expireOldInvites(lobby);
+    const invites = ensurePartyInviteMap(lobby);
+    const key = inviteKey(fromPlayerId, playerId);
+    const invite = invites.get(key);
+    if (!invite) throw new Error("That party invite expired.");
+    invites.delete(key);
+
+    const from = lobby.players.find(candidate => candidate.id === fromPlayerId);
+    if (!from) throw new Error("That crawler left the match.");
+
+    if (!accepted) {
+      const sourceClient = this.clients.get(from.id);
+      if (sourceClient) safeSend(sourceClient.ws, SERVER_MESSAGES.PARTY_RESPONSE, {
+        lobbyCode: lobby.code,
+        accepted: false,
+        targetPlayerId: to.id,
+        targetName: to.name
+      });
+      safeSend(client.ws, SERVER_MESSAGES.PARTY_RESPONSE, {
+        lobbyCode: lobby.code,
+        accepted: false,
+        fromPlayerId: from.id,
+        fromName: from.name
+      });
+      return true;
+    }
+
+    assignSoloQuickParty(this, lobby, from);
+    assignSoloQuickParty(this, lobby, to);
+    if (getPartySize(lobby, to.partyId) > 1 && to.partyId !== from.partyId) throw new Error(`${to.name} is already in another party.`);
+
+    const oldPartyCode = to.partyCode;
+    cleanupSoloPartyCode(lobby, to);
+    to.partyId = from.partyId;
+    to.partyCode = from.partyCode;
+    to.isPartyLeader = false;
+    if (oldPartyCode && oldPartyCode !== from.partyCode) lobby.partyCodes?.delete(oldPartyCode);
+
+    const sourceClient = this.clients.get(from.id);
+    if (sourceClient) safeSend(sourceClient.ws, SERVER_MESSAGES.PARTY_RESPONSE, {
+      lobbyCode: lobby.code,
+      accepted: true,
+      partyCode: from.partyCode,
+      partyId: from.partyId,
+      targetPlayerId: to.id,
+      targetName: to.name
+    });
+    safeSend(client.ws, SERVER_MESSAGES.PARTY_RESPONSE, {
+      lobbyCode: lobby.code,
+      accepted: true,
+      partyCode: from.partyCode,
+      partyId: from.partyId,
+      fromPlayerId: from.id,
+      fromName: from.name
+    });
+
+    this.broadcastLobbyUpdate(lobby);
+    this.broadcastCrawlerSnapshot(lobby, { force: true });
+    return true;
   };
 
   const originalLobbyPayload = proto.lobbyPayload;
