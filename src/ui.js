@@ -509,7 +509,7 @@ function captureRunProgress() {
     player: {
       level: player.level, xp: player.xp, xpToNext: player.xpToNext,
       maxHp: player.maxHp, hp: player.hp, attackDamage: player.attackDamage,
-      baseSpeed: player.baseSpeed, speed: player.speed, defense: player.defense,
+      baseSpeed: player.baseSpeed, defense: player.defense,
       audienceBonus: player.audienceBonus, coins: player.coins,
       currentWeaponId: player.currentWeaponId, aimX: player.aimX, aimY: player.aimY,
       inventory: player.inventory.map(item => ({ ...item })),
@@ -533,7 +533,6 @@ function restoreRunProgress(snapshot) {
   player.hp = Math.min(snapshot.player.hp, snapshot.player.maxHp);
   player.attackDamage = snapshot.player.attackDamage;
   player.baseSpeed = snapshot.player.baseSpeed;
-  player.speed = snapshot.player.speed;
   player.defense = snapshot.player.defense;
   player.audienceBonus = snapshot.player.audienceBonus;
   player.coins = snapshot.player.coins;
@@ -551,6 +550,7 @@ function restoreRunProgress(snapshot) {
   achievements = new Set(snapshot.achievements);
 
   recalcEquipmentStats();
+  if (!Number.isFinite(player.speed)) player.speed = player.baseSpeed;
   updateInventoryUI();
   renderLog();
 }
