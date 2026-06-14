@@ -150,7 +150,7 @@
   }
 
   function renderQuickPartyUi() {
-    if (!window.multiplayer || !multiplayer.enabled) return;
+    if (typeof multiplayer === "undefined" || !multiplayer.enabled) return;
     const members = safeMembers();
     const localPartyId = currentLocalPartyId(members);
     renderPartySummary(members, localPartyId);
