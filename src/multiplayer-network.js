@@ -63,7 +63,7 @@ function connectMultiplayerNetwork() {
       multiplayerNetwork.lastError = null;
       multiplayer.networkStatus = "connected";
       multiplayer.networkError = null;
-      sendMultiplayerMessage("hello");
+      sendMultiplayerMessage("hello", { profile: playerProfile });
       if (typeof announcer === "function") announcer("Floor 0 collapse server connected.");
       if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
     });
@@ -126,7 +126,7 @@ function sendMultiplayerMessage(type, payload = {}) {
 function requestServerCreateLobby() {
   if (!isMultiplayerNetworkReady()) return false;
   prepareServerLobbyState({ status: "party", lobbyCode: null, partyId: null });
-  return sendMultiplayerMessage("create_lobby");
+  return sendMultiplayerMessage("create_lobby", { profile: playerProfile });
 }
 
 function requestServerJoinLobby(code) {
@@ -134,13 +134,13 @@ function requestServerJoinLobby(code) {
   const cleanedCode = String(code || "").trim().toUpperCase();
   if (!cleanedCode) return false;
   prepareServerLobbyState({ status: "party", lobbyCode: cleanedCode, partyId: `party:${cleanedCode}` });
-  return sendMultiplayerMessage("join_lobby", { lobbyCode: cleanedCode });
+  return sendMultiplayerMessage("join_lobby", { lobbyCode: cleanedCode, profile: playerProfile });
 }
 
 function requestServerQuickMatch() {
   if (!isMultiplayerNetworkReady()) return false;
   prepareServerLobbyState({ status: "matchmaking", lobbyCode: null, partyId: null });
-  return sendMultiplayerMessage("quick_match");
+  return sendMultiplayerMessage("quick_match", { profile: playerProfile });
 }
 
 function requestServerLeaveLobby() {
@@ -305,7 +305,10 @@ function captureLocalCrawlerNetworkState() {
     floor0Status: multiplayer.localFloor0Status || "exploring",
     isDodging: typeof isPlayerDodging === "function" ? isPlayerDodging() : false,
     dodgeProgress: player.dodgeMaxFrames > 0 ? 1 - (player.dodgeFrames / player.dodgeMaxFrames) : 0,
-    currentRoomId: Number.isFinite(Number(player.currentRoomId)) ? Math.trunc(Number(player.currentRoomId)) : undefined
+    currentRoomId: Number.isFinite(Number(player.currentRoomId)) ? Math.trunc(Number(player.currentRoomId)) : undefined,
+    name: playerProfile?.name || "Crawler",
+    sprite: playerProfile?.sprite || "default",
+    color: playerProfile?.color || "blue"
   };
 }
 
@@ -388,7 +391,7 @@ function applyServerLobbyUpdate(update) {
   multiplayer.collapseAt = multiplayer.stagingEndsAt;
   multiplayer.lobbyMembers = (update.players || []).map((player, index) => ({
     id: player.id,
-    name: player.id === multiplayer.playerId ? "You" : (player.name || `Crawler ${index + 1}`),
+    name: player.id === multiplayer.playerId ? (playerProfile?.name || player.name || "Crawler") : (player.name || `Crawler ${index + 1}`),
     leader: !!player.isPartyLeader,
     isPartyLeader: !!player.isPartyLeader,
     local: player.id === multiplayer.playerId,

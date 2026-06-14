@@ -696,6 +696,11 @@ function showFriendlyMultiplayerError(message) {
 }
 
 function showTitleScreen() {
+  const creator = document.getElementById("characterCreatorScreen");
+  if (creator) {
+    creator.style.display = "none";
+    creator.setAttribute("aria-hidden", "true");
+  }
   const title = document.getElementById("titleScreen");
   if (title) title.style.display = "flex";
   updateModeChrome();
@@ -706,8 +711,42 @@ function showTitleScreen() {
 function hideTitleScreen() {
   const title = document.getElementById("titleScreen");
   if (title) title.style.display = "none";
+  const creator = document.getElementById("characterCreatorScreen");
+  if (creator) {
+    creator.style.display = "none";
+    creator.setAttribute("aria-hidden", "true");
+  }
   updateModeChrome();
   updateTesterReadinessUI();
+}
+
+function updateCharacterCreatorPreview() {
+  const input = document.getElementById("creatorNameInput");
+  const name = sanitizePlayerName(input?.value ?? playerProfile.name);
+  const previewName = document.getElementById("creatorPreviewName");
+  if (previewName) previewName.textContent = name;
+}
+
+function showCharacterCreator() {
+  const title = document.getElementById("titleScreen");
+  const creator = document.getElementById("characterCreatorScreen");
+  const input = document.getElementById("creatorNameInput");
+  if (input) input.value = playerProfile.name;
+  updateCharacterCreatorPreview();
+  if (title) title.style.display = "none";
+  if (creator) {
+    creator.style.display = "flex";
+    creator.setAttribute("aria-hidden", "false");
+  }
+  if (input) input.focus();
+}
+
+function saveCharacterProfileFromCreator() {
+  const input = document.getElementById("creatorNameInput");
+  writePlayerProfile({ ...playerProfile, name: input?.value });
+  updateCharacterCreatorPreview();
+  if (typeof announcer === "function") announcer(`Crawler profile saved: ${playerProfile.name}.`);
+  showTitleScreen();
 }
 
 function setMultiplayerPanelOpen(isOpen) {
@@ -798,7 +837,11 @@ function updateMultiplayerPanel() {
       const statusText = currentFloor === 0 || ["start_pending", "active"].includes(multiplayer.status)
         ? `${role} · ${floor0Status}`
         : role;
-      row.innerHTML = `<span>${member.name}${member.local ? " (local)" : ""}</span><span>${statusText}</span>`;
+      const nameSpan = document.createElement("span");
+      nameSpan.textContent = `${member.name}${member.local ? " (local)" : ""}`;
+      const statusSpan = document.createElement("span");
+      statusSpan.textContent = statusText;
+      row.append(nameSpan, statusSpan);
       list.appendChild(row);
     }
   }
@@ -821,6 +864,11 @@ function setupTitleScreenHandlers() {
 
   bind("startSingleBtn", startSinglePlayer);
   bind("quickMatchBtn", startQuickMatch);
+  bind("characterCreatorBtn", showCharacterCreator);
+  bind("backToTitleBtn", showTitleScreen);
+  bind("saveCharacterBtn", saveCharacterProfileFromCreator);
+  const creatorNameInput = document.getElementById("creatorNameInput");
+  if (creatorNameInput) creatorNameInput.addEventListener("input", updateCharacterCreatorPreview);
   bind("createPartyBtn", createLobby);
   bind("joinPartyBtn", () => {
     const code = prompt("Enter lobby code", multiplayer.lobbyCode || multiplayer.partyCode || "RUNE-");
