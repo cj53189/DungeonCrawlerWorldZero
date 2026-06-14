@@ -409,7 +409,7 @@ function updateSpiderLungeState(enemy, targetCrawler, dist, canSeeTarget, tag) {
 function calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist) {
   const tag = enemy.behaviorTag || "";
   const state = enemy.behaviorState || (enemy.behaviorState = {});
-  enemy.animationState = "walk";
+  setEnemyAnimationState(enemy, "walk");
 
   if (targetCrawler && (canSeeTarget || bossCanAlwaysTrack)) {
     if (tag === "spider_lunge" || tag === "spider_hit_and_run") {
@@ -437,6 +437,8 @@ function calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlway
       if (Math.random() < 0.018) state.skirmishSide *= -1;
     } else if (tag === "boss_gatekeeper") {
       speed *= 0.95;
+    } else if (tag === "boss_skeleton") {
+      speed *= 0.9;
     }
 
     return {
@@ -445,10 +447,16 @@ function calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlway
     };
   }
 
-  enemy.animationState = "idle";
+  setEnemyAnimationState(enemy, "idle");
   const patrolSpeed = tag === "bot_patrol" ? 0.24 : tag === "drone_skirmisher" ? 0.48 : 0.35;
   if (Math.random() < (tag === "bot_patrol" ? 0.006 : 0.015)) enemy.wanderAngle = Math.random() * Math.PI * 2;
   return { dx: Math.cos(enemy.wanderAngle) * patrolSpeed, dy: Math.sin(enemy.wanderAngle) * patrolSpeed };
+}
+
+function setEnemyAnimationState(enemy, state) {
+  if (!enemy || enemy.animationState === state) return;
+  enemy.animationState = state;
+  enemy.animationStartedAt = frameCount;
 }
 
 function updateEnemyFacing(enemy, dx, dy) {
@@ -516,8 +524,41 @@ function updateEnemies() {
     ctx.lineWidth = 1;
   }
 for (const enemy of enemies) {
+    if (enemy.isDying) {
+      const deathAnim = enemy.animations?.death;
+      const deathTicks = deathAnim ? Math.ceil((deathAnim.frames?.length || 1) * (60 / Math.max(1, deathAnim.fps || 8))) : 0;
+      if (!deathAnim || frameCount - (enemy.animationStartedAt || frameCount) >= deathTicks) {
+        enemy.isDying = false;
+        enemy.deathAnimationComplete = true;
+        stats.enemiesKilled++;
+        changeAudience(enemy.boss ? 10 : 4);
+        gainXP(enemy.xpReward || 15);
+        createCorpse(enemy);
+        if (enemy.boss) completeBossEncounter(enemy);
+        achievement("NEW ACHIEVEMENT: Pest Control Adjacent", `You killed a level ${enemy.level || 1} dungeon creature. It left behind a corpse. The dungeon calls this an interactive container with smell.`);
+      }
+      continue;
+    }
     if (enemy.hp <= 0) continue;
     enemy.damageCooldown = Math.max(0, enemy.damageCooldown - 1);
+    if (enemy.pendingAttack) {
+      const attack = enemy.animations?.attack;
+      const ticksPerFrame = attack?.fps ? Math.max(1, Math.round(60 / attack.fps)) : 5;
+      const damageFrame = attack?.damageFrame ?? Math.max(0, Math.floor((attack?.frames?.length || 1) * 0.65));
+      const elapsed = frameCount - (enemy.animationStartedAt || frameCount);
+      if (!enemy.pendingAttack.damageApplied && elapsed >= damageFrame * ticksPerFrame) {
+        const crawler = enemy.pendingAttack.target;
+        if (crawler && Math.hypot(crawler.x - enemy.x, crawler.y - enemy.y) < getCrawlerRadius(crawler) + enemy.r + (enemy.attackReach || 4)) {
+          damageCrawlerFromEnemy(crawler, enemy);
+        }
+        enemy.pendingAttack.damageApplied = true;
+      }
+      if (elapsed >= (attack?.frames?.length || 1) * ticksPerFrame) {
+        enemy.pendingAttack = null;
+        setEnemyAnimationState(enemy, "idle");
+      }
+      continue;
+    }
     if (!getActiveCrawlers().some(crawler => !crawler.safe)) continue;
 
     const exTile = Math.floor(enemy.x / TILE), eyTile = Math.floor(enemy.y / TILE);
@@ -526,7 +567,7 @@ for (const enemy of enemies) {
     const remoteSynced = typeof updateFloor0EnemySyncInterpolation === "function" && updateFloor0EnemySyncInterpolation(enemy);
 
     if (!remoteSynced) {
-      const visibleTarget = getNearestVisibleCrawler(enemy.x, enemy.y, 210);
+      const visibleTarget = getNearestVisibleCrawler(enemy.x, enemy.y, enemy.aggroRange || 210);
       const fallbackTarget = enemy.boss && bossAggroed ? getNearestActiveCrawler(enemy.x, enemy.y) : null;
       const targetInfo = visibleTarget || fallbackTarget;
       const targetCrawler = targetInfo?.crawler || null;
@@ -547,8 +588,13 @@ for (const enemy of enemies) {
 
     for (const crawler of getActiveCrawlers()) {
       const newDist = Math.hypot(crawler.x - enemy.x, crawler.y - enemy.y);
-      if (newDist < getCrawlerRadius(crawler) + enemy.r + 4) {
-        damageCrawlerFromEnemy(crawler, enemy);
+      if (newDist < getCrawlerRadius(crawler) + enemy.r + (enemy.attackReach || 4)) {
+        if (enemy.animations?.attack && enemy.damageCooldown <= 0) {
+          enemy.pendingAttack = { target: crawler, damageApplied: false };
+          setEnemyAnimationState(enemy, "attack");
+        } else {
+          damageCrawlerFromEnemy(crawler, enemy);
+        }
         break;
       }
     }
@@ -581,12 +627,19 @@ function damageEnemy(enemy, damage, sourceWeapon = null, attacker = player) {
   if (dealt > 0 && typeof awardWeaponSkillXpForHit === "function") awardWeaponSkillXpForHit(sourceWeapon || getCurrentWeapon(), dealt);
   if (typeof sendFloor0EnemyEvent === "function") sendFloor0EnemyEvent(enemy.hp <= 0 ? "enemy_killed" : "enemy_damaged", enemy);
   if (enemy.hp <= 0) {
-    stats.enemiesKilled++;
-    changeAudience(enemy.boss ? 10 : 4);
-    gainXP(enemy.xpReward || 15);
-    createCorpse(enemy);
-    if (enemy.boss) completeBossEncounter(enemy);
-    achievement("NEW ACHIEVEMENT: Pest Control Adjacent", `You killed a level ${enemy.level || 1} dungeon creature. It left behind a corpse. The dungeon calls this an interactive container with smell.`);
+    if (enemy.animations?.death) {
+      enemy.hp = 0;
+      enemy.pendingAttack = null;
+      enemy.isDying = true;
+      setEnemyAnimationState(enemy, "death");
+    } else {
+      stats.enemiesKilled++;
+      changeAudience(enemy.boss ? 10 : 4);
+      gainXP(enemy.xpReward || 15);
+      createCorpse(enemy);
+      if (enemy.boss) completeBossEncounter(enemy);
+      achievement("NEW ACHIEVEMENT: Pest Control Adjacent", `You killed a level ${enemy.level || 1} dungeon creature. It left behind a corpse. The dungeon calls this an interactive container with smell.`);
+    }
   }
   return true;
 }

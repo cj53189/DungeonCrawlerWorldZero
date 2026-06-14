@@ -33,6 +33,7 @@ const OTHER_CRAWLER_DIRECTION_ROWS = { down: 0, up: 1, left: 3, right: 4 };
 const NETWORK_DIRECTION_VALUES = { 0: "down", 1: "up", 2: "left", 3: "right" };
 
 const ENEMY_SPRITE_CACHE = new Map();
+const warnedMissingEnemySprites = new Set();
 
 function getEnemySpriteSheet(enemy) {
   if (!enemy?.spriteKey || !enemy.spritePath) return null;
@@ -41,16 +42,24 @@ function getEnemySpriteSheet(enemy) {
     const image = new Image();
     entry = { image, failed: false };
     image.onload = () => { entry.failed = false; };
-    image.onerror = () => { entry.failed = true; };
+    image.onerror = () => {
+      entry.failed = true;
+      if (enemy.missingWarning && !warnedMissingEnemySprites.has(enemy.spriteKey)) {
+        warnedMissingEnemySprites.add(enemy.spriteKey);
+        console.warn(enemy.missingWarning);
+      }
+    };
     image.src = enemy.spritePath;
     ENEMY_SPRITE_CACHE.set(enemy.spriteKey, entry);
   }
   if (entry.failed || !entry.image.complete) return null;
-  const frameWidth = enemy.frameWidth || 32;
-  const frameHeight = enemy.frameHeight || 32;
-  const frameCount = Math.max(1, enemy.frameCount || 1);
-  const rowCount = Math.max(1, enemy.rowCount || 1);
-  if (entry.image.naturalWidth < frameWidth * frameCount || entry.image.naturalHeight < frameHeight * rowCount) return null;
+  const columns = Math.max(1, enemy.columns || enemy.frameCount || 1);
+  const rows = Math.max(1, enemy.rows || enemy.rowCount || 1);
+  const frameWidth = enemy.frameWidth || Math.floor(entry.image.naturalWidth / columns) || 32;
+  const frameHeight = enemy.frameHeight || Math.floor(entry.image.naturalHeight / rows) || 32;
+  if (entry.image.naturalWidth < frameWidth * columns || entry.image.naturalHeight < frameHeight * rows) return null;
+  enemy.frameWidth = frameWidth;
+  enemy.frameHeight = frameHeight;
   return entry.image;
 }
 
@@ -186,6 +195,8 @@ function drawEnemyFallbackFigure(enemy) {
 }
 
 function enemySpriteRow(enemy) {
+  const animation = enemy?.animations?.[enemy.animationState || "walk"];
+  if (animation) return animation.row || 0;
   const rows = enemy?.directionRows;
   if (!rows) return 0;
   const facingX = Number(enemy.facingX || 0);
@@ -203,10 +214,14 @@ function drawEnemySprite(enemy) {
 
   const frameWidth = enemy.frameWidth || 32;
   const frameHeight = enemy.frameHeight || 32;
-  const frameTotal = Math.max(1, enemy.frameCount || 1);
-  const speed = Math.max(1, enemy.animationSpeed || 10);
-  const frame = enemy.animationState === "idle" ? 0 : Math.floor(frameCount / speed) % frameTotal;
-  const row = Math.max(0, Math.min(Math.max(1, enemy.rowCount || 1) - 1, enemySpriteRow(enemy)));
+  const animation = enemy.animations?.[enemy.animationState || "walk"] || null;
+  const frameTotal = Math.max(1, animation?.frames?.length || enemy.frameCount || 1);
+  const elapsedFrames = Math.max(0, frameCount - (enemy.animationStartedAt || 0));
+  const ticksPerFrame = animation?.fps ? Math.max(1, Math.round(60 / animation.fps)) : Math.max(1, enemy.animationSpeed || 10);
+  let animationFrameIndex = Math.floor(elapsedFrames / ticksPerFrame);
+  if (animation && !animation.loop) animationFrameIndex = Math.min(frameTotal - 1, animationFrameIndex);
+  const frame = animation?.frames?.[animationFrameIndex % frameTotal] ?? (enemy.animationState === "idle" ? 0 : Math.floor(frameCount / ticksPerFrame) % frameTotal);
+  const row = Math.max(0, Math.min(Math.max(1, enemy.rows || enemy.rowCount || 1) - 1, enemySpriteRow(enemy)));
   const renderWidth = Math.max(28, (enemy.r || 11) * (enemy.boss ? 2.8 : 2.35));
   const renderHeight = Math.max(34, renderWidth * (enemy.boss ? 1.25 : 1.18));
   const dx = enemy.x - renderWidth / 2;
@@ -218,7 +233,14 @@ function drawEnemySprite(enemy) {
   ctx.ellipse(enemy.x, enemy.y + (enemy.r || 11) * 0.72, (enemy.r || 11) * 1.08, Math.max(4, (enemy.r || 11) * 0.42), 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(sheet, frame * frameWidth, row * frameHeight, frameWidth, frameHeight, dx, dy, renderWidth, renderHeight);
+  const shouldFlipLeft = enemy.facesRightByDefault && Number(enemy.facingX || 0) < -0.05;
+  if (shouldFlipLeft) {
+    ctx.translate(enemy.x, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(sheet, frame * frameWidth, row * frameHeight, frameWidth, frameHeight, -renderWidth / 2, dy, renderWidth, renderHeight);
+  } else {
+    ctx.drawImage(sheet, frame * frameWidth, row * frameHeight, frameWidth, frameHeight, dx, dy, renderWidth, renderHeight);
+  }
   if (enemy.boss) {
     ctx.strokeStyle = "#ffd86b";
     ctx.lineWidth = 3;
@@ -1218,11 +1240,11 @@ function draw() {
     ctx.lineWidth = 1;
   }
   for (const enemy of enemies) {
-    if (enemy.hp <= 0) continue;
+    if (enemy.hp <= 0 && !enemy.isDying) continue;
     const tx = Math.floor(enemy.x / TILE), ty = Math.floor(enemy.y / TILE);
     if (!visible[ty]?.[tx]) continue;
     drawEnemySprite(enemy);
-    ctx.fillStyle = "#ffbaba"; ctx.fillRect(enemy.x - 13, enemy.y - 35, 26 * (enemy.hp / enemy.maxHp), 4);
+    ctx.fillStyle = "#ffbaba"; ctx.fillRect(enemy.x - 13, enemy.y - 35, 26 * (Math.max(0, enemy.hp) / enemy.maxHp), 4);
     ctx.fillStyle = "rgba(255,255,255,0.78)";
     ctx.font = "10px Arial";
     ctx.textAlign = "center";

@@ -7,7 +7,8 @@ const ENEMY_BEHAVIOR_TAGS = {
   BOT_PATROL: "bot_patrol",
   GUARD_BRUISER: "guard_bruiser",
   DRONE_SKIRMISHER: "drone_skirmisher",
-  BOSS_GATEKEEPER: "boss_gatekeeper"
+  BOSS_GATEKEEPER: "boss_gatekeeper",
+  BOSS_SKELETON: "boss_skeleton"
 };
 
 const ENEMY_SPRITE_DEFINITIONS = {
@@ -16,7 +17,25 @@ const ENEMY_SPRITE_DEFINITIONS = {
   janitor_bot: { spriteKey: "janitor_bot", src: "./assets/sprites/enemies/janitor_bot.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 12 },
   maintenance_guard: { spriteKey: "maintenance_guard", src: "./assets/sprites/enemies/maintenance_guard.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 11 },
   security_drone: { spriteKey: "security_drone", src: "./assets/sprites/enemies/security_drone.png", frameWidth: 32, frameHeight: 32, frameCount: 4, animationSpeed: 8 },
-  gatekeeper: { spriteKey: "gatekeeper", src: "./assets/sprites/enemies/gatekeeper.png", frameWidth: 48, frameHeight: 48, frameCount: 4, animationSpeed: 11 }
+  gatekeeper: { spriteKey: "gatekeeper", src: "./assets/sprites/enemies/gatekeeper.png", frameWidth: 48, frameHeight: 48, frameCount: 4, animationSpeed: 11 },
+  skeletonboss: {
+    spriteKey: "skeletonboss",
+    displayName: "Skeleton Boss",
+    src: "./assets/sprites/enemies/skeletonboss/skeletonboss.png",
+    missingWarning: "Skeleton Boss sprite missing: assets/sprites/enemies/skeletonboss/skeletonboss.png",
+    columns: 10,
+    rows: 5,
+    frameCount: 10,
+    rowCount: 5,
+    facesRightByDefault: true,
+    animations: {
+      idle: { row: 0, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 6, loop: true },
+      walk: { row: 1, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 10, loop: true },
+      attack: { row: 2, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 12, loop: false, damageFrame: 7 },
+      death: { row: 3, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 8, loop: false, holdFinalFrame: true },
+      revive: { row: 4, frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9], fps: 8, loop: false }
+    }
+  }
 };
 
 const ENEMY_IDENTITY_BY_NAME = {
@@ -43,11 +62,18 @@ function enemySpriteMetadataForKey(spriteKey) {
     spritePath: definition.src,
     frameWidth: definition.frameWidth,
     frameHeight: definition.frameHeight,
+    columns: definition.columns || definition.frameCount,
+    rows: definition.rows || definition.rowCount || 1,
     frameCount: definition.frameCount,
     rowCount: definition.rowCount || 1,
     directionRows: definition.directionRows || null,
     animationSpeed: definition.animationSpeed,
-    animationState: "walk"
+    animations: definition.animations || null,
+    facesRightByDefault: !!definition.facesRightByDefault,
+    missingWarning: definition.missingWarning || null,
+    displayName: definition.displayName || null,
+    animationState: "walk",
+    animationStartedAt: 0
   };
 }
 
