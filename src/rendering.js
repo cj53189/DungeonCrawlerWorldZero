@@ -215,17 +215,23 @@ function drawEnemySprite(enemy) {
   const frameWidth = enemy.frameWidth || 32;
   const frameHeight = enemy.frameHeight || 32;
   const animation = enemy.animations?.[enemy.animationState || "walk"] || null;
-  const frameTotal = Math.max(1, animation?.frames?.length || enemy.frameCount || 1);
   const elapsedFrames = Math.max(0, frameCount - (enemy.animationStartedAt || 0));
-  const ticksPerFrame = animation?.fps ? Math.max(1, Math.round(60 / animation.fps)) : Math.max(1, enemy.animationSpeed || 10);
-  let animationFrameIndex = Math.floor(elapsedFrames / ticksPerFrame);
-  if (animation && !animation.loop) animationFrameIndex = Math.min(frameTotal - 1, animationFrameIndex);
-  const frame = animation?.frames?.[animationFrameIndex % frameTotal] ?? (enemy.animationState === "idle" ? 0 : Math.floor(frameCount / ticksPerFrame) % frameTotal);
+  const ticksPerFrame = animation?.fps && !enemy.directionalFrameRows ? Math.max(1, Math.round(60 / animation.fps)) : Math.max(1, enemy.animationSpeed || 10);
   const row = Math.max(0, Math.min(Math.max(1, enemy.rows || enemy.rowCount || 1) - 1, enemySpriteRow(enemy)));
-  const renderWidth = Math.max(28, (enemy.r || 11) * (enemy.boss ? 2.8 : 2.35));
-  const renderHeight = Math.max(34, renderWidth * (enemy.boss ? 1.25 : 1.18));
+  let frame;
+  if (enemy.directionalFrameRows) {
+    const frameTotal = Math.max(1, Math.min(enemy.columns || enemy.frameCount || 1, enemy.frameCount || 1));
+    frame = enemy.visualMoving ? Math.floor(frameCount / ticksPerFrame) % frameTotal : 0;
+  } else {
+    const frameTotal = Math.max(1, animation?.frames?.length || enemy.frameCount || 1);
+    let animationFrameIndex = Math.floor(elapsedFrames / ticksPerFrame);
+    if (animation && !animation.loop) animationFrameIndex = Math.min(frameTotal - 1, animationFrameIndex);
+    frame = animation?.frames?.[animationFrameIndex % frameTotal] ?? (enemy.animationState === "idle" ? 0 : Math.floor(frameCount / ticksPerFrame) % frameTotal);
+  }
+  const renderWidth = enemy.directionalFrameRows ? frameWidth : Math.max(28, (enemy.r || 11) * (enemy.boss ? 2.8 : 2.35));
+  const renderHeight = enemy.directionalFrameRows ? frameHeight : Math.max(34, renderWidth * (enemy.boss ? 1.25 : 1.18));
   const dx = enemy.x - renderWidth / 2;
-  const dy = enemy.y + (enemy.r || 11) - renderHeight;
+  const dy = enemy.directionalFrameRows ? enemy.y - renderHeight / 2 : enemy.y + (enemy.r || 11) - renderHeight;
 
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.32)";

@@ -2,13 +2,20 @@
   "name": "skeletonboss",
   "displayName": "Skeleton Boss",
   "image": "assets/sprites/enemies/skeletonboss/skeletonboss.png",
-  "columns": 10,
-  "rows": 5,
-  "animations": {
-    "idle": { "row": 0, "frames": [0,1,2,3,4,5,6,7,8,9], "fps": 6, "loop": true },
-    "walk": { "row": 1, "frames": [0,1,2,3,4,5,6,7,8,9], "fps": 10, "loop": true },
-    "attack": { "row": 2, "frames": [0,1,2,3,4,5,6,7,8,9], "fps": 12, "loop": false },
-    "death": { "row": 3, "frames": [0,1,2,3,4,5,6,7,8,9], "fps": 8, "loop": false },
-    "revive": { "row": 4, "frames": [0,1,2,3,4,5,6,7,8,9], "fps": 8, "loop": false }
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "columns": 4,
+  "rows": 4,
+  "directionRows": {
+    "down": 0,
+    "up": 1,
+    "left": 2,
+    "right": 3
+  },
+  "frames": {
+    "down": [0, 1, 2, 3],
+    "up": [4, 5, 6, 7],
+    "left": [8, 9, 10, 11],
+    "right": [12, 13, 14, 15]
   }
 }
