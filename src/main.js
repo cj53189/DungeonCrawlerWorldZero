@@ -72,8 +72,9 @@ function drawStairwellOverlayAfterDungeon() {
   const margin = TILE * 3;
   if (screenX < -margin || screenX > canvas.width + margin || screenY < -margin || screenY > canvas.height + margin) return;
 
+  // This is called while draw() already has the dungeon camera transform active.
+  // Applying the camera transform a second time pushes the sprite offscreen.
   ctx.save();
-  applyDungeonCameraTransform(camX);
   drawStairwellStoneSprite(px, py, isVisible);
   ctx.restore();
 }
