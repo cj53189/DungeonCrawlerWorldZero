@@ -27,6 +27,7 @@ const OTHER_CRAWLER_SPRITE_COLS = 3;
 const OTHER_CRAWLER_SPRITE_ROWS = 5;
 const OTHER_CRAWLER_RENDER_WIDTH = SPRITE_FRAME_W;
 const OTHER_CRAWLER_RENDER_HEIGHT = SPRITE_FRAME_H;
+const REMOTE_PLAYER_SPRITE_VISUAL_SCALE = 0.72;
 const OTHER_CRAWLER_IDLE_FRAME = 1;
 
 const ENEMY_SPRITE_CACHE = new Map();
@@ -382,8 +383,10 @@ function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
     ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
     : OTHER_CRAWLER_IDLE_FRAME;
   const row = Math.min(OTHER_CRAWLER_SPRITE_ROWS - 1, getEntitySpriteRowForAim(crawler));
-  const dx = Math.round(crawler.x - OTHER_CRAWLER_RENDER_WIDTH / 2);
-  const dy = Math.round(crawler.y + (crawler.r || player.r) - OTHER_CRAWLER_RENDER_HEIGHT);
+  const drawW = OTHER_CRAWLER_RENDER_WIDTH * REMOTE_PLAYER_SPRITE_VISUAL_SCALE;
+  const drawH = OTHER_CRAWLER_RENDER_HEIGHT * REMOTE_PLAYER_SPRITE_VISUAL_SCALE;
+  const dx = Math.round(crawler.x - drawW / 2);
+  const dy = Math.round(crawler.y + (crawler.r || player.r) - drawH);
 
   ctx.save();
   ctx.globalAlpha = alpha;
@@ -393,11 +396,11 @@ function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
   ctx.fill();
   drawRemoteCrawlerBadge(crawler);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(OTHER_CRAWLER_SPRITE_SHEET, frame * SPRITE_FRAME_W, row * SPRITE_FRAME_H, SPRITE_FRAME_W, SPRITE_FRAME_H, dx, dy, OTHER_CRAWLER_RENDER_WIDTH, OTHER_CRAWLER_RENDER_HEIGHT);
+  ctx.drawImage(OTHER_CRAWLER_SPRITE_SHEET, frame * SPRITE_FRAME_W, row * SPRITE_FRAME_H, SPRITE_FRAME_W, SPRITE_FRAME_H, dx, dy, drawW, drawH);
   if (tint) {
     ctx.globalCompositeOperation = "source-atop";
     ctx.fillStyle = tint;
-    ctx.fillRect(dx, dy, OTHER_CRAWLER_RENDER_WIDTH, OTHER_CRAWLER_RENDER_HEIGHT);
+    ctx.fillRect(dx, dy, drawW, drawH);
   }
   ctx.restore();
 }
