@@ -4,7 +4,10 @@ const fs = require("fs");
 const { WebSocketServer } = require("ws");
 const { randomUUID } = require("crypto");
 const { LobbyManager } = require("./rooms");
+const { applyQuickPartyExtension } = require("./quick-party-extension");
 const { CLIENT_MESSAGES, SERVER_MESSAGES, parseClientMessage, safeSend } = require("./protocol");
+
+applyQuickPartyExtension(LobbyManager);
 
 const PORT = Number(process.env.PORT || 8080);
 const CLIENT_ROOT = path.resolve(__dirname, "../..");
@@ -114,7 +117,7 @@ wss.on("connection", (ws) => {
           break;
         case CLIENT_MESSAGES.CREATE_LOBBY:
           rooms.updateClientProfile(playerId, message.profile || message);
-          rooms.createPrivateLobby(playerId);
+          rooms.joinQuickMatch(playerId);
           break;
         case CLIENT_MESSAGES.JOIN_LOBBY:
           rooms.updateClientProfile(playerId, message.profile || message);
