@@ -3,6 +3,7 @@ const { LOBBY_MODES, LOBBY_STATUS, SERVER_MESSAGES, TARGET_PLAYERS, safeSend } =
 const PARTY_CODE_PREFIX = "RUNE";
 const PARTY_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const PARTY_INVITE_TTL_MS = 30_000;
+const FLOOR0_STAIRS_STATUSES = new Set(["at_stairs", "advancing"]);
 
 function normalizePartyCode(code) {
   return String(code || "").trim().toUpperCase();
@@ -298,6 +299,30 @@ function applyQuickPartyExtension(LobbyManager) {
     this.broadcastLobbyUpdate(lobby);
     this.broadcastCrawlerSnapshot(lobby, { force: true });
     return true;
+  };
+
+  const originalMarkCrawlerAtFloor0Stairs = proto.markCrawlerAtFloor0Stairs;
+  proto.markCrawlerAtFloor0Stairs = function markCrawlerAtFloor0StairsWithExpiredCollapseResolve(playerId) {
+    const client = this.requireClient(playerId);
+    const lobby = client.lobbyCode ? this.lobbies.get(client.lobbyCode) : null;
+    const result = originalMarkCrawlerAtFloor0Stairs.call(this, playerId);
+    const player = lobby?.players.find(candidate => candidate.id === playerId);
+
+    if (
+      lobby &&
+      lobby.status === LOBBY_STATUS.STAGING &&
+      player &&
+      FLOOR0_STAIRS_STATUSES.has(player.floor0Status) &&
+      Date.now() >= lobby.floor0CollapseAt
+    ) {
+      if (lobby.floor0CollapseTimer) {
+        clearTimeout(lobby.floor0CollapseTimer);
+        lobby.floor0CollapseTimer = null;
+      }
+      setTimeout(() => this.resolveFloor0Collapse(lobby.code), 0);
+    }
+
+    return result;
   };
 
   const originalLobbyPayload = proto.lobbyPayload;
