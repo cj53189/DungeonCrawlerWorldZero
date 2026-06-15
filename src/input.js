@@ -397,12 +397,13 @@ window.addEventListener("keydown", e => {
   if (e.key.toLowerCase() === "k") toggleLighting();
   if (e.key === "Escape" && typeof closeProgressionPanel === "function") closeProgressionPanel();
   if (e.key === "Escape" && multiplayer.enabled) closeMultiplayerPanel();
-  if (e.code === "Space") { e.preventDefault(); triggerDodge(); }
+  if (e.code === "Space") { e.preventDefault(); attack(); }
+  if (e.key === "Shift" && !inputState.shiftDodgeHeld) { e.preventDefault(); inputState.shiftDodgeHeld = true; triggerDodge(); }
   if (["1", "2", "3", "4", "5"].includes(e.key)) setPlayerWeapon(WEAPON_ORDER[Number(e.key) - 1]);
   if (e.key.toLowerCase() === "q") cyclePlayerWeapon(-1);
   if (e.key.toLowerCase() === "z") cyclePlayerWeapon(1);
 });
-window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+window.addEventListener("keyup", e => { keys[e.key.toLowerCase()] = false; if (e.key === "Shift") inputState.shiftDodgeHeld = false; });
 
 function pollGamepad() {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -527,3 +528,47 @@ function pollGamepad() {
   gamepadState.previousButtons = gp.buttons.map(button => button.pressed);
 }
 
+
+function isPointerOverGameplayCanvas(event) {
+  if (!event || event.button > 0) return false;
+  if (event.target !== canvas) return false;
+  if (typeof isMajorUiOpen === "function" && isMajorUiOpen()) return false;
+  return true;
+}
+
+function screenToWorld(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const screenX = clientX - rect.left;
+  const screenY = clientY - rect.top;
+  const camX = player.x - canvas.width / 2;
+  const camOffsetY = canvas.height / 2 - player.y * CAMERA_TILT_SCALE;
+  return {
+    x: screenX + camX,
+    y: (screenY - camOffsetY) / CAMERA_TILT_SCALE
+  };
+}
+
+function updateMouseAimFromEvent(event) {
+  if (!event || event.target !== canvas) return;
+  const world = screenToWorld(event.clientX, event.clientY);
+  inputState.mouseWorldX = world.x;
+  inputState.mouseWorldY = world.y;
+  inputState.mouseAimActive = true;
+  setLastActiveInputMethod("mouse");
+  updatePlayerAim(world.x - player.x, world.y - player.y);
+}
+
+canvas.addEventListener("mousemove", updateMouseAimFromEvent);
+canvas.addEventListener("mousedown", event => {
+  if (!isPointerOverGameplayCanvas(event)) return;
+  updateMouseAimFromEvent(event);
+  if (event.button === 0) {
+    event.preventDefault();
+    inputState.mouseAttackActive = true;
+    attack();
+  }
+});
+window.addEventListener("mouseup", event => {
+  if (event.button === 0) inputState.mouseAttackActive = false;
+});
+canvas.addEventListener("mouseleave", () => { inputState.mouseAttackActive = false; });

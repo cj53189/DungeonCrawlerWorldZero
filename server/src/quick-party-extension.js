@@ -174,14 +174,19 @@ function applyQuickPartyExtension(LobbyManager) {
     return originalJoinPrivateLobby.call(this, playerId, requestedCode);
   };
 
-  proto.requestPartyInvite = function requestPartyInvite(playerId, targetPlayerId) {
+  proto.requestPartyInvite = function requestPartyInvite(playerId, targetPlayerId, options = {}) {
     if (!targetPlayerId || targetPlayerId === playerId) return false;
     const { client, lobby, player: from } = findPlayerLobby(this, playerId);
-    if (!lobby || !from || lobby.status !== LOBBY_STATUS.STAGING) return false;
+    if (!lobby || !from) return false;
     if (lobby.mode !== LOBBY_MODES.QUICK_MATCH) throw new Error("Party invites are only available in Quick Match.");
 
     const to = lobby.players.find(candidate => candidate.id === targetPlayerId);
-    if (!to) throw new Error("That crawler is not in your Quick Match room.");
+    if (!to) throw new Error("That crawler is not in your Quick Match run.");
+    if (from.crawlerState?.currentFloor !== to.crawlerState?.currentFloor) throw new Error("Direct party invites require the same floor.");
+    if (options.method === "interact") {
+      const distance = Math.hypot((from.crawlerState?.x ?? Infinity) - (to.crawlerState?.x ?? -Infinity), (from.crawlerState?.y ?? Infinity) - (to.crawlerState?.y ?? -Infinity));
+      if (!Number.isFinite(distance) || distance > 96) throw new Error("Move closer to invite that crawler.");
+    }
 
     assignSoloQuickParty(this, lobby, from);
     assignSoloQuickParty(this, lobby, to);
@@ -213,14 +218,24 @@ function applyQuickPartyExtension(LobbyManager) {
     ensurePartyInviteMap(lobby).set(inviteKey(from.id, to.id), invite);
 
     const targetClient = this.clients.get(to.id);
-    if (targetClient) safeSend(targetClient.ws, SERVER_MESSAGES.PARTY_INVITE, {
+    if (targetClient) {
+      safeSend(targetClient.ws, SERVER_MESSAGES.PARTY_INVITE_RECEIVED, {
       lobbyCode: lobby.code,
       fromPlayerId: from.id,
       fromName: from.name,
       fromPartyId: from.partyId,
       fromPartyCode: from.partyCode,
       expiresAt: new Date(invite.expiresAt).toISOString()
-    });
+      });
+      safeSend(targetClient.ws, SERVER_MESSAGES.PARTY_INVITE, {
+      lobbyCode: lobby.code,
+      fromPlayerId: from.id,
+      fromName: from.name,
+      fromPartyId: from.partyId,
+      fromPartyCode: from.partyCode,
+      expiresAt: new Date(invite.expiresAt).toISOString()
+      });
+    }
 
     safeSend(client.ws, SERVER_MESSAGES.PARTY_RESPONSE, {
       lobbyCode: lobby.code,
@@ -237,7 +252,7 @@ function applyQuickPartyExtension(LobbyManager) {
   proto.respondPartyInvite = function respondPartyInvite(playerId, fromPlayerId, accepted = false) {
     if (!fromPlayerId || fromPlayerId === playerId) return false;
     const { client, lobby, player: to } = findPlayerLobby(this, playerId);
-    if (!lobby || !to || lobby.status !== LOBBY_STATUS.STAGING) return false;
+    if (!lobby || !to) return false;
 
     expireOldInvites(lobby);
     const invites = ensurePartyInviteMap(lobby);

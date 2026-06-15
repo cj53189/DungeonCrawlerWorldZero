@@ -314,7 +314,7 @@ function captureLocalCrawlerNetworkState() {
 }
 
 function maybeSendLocalCrawlerState(now = Date.now()) {
-  if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0) return false;
+  if (!multiplayer.enabled || !multiplayer.usingServer) return false;
   if (!isMultiplayerNetworkReady()) return false;
 
   const state = captureLocalCrawlerNetworkState();
@@ -370,6 +370,7 @@ function applyServerCrawlerSnapshot(snapshot) {
       currentFloor: snapshotFloor,
       status: crawler.status || "active",
       floor0Status: normalizeFloor0StatusValue(crawler.floor0Status || member?.floor0Status),
+      currentRoomId: Number.isFinite(Number(crawler.currentRoomId)) ? Math.trunc(Number(crawler.currentRoomId)) : undefined,
       isDodging: !!crawler.isDodging,
       dodgeProgress: Math.max(0, Math.min(1, Number(crawler.dodgeProgress) || 0)),
       color: member?.color || crawler.color || "#75c7ff",

@@ -115,10 +115,12 @@ wss.on("connection", (ws) => {
           rooms.updateClientProfile(playerId, message.profile || message);
           safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4 });
           break;
+        case CLIENT_MESSAGES.PARTY_CREATE:
         case CLIENT_MESSAGES.CREATE_LOBBY:
           rooms.updateClientProfile(playerId, message.profile || message);
           rooms.joinQuickMatch(playerId);
           break;
+        case CLIENT_MESSAGES.PARTY_JOIN_BY_CODE:
         case CLIENT_MESSAGES.JOIN_LOBBY:
           rooms.updateClientProfile(playerId, message.profile || message);
           rooms.joinPrivateLobby(playerId, message.lobbyCode || message.code);
@@ -127,14 +129,22 @@ wss.on("connection", (ws) => {
           rooms.updateClientProfile(playerId, message.profile || message);
           rooms.joinQuickMatch(playerId);
           break;
+        case CLIENT_MESSAGES.PARTY_LEAVE:
         case CLIENT_MESSAGES.LEAVE_LOBBY:
           rooms.leaveLobby(playerId);
           break;
         case CLIENT_MESSAGES.CRAWLER_STATE:
           rooms.updateCrawlerState(playerId, message.state || message);
           break;
+        case CLIENT_MESSAGES.PARTY_INVITE_SEND:
         case CLIENT_MESSAGES.PARTY_INVITE:
-          rooms.requestPartyInvite(playerId, message.targetPlayerId);
+          rooms.requestPartyInvite(playerId, message.targetPlayerId, message);
+          break;
+        case CLIENT_MESSAGES.PARTY_INVITE_ACCEPT:
+          rooms.respondPartyInvite(playerId, message.fromPlayerId, true);
+          break;
+        case CLIENT_MESSAGES.PARTY_INVITE_DECLINE:
+          rooms.respondPartyInvite(playerId, message.fromPlayerId, false);
           break;
         case CLIENT_MESSAGES.PARTY_RESPONSE:
           rooms.respondPartyInvite(playerId, message.fromPlayerId, !!message.accepted);

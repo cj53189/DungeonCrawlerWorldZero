@@ -46,6 +46,10 @@ function updatePrompt() {
     if (t === "C") { text = "Open chest"; break; }
   }
   if (!text && typeof petMerchantInReach === "function" && petMerchantInReach()) text = "Hire run companion";
+  if (!text && typeof getNearbyInviteTarget === "function") {
+    const inviteTarget = getNearbyInviteTarget();
+    if (inviteTarget) text = `Invite ${inviteTarget.name || "Crawler"} to party`;
+  }
   if (!text && player.safe) text = "Safe Room";
   prompt.textContent = text;
   prompt.style.display = text ? "block" : "none";
