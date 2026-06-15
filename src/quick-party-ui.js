@@ -106,12 +106,66 @@
     }
   }
 
+
+  function activePendingInvites(members, localPartyId) {
+    if (!(multiplayer?.pendingPartyInvites instanceof Map)) return [];
+    const now = Date.now();
+    const byId = new Map(members.map(member => [member.id, member]));
+    const invites = [];
+    for (const [fromPlayerId, invite] of multiplayer.pendingPartyInvites.entries()) {
+      const expiresAt = Number(invite?.expiresAt);
+      if (Number.isFinite(expiresAt) && expiresAt > 0 && expiresAt <= now) {
+        multiplayer.pendingPartyInvites.delete(fromPlayerId);
+        continue;
+      }
+      const inviter = byId.get(fromPlayerId);
+      if (localPartyId && inviter?.partyId === localPartyId) {
+        multiplayer.pendingPartyInvites.delete(fromPlayerId);
+        continue;
+      }
+      invites.push({ ...invite, fromPlayerId, fromName: invite?.fromName || inviter?.name || "Crawler", expiresAt });
+    }
+    return invites.sort((a, b) => String(a.fromName).localeCompare(String(b.fromName)));
+  }
+
+  function renderPendingInviteCards(list, members, localPartyId) {
+    const invites = activePendingInvites(members, localPartyId);
+    if (!invites.length) return;
+    const now = Date.now();
+    for (const invite of invites) {
+      const card = document.createElement("div");
+      card.className = "mpPendingInviteCard";
+
+      const text = document.createElement("div");
+      text.className = "mpPendingInviteText";
+      const seconds = Number.isFinite(invite.expiresAt) ? Math.max(0, Math.ceil((invite.expiresAt - now) / 1000)) : null;
+      text.textContent = seconds === null
+        ? `${invite.fromName} invited you to party.`
+        : `${invite.fromName} invited you to party · ${seconds}s`;
+
+      const actions = document.createElement("div");
+      actions.className = "mpPendingInviteActions";
+      const accept = document.createElement("button");
+      accept.type = "button";
+      accept.textContent = "Accept";
+      accept.addEventListener("click", () => respondQuickPartyInvite?.(invite.fromPlayerId, true));
+      const decline = document.createElement("button");
+      decline.type = "button";
+      decline.textContent = "Decline";
+      decline.addEventListener("click", () => respondQuickPartyInvite?.(invite.fromPlayerId, false));
+      actions.append(accept, decline);
+      card.append(text, actions);
+      list.appendChild(card);
+    }
+  }
+
   function renderMemberList(members, localPartyId) {
     const list = document.getElementById("mpMemberList");
     if (!list) return;
 
     const partyCounts = countParties(members);
     list.innerHTML = "";
+    renderPendingInviteCards(list, members, localPartyId);
     for (const member of sortedMembers(members, localPartyId)) {
       const isLocal = member.local || member.id === multiplayer?.playerId;
       const role = roleText(member, members, partyCounts, localPartyId);
@@ -170,6 +224,10 @@
       .mpMemberLocal { border-color: rgba(255,216,107,0.32); }
       .mpMemberSolo span:last-child { color: #d7d7d7; }
       .mpMemberInvite { border-color: rgba(255,216,107,0.48); background: rgba(255,216,107,0.08); }
+      .mpPendingInviteCard { display:flex; align-items:center; gap:8px; padding:8px; margin:0 0 6px; border:1px solid rgba(255,216,107,0.62); border-radius:8px; background:rgba(255,216,107,0.12); }
+      .mpPendingInviteText { flex:1; min-width:0; font-size:12px; font-weight:900; color:#fff2ba; }
+      .mpPendingInviteActions { display:flex; gap:6px; }
+      .mpPendingInviteActions button { font-weight:900; min-height:30px; }
     `;
     document.head.appendChild(style);
   }
@@ -248,8 +306,15 @@
     multiplayer.remotePlayers = new Map();
 
     if (typeof resetState === "function") resetState({ preserveRun: true, snapshot });
-    if (typeof applyServerFloorSpawnAssignment === "function") applyServerFloorSpawnAssignment(message.spawnAssignment || message.spawnAssignments?.[multiplayer.playerId]);
+    if (typeof applyServerFloorSpawnAssignment === "function") applyServerFloorSpawnAssignment(message.spawnAssignment || message.spawnAssignments?.[multiplayer.playerId], message);
     if (typeof applyFloor0WorldState === "function") applyFloor0WorldState(message.worldState);
+    if (typeof updateVisibility === "function") updateVisibility(true);
+    if (typeof updateHUD === "function") updateHUD();
+    if (typeof multiplayerNetwork !== "undefined") {
+      multiplayerNetwork.lastCrawlerStateSignature = "";
+      multiplayerNetwork.lastCrawlerStateSentAt = 0;
+    }
+    if (typeof maybeSendLocalCrawlerState === "function") maybeSendLocalCrawlerState(0);
     const center = document.getElementById("centerMessage");
     if (center) center.style.display = "none";
     if (typeof showFloorSplash === "function") showFloorSplash();

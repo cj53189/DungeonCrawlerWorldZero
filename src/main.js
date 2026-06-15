@@ -149,14 +149,23 @@ function crawlerNameById(crawlerId) {
 function handleQuickPartyInviteMessage(message) {
   ensureQuickPartyInviteState();
   if (!message?.fromPlayerId) return;
-  multiplayer.pendingPartyInvites.set(message.fromPlayerId, {
-    fromPlayerId: message.fromPlayerId,
-    fromName: message.fromName || "Crawler",
-    fromPartyId: message.fromPartyId || null,
-    fromPartyCode: normalizeQuickPartyCode(message.fromPartyCode),
-    expiresAt: message.expiresAt ? Date.parse(message.expiresAt) : Date.now() + 30_000
+  const fromPlayerId = message.fromPlayerId;
+  const localPartyId = multiplayer.partyId || multiplayer.lobbyMembers?.find?.(member => member.local || member.id === multiplayer.playerId)?.partyId || null;
+  const inviter = multiplayer.lobbyMembers?.find?.(member => member.id === fromPlayerId);
+  if (localPartyId && inviter?.partyId === localPartyId) {
+    multiplayer.pendingPartyInvites.delete(fromPlayerId);
+    if (typeof announcer === "function") announcer("Already in party.");
+    return;
+  }
+  const existing = multiplayer.pendingPartyInvites.get(fromPlayerId);
+  multiplayer.pendingPartyInvites.set(fromPlayerId, {
+    fromPlayerId,
+    fromName: message.fromName || inviter?.name || existing?.fromName || "Crawler",
+    fromPartyId: message.fromPartyId || existing?.fromPartyId || null,
+    fromPartyCode: normalizeQuickPartyCode(message.fromPartyCode || existing?.fromPartyCode),
+    expiresAt: message.expiresAt ? Date.parse(message.expiresAt) : (existing?.expiresAt || Date.now() + 30_000)
   });
-  announcer(`${message.fromName || "A crawler"} invited you to party up. Invite stored for the next interaction step.`);
+  if (!existing && typeof announcer === "function") announcer(`${message.fromName || inviter?.name || "A crawler"} invited you to party.`);
 }
 
 function handleQuickPartyResponseMessage(message) {
@@ -185,7 +194,8 @@ function requestQuickPartyInvite(targetPlayerId, options = {}) {
 function respondQuickPartyInvite(fromPlayerId, accepted = true) {
   ensureQuickPartyInviteState();
   if (!fromPlayerId || !isMultiplayerNetworkReady?.()) return false;
-  if (!accepted) multiplayer.pendingPartyInvites.delete(fromPlayerId);
+  multiplayer.pendingPartyInvites.delete(fromPlayerId);
+  if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
   return sendMultiplayerMessage(accepted ? "party_invite_accept" : "party_invite_decline", { fromPlayerId, accepted: !!accepted });
 }
 
@@ -235,6 +245,13 @@ function installQuickPartyCodeClient() {
       applyLobbyUpdateWithoutQuickParty(update);
       if (update?.mode === "quick_match" && previousPartyCode) multiplayer.partyCode = previousPartyCode;
       syncLocalQuickPartyMembership();
+      const localPartyId = multiplayer.partyId;
+      if (localPartyId && multiplayer.pendingPartyInvites instanceof Map) {
+        for (const [fromPlayerId] of multiplayer.pendingPartyInvites.entries()) {
+          const inviter = multiplayer.lobbyMembers?.find?.(member => member.id === fromPlayerId);
+          if (inviter?.partyId === localPartyId) multiplayer.pendingPartyInvites.delete(fromPlayerId);
+        }
+      }
     };
     applyServerLobbyUpdate.__quickPartyWrapped = true;
   }
