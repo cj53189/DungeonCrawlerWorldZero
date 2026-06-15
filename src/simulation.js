@@ -529,12 +529,12 @@ function updateEnemies() {
     const tx = Math.floor(corpse.x / TILE), ty = Math.floor(corpse.y / TILE);
     if (!visible[ty]?.[tx]) continue;
 
-    ctx.fillStyle = corpse.boss ? "rgba(120,70,160,0.9)" : "rgba(105,88,72,0.9)";
+    ctx.fillStyle = corpse.playerCorpse ? "rgba(95,120,150,0.92)" : (corpse.boss ? "rgba(120,70,160,0.9)" : "rgba(105,88,72,0.9)");
     ctx.beginPath();
     ctx.ellipse(corpse.x, corpse.y + 2, corpse.r + 4, Math.max(6, corpse.r * 0.55), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = corpse.boss ? "rgba(255,216,107,0.85)" : "rgba(210,190,160,0.35)";
+    ctx.strokeStyle = corpse.playerCorpse ? "rgba(220,235,255,0.75)" : (corpse.boss ? "rgba(255,216,107,0.85)" : "rgba(210,190,160,0.35)");
     ctx.lineWidth = corpse.boss ? 2 : 1;
     ctx.stroke();
     ctx.lineWidth = 1;

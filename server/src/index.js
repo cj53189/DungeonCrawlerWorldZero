@@ -161,6 +161,9 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.PVP_DAMAGE:
           rooms.handlePvpDamage(playerId, message);
           break;
+        case CLIENT_MESSAGES.PLAYER_CORPSE_LOOT_TAKE:
+          rooms.handlePlayerCorpseLootTake(playerId, message);
+          break;
         default:
           safeSend(ws, SERVER_MESSAGES.ERROR, { message: `Unsupported message type: ${message.type}` });
       }

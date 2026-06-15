@@ -18,7 +18,8 @@ const CLIENT_MESSAGES = Object.freeze({
   FLOOR0_STAIRS_REACHED: "floor0_stairs_reached",
   FLOOR0_WORLD_EVENT: "floor0_world_event",
   FLOOR0_ENEMY_SNAPSHOT: "floor0_enemy_snapshot",
-  PVP_DAMAGE: "pvp_damage"
+  PVP_DAMAGE: "pvp_damage",
+  PLAYER_CORPSE_LOOT_TAKE: "player_corpse_loot_take"
 });
 
 const SERVER_MESSAGES = Object.freeze({
@@ -43,6 +44,10 @@ const SERVER_MESSAGES = Object.freeze({
   FLOOR0_WORLD_EVENT: "floor0_world_event",
   FLOOR0_ENEMY_SNAPSHOT: "floor0_enemy_snapshot",
   PVP_DAMAGE_APPLIED: "pvp_damage_applied",
+  PLAYER_DIED: "player_died",
+  PLAYER_CORPSE_CREATED: "player_corpse_created",
+  PLAYER_CORPSE_LOOT_TAKEN: "player_corpse_loot_taken",
+  PLAYER_CORPSE_LOOTED: "player_corpse_looted",
   ERROR: "error"
 });
 

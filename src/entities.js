@@ -231,6 +231,7 @@ function removeCorpseFromMap(corpse) {
 
 function markCorpseLooted(corpse, { sync = true, announce = true } = {}) {
   if (!corpse) return false;
+  if (corpse.playerCorpse) sync = false;
   const wasLooted = !!corpse.looted;
   corpse.loot = [];
   corpse.looted = true;
@@ -323,6 +324,11 @@ function awardCorpseLootItem(corpse, item) {
 function takeCorpseLootItem(corpse, index) {
   if (!corpse || corpse.looted || hasFloor0LootAlreadyTaken(corpse) || index < 0 || index >= corpse.loot.length) return;
 
+  if (corpse.playerCorpse && typeof takeServerPlayerCorpseLoot === "function") {
+    takeServerPlayerCorpseLoot(corpse, index, false);
+    return;
+  }
+
   if (isServerFloor0LootShared()) {
     // Floor 0 corpses are server-shared containers. Claim the entire corpse on
     // first take so two crawlers cannot race individual items into duplicate loot.
@@ -347,6 +353,10 @@ function takeAllCorpseLoot(corpse) {
   if (!corpse.loot.length) {
     announcer(`You searched ${corpse.name}. It contained disappointment and several fluids best left unidentified.`);
     finishCorpseLootIfEmpty(corpse);
+    return;
+  }
+  if (corpse.playerCorpse && typeof takeServerPlayerCorpseLoot === "function") {
+    takeServerPlayerCorpseLoot(corpse, 0, true);
     return;
   }
   while (corpse.loot.length) takeCorpseLootItem(corpse, 0);

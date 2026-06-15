@@ -183,3 +183,77 @@ test('PvP down awards kill credit once and resists stale victim snapshots', () =
 
   manager.destroyLobby(run);
 });
+
+test('Floor 1 spawn assignments group parties and separate solos by room slot', () => {
+  const manager = new LobbyManager();
+  for (const id of ['player_a', 'player_b', 'player_c', 'player_d']) addClient(manager, id);
+  const run = manager.createLobby({ code: 'TEST-PARTY', mode: 'quick_match' });
+  manager.addPlayerToLobby(run, manager.clients.get('player_a'), { partyId: 'party_one' });
+  manager.addPlayerToLobby(run, manager.clients.get('player_b'), { partyId: 'party_one' });
+  manager.addPlayerToLobby(run, manager.clients.get('player_c'), { partyId: null });
+  manager.addPlayerToLobby(run, manager.clients.get('player_d'), { partyId: null });
+
+  const assignments = manager.assignSpawnPoints(run, run.players, 1);
+  assert.equal(assignments.player_a.groupId, 'party_one');
+  assert.equal(assignments.player_b.groupId, 'party_one');
+  assert.equal(assignments.player_a.roomSlot, assignments.player_b.roomSlot);
+  assert.notEqual(assignments.player_a.groupMemberIndex, assignments.player_b.groupMemberIndex);
+  assert.notEqual(`${assignments.player_a.dx},${assignments.player_a.dy}`, `${assignments.player_b.dx},${assignments.player_b.dy}`);
+  assert.notEqual(assignments.player_c.roomSlot, assignments.player_a.roomSlot);
+  assert.notEqual(assignments.player_d.roomSlot, assignments.player_c.roomSlot);
+  for (const assignment of Object.values(assignments)) {
+    assert.equal(assignment.floor, 1);
+    assert.equal(assignment.safeRoom, false);
+    assert.equal(assignment.bossRoom, false);
+    assert.equal(assignment.lockedRoom, false);
+    assert.equal(assignment.stairwellRoom, false);
+    assert.equal(assignment.exitRoom, false);
+  }
+  manager.destroyLobby(run);
+});
+
+test('player corpses persist until server-authoritative loot is fully taken', () => {
+  const manager = new LobbyManager();
+  const a = addClient(manager, 'player_a');
+  const b = addClient(manager, 'player_b');
+  const run = manager.joinQuickMatch('player_a');
+  manager.joinQuickMatch('player_b');
+  manager.markCrawlerAtFloor0Stairs('player_a');
+  manager.markCrawlerAtFloor0Stairs('player_b');
+  manager.resolveFloor0Collapse(run.code);
+
+  manager.updateCrawlerState('player_a', {
+    x: 160,
+    y: 192,
+    hp: 0,
+    maxHp: 100,
+    currentFloor: 1,
+    status: 'downed',
+    currentRoomId: 7,
+    lootSnapshot: {
+      coins: 42,
+      inventory: [{ id: 'box_1', type: 'lootbox', name: 'Lost Box', rarity: 'Rare' }],
+      equipment: { weapon: { id: 'sword_1', type: 'weapon', name: 'Test Sword', damage: 9, rarity: 'Common' } }
+    }
+  });
+
+  const created = last(b, 'player_corpse_created');
+  assert.equal(created.corpse.deadPlayerId, 'player_a');
+  assert.equal(created.corpse.deadPlayerName, 'player_a');
+  assert.equal(created.corpse.floor, 1);
+  assert.equal(created.corpse.roomId, 7);
+  assert.equal(created.corpse.loot.length, 3);
+  assert.equal(manager.floorWorldStatePayload(run, 1).playerCorpses.length, 1);
+
+  manager.handlePlayerCorpseLootTake('player_b', { corpseId: created.corpse.id, lootIndex: 0 });
+  const partial = last(a, 'player_corpse_loot_taken');
+  assert.equal(partial.loot[0].type, 'coins');
+  assert.equal(partial.remainingLoot.length, 2);
+  assert.equal(manager.floorWorldStatePayload(run, 1).playerCorpses[0].loot.length, 2);
+
+  manager.handlePlayerCorpseLootTake('player_b', { corpseId: created.corpse.id, takeAll: true });
+  assert.equal(last(a, 'player_corpse_looted').corpseId, created.corpse.id);
+  assert.equal(manager.floorWorldStatePayload(run, 1).playerCorpses.length, 0);
+
+  manager.destroyLobby(run);
+});

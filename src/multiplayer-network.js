@@ -266,6 +266,16 @@ function handleMultiplayerServerMessage(message) {
     case "pvp_damage_applied":
       applyServerPvpDamage(message);
       break;
+    case "player_corpse_created":
+    case "player_died":
+      applyPlayerCorpseCreated(message.corpse);
+      break;
+    case "player_corpse_loot_taken":
+      applyPlayerCorpseLootTaken(message);
+      break;
+    case "player_corpse_looted":
+      applyPlayerCorpseLooted(message.corpseId);
+      break;
     case "error":
       handleMultiplayerNetworkError(formatServerErrorMessage(message.message || "Floor 0 collapse server request failed."));
       break;
@@ -358,7 +368,7 @@ function crawlerStateSignature(state) {
 }
 
 function captureLocalCrawlerNetworkState() {
-  return {
+  const state = {
     x: player.x,
     y: player.y,
     aimX: Number.isFinite(player.aimX) ? player.aimX : undefined,
@@ -380,6 +390,34 @@ function captureLocalCrawlerNetworkState() {
     name: playerProfile?.name || "Crawler",
     characterId: getCharacterDef(playerProfile?.characterId).id
   };
+  if (state.status === "downed" && !multiplayerNetwork.playerCorpseLootSent) {
+    state.lootSnapshot = capturePlayerCorpseLootSnapshot();
+    multiplayerNetwork.playerCorpseLootSent = true;
+    clearLocalLootAfterCorpseSnapshot();
+  }
+  return state;
+}
+
+function cloneLootableItemForCorpse(item, originalSlot) {
+  if (!item || typeof item !== "object") return null;
+  return { ...JSON.parse(JSON.stringify(item)), originalSlot };
+}
+
+function capturePlayerCorpseLootSnapshot() {
+  return {
+    coins: Math.max(0, Math.trunc(Number(player.coins) || 0)),
+    inventory: (player.inventory || []).map(item => cloneLootableItemForCorpse(item, "inventory")).filter(Boolean),
+    equipment: Object.fromEntries(Object.entries(player.equipment || {}).map(([slot, item]) => [slot, cloneLootableItemForCorpse(item, slot)]).filter(([, item]) => !!item))
+  };
+}
+
+function clearLocalLootAfterCorpseSnapshot() {
+  player.coins = 0;
+  player.inventory = [];
+  for (const slot of Object.keys(player.equipment || {})) player.equipment[slot] = null;
+  if (typeof recalcEquipmentStats === "function") recalcEquipmentStats();
+  if (typeof updateInventoryUI === "function") updateInventoryUI();
+  if (typeof updateHUD === "function") updateHUD();
 }
 
 function maybeSendLocalCrawlerState(now = Date.now()) {
@@ -575,6 +613,7 @@ function handleServerFloorStart(message) {
   multiplayer.status = "active";
   multiplayer.pvpEnabled = currentFloor >= 1;
   multiplayer.floorStartedAt = Date.now();
+  multiplayerNetwork.playerCorpseLootSent = false;
   multiplayer.collapseAt = multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
   multiplayer.remotePlayers = new Map();
   resetState({ preserveRun: true, snapshot });
@@ -626,16 +665,18 @@ function localSpawnSlotFromAssignment(assignment) {
 
 function findFallbackFloorSpawn(assignment) {
   const slot = localSpawnSlotFromAssignment(assignment);
+  const roomSlot = Number.isFinite(Number(assignment?.roomSlot ?? assignment?.groupSlot)) ? Math.trunc(Number(assignment.roomSlot ?? assignment.groupSlot)) : slot;
+  const tileSlot = Number.isFinite(Number(assignment?.groupMemberIndex)) ? Math.trunc(Number(assignment.groupMemberIndex)) : slot;
   const candidateRooms = (rooms || [])
     .filter(room => room && room.type !== "safe" && room.type !== "boss" && !room.locked && (!bossRoom || room.id !== bossRoom.id))
     .map(room => ({ room, tiles: roomWalkableSpawnTiles(room) }))
     .filter(entry => entry.tiles.length >= 4)
     .sort((a, b) => (a.room.type === "normal" ? -1 : 0) - (b.room.type === "normal" ? -1 : 0) || b.tiles.length - a.tiles.length);
-  const entry = candidateRooms[slot % Math.max(1, candidateRooms.length)] || candidateRooms[0];
+  const entry = candidateRooms[roomSlot % Math.max(1, candidateRooms.length)] || candidateRooms[0];
   if (!entry) return null;
   const centerSorted = entry.tiles.sort((a, b) => Math.hypot(a.x - entry.room.cx, a.y - entry.room.cy) - Math.hypot(b.x - entry.room.cx, b.y - entry.room.cy));
-  const tile = centerSorted[slot % centerSorted.length] || centerSorted[0];
-  return { ...tile, roomId: entry.room.id, fallback: true, slot };
+  const tile = centerSorted[tileSlot % centerSorted.length] || centerSorted[0];
+  return { ...tile, roomId: entry.room.id, fallback: true, slot, roomSlot, tileSlot };
 }
 
 function warnInvalidFloorSpawn(assignment, fallback, reason) {
@@ -1048,12 +1089,60 @@ function applyFloor0WorldState(messageOrState) {
   for (const id of worldState.openedDoorIds || []) applyFloor0WorldEvent({ type: "door_opened", id });
   for (const id of worldState.openedChestIds || []) applyFloor0WorldEvent({ type: "chest_opened", id });
   for (const id of worldState.takenLootIds || []) applyFloor0WorldEvent({ type: "loot_taken", id });
+  for (const corpse of worldState.playerCorpses || []) applyPlayerCorpseCreated(corpse);
   const states = Array.isArray(worldState.enemyStates) ? worldState.enemyStates : Object.values(worldState.enemyStates || {});
   for (const state of states) {
     if (!state?.enemyId) continue;
     rememberFloor0EnemyState(state);
     applyFloor0EnemyState(state, { immediate: true });
   }
+}
+
+
+function normalizePlayerCorpse(corpse) {
+  if (!corpse?.id || corpse.looted) return null;
+  return {
+    ...corpse,
+    playerCorpse: true,
+    kind: "player",
+    boss: false,
+    name: corpse.name || `${corpse.deadPlayerName || "Crawler"}'s Corpse`,
+    r: Number(corpse.r) || 13,
+    loot: (corpse.loot || []).map(item => ({ ...item }))
+  };
+}
+
+function applyPlayerCorpseCreated(rawCorpse) {
+  const corpse = normalizePlayerCorpse(rawCorpse);
+  if (!corpse || Number(corpse.floor) !== currentFloor) return false;
+  const existing = getCorpseById(corpse.id);
+  if (existing) Object.assign(existing, corpse);
+  else corpses.push(corpse);
+  minimapDirty = true;
+  return true;
+}
+
+function applyPlayerCorpseLootTaken(message = {}) {
+  const corpse = getCorpseById(message.corpseId);
+  if (!corpse) return false;
+  if (message.looterPlayerId === multiplayer.playerId) {
+    for (const item of message.loot || []) awardCorpseLootItem(corpse, item);
+    updateInventoryUI();
+    updateHUD();
+  }
+  corpse.loot = (message.remainingLoot || []).map(item => ({ ...item }));
+  if (activeLootCorpseId === corpse.id) renderCorpseLootWindow(corpse);
+  return true;
+}
+
+function applyPlayerCorpseLooted(corpseId) {
+  const corpse = getCorpseById(corpseId);
+  if (corpse) markCorpseLooted(corpse, { sync: false, announce: false });
+}
+
+function takeServerPlayerCorpseLoot(corpse, index, takeAll = false) {
+  if (!corpse?.playerCorpse || !multiplayer.enabled || !multiplayer.usingServer) return false;
+  return sendMultiplayerMessage("player_corpse_loot_take", { corpseId: corpse.id, lootIndex: index, takeAll });
 }
 
 function applyFloor0EnemySnapshot(message) {
