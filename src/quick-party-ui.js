@@ -155,6 +155,7 @@
     const localPartyId = currentLocalPartyId(members);
     renderPartySummary(members, localPartyId);
     renderMemberList(members, localPartyId);
+    if (typeof renderNearbyCrawlersUi === "function") renderNearbyCrawlersUi();
     renderCopyButtonText();
   }
 
@@ -295,4 +296,79 @@
       });
     }
   }, 1000);
+})();
+
+function getNearbyCrawlerCandidates({ limit = 8, maxDistance = TILE * 8 } = {}) {
+  if (!multiplayer?.enabled || !multiplayer.remotePlayers || currentFloor == null) return [];
+  const membersById = new Map((multiplayer.lobbyMembers || []).map(member => [member.id, member]));
+  const localPartyId = multiplayer.partyId || (multiplayer.lobbyMembers || []).find(member => member.local || member.id === multiplayer.playerId)?.partyId || null;
+  const now = Date.now();
+  return Array.from(multiplayer.remotePlayers.values())
+    .filter(remote => remote && remote.id !== multiplayer.playerId)
+    .filter(remote => Number(remote.currentFloor) === Number(currentFloor))
+    .filter(remote => (remote.hp ?? 1) > 0 && remote.status !== "downed" && now - (Number(remote.updatedAt) || now) < 10_000)
+    .map(remote => {
+      const distance = Math.hypot(remote.x - player.x, remote.y - player.y);
+      const sameRoom = Number.isFinite(Number(player.currentRoomId)) && Math.trunc(Number(remote.currentRoomId)) === Math.trunc(Number(player.currentRoomId));
+      const member = membersById.get(remote.id) || {};
+      return {
+        ...remote,
+        name: member.name || remote.name || "Crawler",
+        partyId: member.partyId || remote.partyId || null,
+        sameRoom,
+        distance,
+        inParty: !!(localPartyId && (member.partyId || remote.partyId) === localPartyId),
+        inviteSent: multiplayer.sentPartyInvites?.has?.(remote.id)
+      };
+    })
+    .filter(remote => remote.sameRoom || remote.distance <= maxDistance)
+    .sort((a, b) => (b.sameRoom - a.sameRoom) || (a.distance - b.distance))
+    .slice(0, limit);
+}
+
+function getNearbyInviteTarget() {
+  return getNearbyCrawlerCandidates({ limit: 1, maxDistance: TILE * 2.25 })[0] || null;
+}
+
+function renderNearbyCrawlersUi() {
+  const list = document.getElementById("mpNearbyCrawlerList");
+  if (!list) return;
+  const crawlers = getNearbyCrawlerCandidates({ limit: 8 });
+  list.innerHTML = "";
+  if (!crawlers.length) {
+    const empty = document.createElement("div");
+    empty.className = "mpNearbyEmpty";
+    empty.textContent = "No same-floor crawlers nearby.";
+    list.appendChild(empty);
+    return;
+  }
+  for (const crawler of crawlers) {
+    const row = document.createElement("div");
+    row.className = "mpMember mpNearbyCrawler";
+    const info = document.createElement("span");
+    info.textContent = `${crawler.name} · ${crawler.sameRoom ? "Same room" : "Nearby"}`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mpNearbyInviteBtn";
+    if (crawler.inParty) { button.textContent = "In Party"; button.disabled = true; }
+    else if (crawler.inviteSent) { button.textContent = "Invite Sent"; button.disabled = true; }
+    else { button.textContent = "Invite"; button.addEventListener("click", () => requestQuickPartyInvite?.(crawler.id, { method: "ui", distance: crawler.distance })); }
+    row.append(info, button);
+    list.appendChild(row);
+  }
+}
+
+(function installNearbyCrawlerUi() {
+  const style = document.createElement("style");
+  style.textContent = `.mpNearbyCrawler button{margin-left:auto}.mpNearbyEmpty{font-size:11px;color:#cbd3ff;padding:6px 0}.mpNearbyInviteBtn{font-weight:800}`;
+  document.head.appendChild(style);
+  const previous = window.renderQuickPartyUi;
+  if (typeof previous === "function" && !previous.__nearbyCrawlerWrapped) {
+    window.renderQuickPartyUi = function renderQuickPartyUiWithNearby(...args) {
+      const result = previous.apply(this, args);
+      renderNearbyCrawlersUi();
+      return result;
+    };
+    window.renderQuickPartyUi.__nearbyCrawlerWrapped = true;
+  }
 })();

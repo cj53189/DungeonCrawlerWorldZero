@@ -175,18 +175,18 @@ function handleQuickPartyResponseMessage(message) {
   else announcer(`Party invite declined by ${message.targetName || message.fromName || "Crawler"}.`);
 }
 
-function requestQuickPartyInvite(targetPlayerId) {
+function requestQuickPartyInvite(targetPlayerId, options = {}) {
   ensureQuickPartyInviteState();
   if (!targetPlayerId || !isMultiplayerNetworkReady?.()) return false;
   multiplayer.sentPartyInvites.set(targetPlayerId, Date.now() + 30_000);
-  return sendMultiplayerMessage("party_invite", { targetPlayerId });
+  return sendMultiplayerMessage("party_invite_send", { targetPlayerId, ...options });
 }
 
 function respondQuickPartyInvite(fromPlayerId, accepted = true) {
   ensureQuickPartyInviteState();
   if (!fromPlayerId || !isMultiplayerNetworkReady?.()) return false;
   if (!accepted) multiplayer.pendingPartyInvites.delete(fromPlayerId);
-  return sendMultiplayerMessage("party_response", { fromPlayerId, accepted: !!accepted });
+  return sendMultiplayerMessage(accepted ? "party_invite_accept" : "party_invite_decline", { fromPlayerId, accepted: !!accepted });
 }
 
 function installQuickPartyCodeClient() {
@@ -205,7 +205,7 @@ function installQuickPartyCodeClient() {
   const handleServerMessageWithoutQuickParty = typeof handleMultiplayerServerMessage === "function" ? handleMultiplayerServerMessage : null;
   if (handleServerMessageWithoutQuickParty && !handleServerMessageWithoutQuickParty.__quickPartyWrapped) {
     handleMultiplayerServerMessage = function handleMultiplayerServerMessageWithQuickParty(message) {
-      if (message?.type === "party_invite") {
+      if (message?.type === "party_invite" || message?.type === "party_invite_received") {
         handleQuickPartyInviteMessage(message);
         if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
         if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();

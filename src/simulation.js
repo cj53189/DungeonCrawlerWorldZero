@@ -267,6 +267,8 @@ function updatePlayer() {
     updatePlayerAim(gamepadState.aimX, gamepadState.aimY);
   } else if (touchAttackAimLength > 0) {
     updatePlayerAim(touchState.attackX, touchState.attackY);
+  } else if (inputState.mouseAimActive && Number.isFinite(inputState.mouseWorldX) && Number.isFinite(inputState.mouseWorldY)) {
+    updatePlayerAim(inputState.mouseWorldX - player.x, inputState.mouseWorldY - player.y);
   } else if (Math.hypot(fallbackAimX, fallbackAimY) > 0) {
     updatePlayerAim(fallbackAimX, fallbackAimY);
   } else if (gamepadState.connected && !gamepadState.hasAimInput && Math.hypot(gamepadState.moveX, gamepadState.moveY) > 0) {
@@ -799,6 +801,8 @@ function updateProjectiles() {
     if (hit) projectiles.splice(i, 1);
   }
 
+  if (inputState.mouseAttackActive) attack();
+
   for (let i = attackTelegraphs.length - 1; i >= 0; i--) {
     attackTelegraphs[i].life--;
     if (attackTelegraphs[i].life <= 0) attackTelegraphs.splice(i, 1);
@@ -862,6 +866,14 @@ function interact() {
       }
     }
   }
+  if (typeof getNearbyInviteTarget === "function") {
+    const target = getNearbyInviteTarget();
+    if (target && typeof requestQuickPartyInvite === "function" && requestQuickPartyInvite(target.id, { method: "interact", distance: target.distance })) {
+      announcer(`Party invite sent to ${target.name || "Crawler"}.`);
+      return;
+    }
+  }
+
   stats.interactionsWithNothing++;
   announcer("You interacted with absolutely nothing. Stunning. The nothing is considering a restraining order.");
 }
