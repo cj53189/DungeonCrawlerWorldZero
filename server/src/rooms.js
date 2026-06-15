@@ -246,7 +246,9 @@ class LobbyManager {
       isPartyLeader: !!isPartyLeader,
       crawlerState: null,
       floor0Status: FLOOR0_ADVANCE_STATUSES.EXPLORING,
-      floor0ReachedStairsAt: null
+      floor0ReachedStairsAt: null,
+      lastPvpDownCredit: null,
+      pvpDamageAuthorityUntil: 0
     });
     this.applyFloor0LateJoinTimer(lobby);
     safeSend(client.ws, SERVER_MESSAGES.FLOOR0_WORLD_STATE, {
@@ -350,6 +352,13 @@ class LobbyManager {
       return false;
     }
 
+    const existing = player.crawlerState;
+    if (existing && player.pvpDamageAuthorityUntil && Date.now() < player.pvpDamageAuthorityUntil) {
+      sanitized.hp = Math.min(sanitized.hp, existing.hp);
+      if (existing.status === "downed") sanitized.status = "downed";
+      sanitized.pvpKills = Math.max(sanitized.pvpKills || 0, existing.pvpKills || 0);
+    }
+
     player.crawlerState = {
       ...sanitized,
       id: player.id,
@@ -443,6 +452,75 @@ class LobbyManager {
           floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING
         }))
     });
+  }
+
+  handlePvpDamage(playerId, message = {}) {
+    const reject = (reason) => {
+      console.warn("Rejected PvP damage", { reason, attackerId: playerId, targetPlayerId: message?.targetPlayerId, floor: message?.floor });
+      const client = this.clients.get(playerId);
+      if (client) safeSend(client.ws, SERVER_MESSAGES.ERROR, { message: `PvP damage rejected: ${reason}` });
+      return false;
+    };
+
+    const client = this.requireClient(playerId);
+    if (!client.lobbyCode) return reject("attacker not in run");
+    const lobby = this.lobbies.get(client.lobbyCode);
+    if (!lobby) return reject("run not found");
+
+    const attacker = lobby.players.find(candidate => candidate.id === playerId);
+    const targetId = String(message.targetPlayerId || "");
+    const target = lobby.players.find(candidate => candidate.id === targetId);
+    if (!attacker || !target) return reject("attacker/target not in same run");
+    if (attacker.id === target.id) return reject("self damage");
+    if (lobby.floor < 1 || Math.trunc(Number(message.floor)) !== lobby.floor) return reject("floor pvp disabled");
+    if (attacker.partyId && target.partyId && attacker.partyId === target.partyId) return reject("same party");
+    if (!attacker.crawlerState || !target.crawlerState) return reject("missing crawler state");
+    if (attacker.crawlerState.currentFloor !== lobby.floor || target.crawlerState.currentFloor !== lobby.floor) return reject("different floor");
+    if (target.crawlerState.status !== "active" || target.crawlerState.hp <= 0) return reject("target downed");
+
+    const damage = Math.max(0, Math.min(250, Math.round(Number(message.damage) || 0)));
+    if (damage <= 0) return reject("invalid damage");
+    const distance = Math.hypot((attacker.crawlerState.x || 0) - (target.crawlerState.x || 0), (attacker.crawlerState.y || 0) - (target.crawlerState.y || 0));
+    if (distance > 520) return reject("range sanity check");
+
+    const beforeHp = target.crawlerState.hp;
+    const hp = Math.max(0, beforeHp - damage);
+    const downed = hp <= 0;
+    target.crawlerState = {
+      ...target.crawlerState,
+      hp,
+      status: downed ? "downed" : "active",
+      knockbackX: Number(message.knockback?.x) || 0,
+      knockbackY: Number(message.knockback?.y) || 0,
+      knockbackFrames: 8,
+      knockbackUntil: Date.now() + 160,
+      updatedAt: Date.now()
+    };
+    target.pvpDamageAuthorityUntil = Date.now() + 2000;
+
+    if (downed && target.lastPvpDownCredit !== attacker.id) {
+      target.lastPvpDownCredit = attacker.id;
+      const attackerKills = Math.max(0, Math.trunc(Number(attacker.crawlerState.pvpKills) || 0)) + 1;
+      attacker.crawlerState = { ...attacker.crawlerState, pvpKills: attackerKills, updatedAt: Date.now() };
+    }
+
+    const payload = {
+      lobbyCode: lobby.code,
+      attackerId: attacker.id,
+      targetPlayerId: target.id,
+      damage: beforeHp - hp,
+      hp,
+      maxHp: target.crawlerState.maxHp,
+      status: target.crawlerState.status,
+      floor: lobby.floor,
+      hit: message.hit || null,
+      knockback: { x: target.crawlerState.knockbackX, y: target.crawlerState.knockbackY, frames: target.crawlerState.knockbackFrames },
+      attackerPvpKills: Math.max(0, Math.trunc(Number(attacker.crawlerState.pvpKills) || 0)),
+      downed
+    };
+    this.broadcast(lobby, SERVER_MESSAGES.PVP_DAMAGE_APPLIED, payload);
+    this.broadcastCrawlerSnapshot(lobby, { force: true });
+    return true;
   }
 
   handleFloor0WorldEvent(playerId, event) {

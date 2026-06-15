@@ -118,3 +118,68 @@ test('reconnect is allowed only for players already registered in a locked run',
 
   manager.destroyLobby(run);
 });
+
+test('PvP damage applies on Floor 1 and blocks same-party friendly fire', () => {
+  const manager = new LobbyManager();
+  const a = addClient(manager, 'player_a');
+  const b = addClient(manager, 'player_b');
+  const c = addClient(manager, 'player_c');
+  const run = manager.joinQuickMatch('player_a');
+  manager.joinQuickMatch('player_b');
+  manager.joinQuickMatch('player_c');
+  manager.markCrawlerAtFloor0Stairs('player_a');
+  manager.markCrawlerAtFloor0Stairs('player_b');
+  manager.markCrawlerAtFloor0Stairs('player_c');
+  manager.resolveFloor0Collapse(run.code);
+
+  manager.updateCrawlerState('player_a', { x: 100, y: 100, hp: 100, maxHp: 100, currentFloor: 1, status: 'active', pvpKills: 0 });
+  manager.updateCrawlerState('player_b', { x: 130, y: 100, hp: 100, maxHp: 100, currentFloor: 1, status: 'active', pvpKills: 0 });
+  manager.handlePvpDamage('player_a', { targetPlayerId: 'player_b', damage: 35, floor: 1, knockback: { x: 6, y: 0 } });
+
+  const target = run.players.find(player => player.id === 'player_b');
+  assert.equal(target.crawlerState.hp, 65);
+  assert.equal(target.crawlerState.status, 'active');
+  assert.equal(last(a, 'pvp_damage_applied').targetPlayerId, 'player_b');
+  assert.equal(last(b, 'pvp_damage_applied').hp, 65);
+
+  const playerA = run.players.find(player => player.id === 'player_a');
+  const playerC = run.players.find(player => player.id === 'player_c');
+  playerA.partyId = 'party:test';
+  playerC.partyId = 'party:test';
+  manager.updateCrawlerState('player_c', { x: 145, y: 100, hp: 100, maxHp: 100, currentFloor: 1, status: 'active', partyId: 'party:test' });
+  manager.handlePvpDamage('player_a', { targetPlayerId: 'player_c', damage: 35, floor: 1 });
+  assert.equal(playerC.crawlerState.hp, 100);
+  assert.match(last(a, 'error').message, /same party/);
+
+  manager.destroyLobby(run);
+});
+
+test('PvP down awards kill credit once and resists stale victim snapshots', () => {
+  const manager = new LobbyManager();
+  const a = addClient(manager, 'player_a');
+  addClient(manager, 'player_b');
+  const run = manager.joinQuickMatch('player_a');
+  manager.joinQuickMatch('player_b');
+  manager.markCrawlerAtFloor0Stairs('player_a');
+  manager.markCrawlerAtFloor0Stairs('player_b');
+  manager.resolveFloor0Collapse(run.code);
+
+  manager.updateCrawlerState('player_a', { x: 100, y: 100, hp: 100, maxHp: 100, currentFloor: 1, status: 'active', pvpKills: 0 });
+  manager.updateCrawlerState('player_b', { x: 130, y: 100, hp: 20, maxHp: 100, currentFloor: 1, status: 'active', pvpKills: 0 });
+  manager.handlePvpDamage('player_a', { targetPlayerId: 'player_b', damage: 25, floor: 1 });
+
+  const attacker = run.players.find(player => player.id === 'player_a');
+  const target = run.players.find(player => player.id === 'player_b');
+  assert.equal(attacker.crawlerState.pvpKills, 1);
+  assert.equal(target.crawlerState.status, 'downed');
+  assert.equal(last(a, 'pvp_damage_applied').attackerPvpKills, 1);
+
+  manager.handlePvpDamage('player_a', { targetPlayerId: 'player_b', damage: 25, floor: 1 });
+  assert.equal(attacker.crawlerState.pvpKills, 1);
+
+  manager.updateCrawlerState('player_b', { x: 130, y: 100, hp: 100, maxHp: 100, currentFloor: 1, status: 'active', pvpKills: 0 });
+  assert.equal(target.crawlerState.hp, 0);
+  assert.equal(target.crawlerState.status, 'downed');
+
+  manager.destroyLobby(run);
+});

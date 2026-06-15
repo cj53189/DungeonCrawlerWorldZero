@@ -228,6 +228,8 @@ function placeMockRemoteCrawlers() {
       r: player.r,
       hp: player.maxHp,
       maxHp: player.maxHp,
+      currentFloor,
+      partyId: member.partyId || null,
       status: "active",
       color: ["#75c7ff", "#ff9bd1", "#ffd86b"][index % 3]
     });
@@ -275,15 +277,50 @@ function applySafeRoomPvpFreeze() {
   announcer(`Safe room PvP violation: crawler frozen for ${PVP_SAFE_ROOM_FREEZE_SECONDS} seconds.`);
 }
 
-function damageRemoteCrawler(crawler, damage) {
-  if (!crawler || crawler.status !== "active") return false;
-  if (typeof canDamageCrawler === "function" ? !canDamageCrawler(player, crawler) : (!canCrawlerInitiatePvp(player) || isCrawlerInSafeRoom(crawler))) {
-    if (typeof isFriendlyCrawler === "function" && isFriendlyCrawler(player, crawler)) addFloatingFeedbackText("friendly", crawler.x, crawler.y - crawler.r - 8, { anchor: crawler, color: "#7be0ff", size: 12 });
+function pvpBlockReason(crawler) {
+  if (!crawler) return "missing target";
+  if (!Number.isFinite(Number(crawler.currentFloor))) return "missing currentFloor";
+  if (!Number.isFinite(Number(crawler.x)) || !Number.isFinite(Number(crawler.y))) return "missing position";
+  if (crawler.currentFloor !== currentFloor) return "different floor";
+  if (!isPvpFloorActive()) return currentFloor < 1 ? "floor 0" : "pvp inactive";
+  if (crawler === player || crawler.id === multiplayer.playerId) return "self";
+  if (!isCrawlerActive(crawler)) return "target downed";
+  if (isCrawlerInSafeRoom(player) || isCrawlerInSafeRoom(crawler)) return "safe room";
+  if (typeof isFriendlyCrawler === "function" && isFriendlyCrawler(player, crawler)) return "same party";
+  if (!crawler.partyId && crawler.partyId !== null) return "missing partyId";
+  return null;
+}
+
+const pvpDebugLogTimes = new Map();
+function logPvpDebug(key, message, payload = {}) {
+  const now = Date.now();
+  if (now - (pvpDebugLogTimes.get(key) || 0) < 1000) return;
+  pvpDebugLogTimes.set(key, now);
+  console.warn(message, payload);
+}
+
+function damageRemoteCrawler(crawler, damage, metadata = {}) {
+  const reason = pvpBlockReason(crawler);
+  if (reason) {
+    if (reason === "same party") addFloatingFeedbackText("friendly", crawler.x, crawler.y - crawler.r - 8, { anchor: crawler, color: "#7be0ff", size: 12 });
+    logPvpDebug(`pvp-block-${crawler?.id || "unknown"}-${reason}`, "PvP damage blocked", { reason, targetId: crawler?.id, floor: currentFloor });
     return false;
   }
   const before = crawler.hp ?? crawler.maxHp ?? player.maxHp;
-  crawler.hp = Math.max(0, before - Math.max(0, damage));
-  if (typeof applyKnockback === "function") applyKnockback(crawler, player.x, player.y, Math.min(12, 4 + Math.max(0, before - crawler.hp) * 0.2));
+  const dealt = Math.max(0, Math.min(before, Math.max(0, damage)));
+  const kbDistance = Math.min(12, 4 + dealt * 0.2);
+  const startX = crawler.x, startY = crawler.y;
+  if (typeof applyKnockback === "function") applyKnockback(crawler, metadata.fromX ?? player.x, metadata.fromY ?? player.y, kbDistance);
+  const knockbackX = (crawler.x || 0) - (startX || 0);
+  const knockbackY = (crawler.y || 0) - (startY || 0);
+  if (typeof sendServerPvpDamage === "function" && multiplayer.usingServer) {
+    const sent = sendServerPvpDamage(crawler, dealt, { ...metadata, knockbackX, knockbackY });
+    if (sent) {
+      logPvpDebug(`pvp-send-${crawler.id}`, "PvP damage sent", { attackerId: multiplayer.playerId, targetId: crawler.id, damage: dealt, floor: currentFloor });
+      return true;
+    }
+  }
+  crawler.hp = Math.max(0, before - dealt);
   if (crawler.hp <= 0) {
     crawler.status = "downed";
     if (typeof awardPvpKill === "function") awardPvpKill(player, crawler);

@@ -651,6 +651,7 @@ function isFriendlyCrawler(attacker, target) {
 function canDamageCrawler(attacker, target) {
   if (!attacker || !target || attacker === target) return false;
   if (!isPvpFloorActive()) return false;
+  if (Number.isFinite(Number(target.currentFloor)) && Number(target.currentFloor) !== currentFloor) return false;
   if (!isCrawlerActive(target) || isCrawlerInSafeRoom(attacker) || isCrawlerInSafeRoom(target)) return false;
   return !isFriendlyCrawler(attacker, target);
 }
@@ -785,7 +786,7 @@ function attack(attacker = player) {
       if (shape.type === "circle") inShape = enemyInCircle(crawler, attacker, shape.radius);
       if (shape.type === "arc") inShape = enemyInArc(crawler, attacker, shape.radius, shape.angle);
       if (shape.type === "line") inShape = enemyInLine(crawler, attacker, shape.length, shape.width);
-      if (inShape) hit = damageRemoteCrawler(crawler, damage) || hit;
+      if (inShape && (!Number.isFinite(Number(crawler.currentFloor)) || Number(crawler.currentFloor) === currentFloor) && hasLineOfSight(player.x, player.y, crawler.x, crawler.y)) hit = damageRemoteCrawler(crawler, damage, { weapon, weaponId: weapon.id, weaponType: shape.type, hitX: crawler.x, hitY: crawler.y }) || hit;
     }
   }
 
@@ -828,7 +829,7 @@ function updateProjectiles() {
         if (crawler.status !== "active" || projectile.hitCrawlers?.has(crawler.id)) continue;
         if (Math.hypot(projectile.x - crawler.x, projectile.y - crawler.y) <= projectile.radius + crawler.r) {
           projectile.hitCrawlers.add(crawler.id);
-          hit = damageRemoteCrawler(crawler, projectile.damage);
+          hit = (!Number.isFinite(Number(crawler.currentFloor)) || Number(crawler.currentFloor) === currentFloor) && damageRemoteCrawler(crawler, projectile.damage, { weapon: projectile.weapon, weaponId: projectile.weapon?.id, weaponType: "projectile", hitX: projectile.x, hitY: projectile.y, fromX: projectile.x - projectile.vx, fromY: projectile.y - projectile.vy });
           projectile.hit = projectile.hit || hit;
           break;
         }
