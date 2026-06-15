@@ -382,6 +382,11 @@ class LobbyManager {
     const status = CRAWLER_STATUS_VALUES.has(state.status) ? state.status : "active";
     const currentRoomId = finiteNumber(state.currentRoomId);
     const dodgeProgress = finiteNumber(state.dodgeProgress);
+    const pvpKills = finiteNumber(state.pvpKills);
+    const knockbackX = finiteNumber(state.knockbackX);
+    const knockbackY = finiteNumber(state.knockbackY);
+    const knockbackFrames = finiteNumber(state.knockbackFrames);
+    const knockbackUntil = finiteNumber(state.knockbackUntil);
 
     return {
       x,
@@ -393,6 +398,12 @@ class LobbyManager {
       ...(currentRoomId === null ? {} : { currentRoomId: Math.trunc(currentRoomId) }),
       ...(state.isDodging ? { isDodging: true } : {}),
       ...(dodgeProgress === null ? {} : { dodgeProgress: Math.max(0, Math.min(1, dodgeProgress)) }),
+      ...(pvpKills === null ? {} : { pvpKills: Math.max(0, Math.trunc(pvpKills)) }),
+      ...(typeof state.partyId === "string" ? { partyId: state.partyId.slice(0, 80) } : {}),
+      ...(knockbackX === null ? {} : { knockbackX }),
+      ...(knockbackY === null ? {} : { knockbackY }),
+      ...(knockbackFrames === null ? {} : { knockbackFrames: Math.max(0, Math.trunc(knockbackFrames)) }),
+      ...(knockbackUntil === null ? {} : { knockbackUntil }),
       ...(aimX === null ? {} : { aimX }),
       ...(aimY === null ? {} : { aimY }),
       name: this.sanitizePlayerName(state.name),
@@ -529,6 +540,10 @@ class LobbyManager {
     const roomId = finiteNumber(raw.roomId);
     const x = finiteNumber(raw.x);
     const y = finiteNumber(raw.y);
+    const knockbackX = finiteNumber(raw.knockbackX);
+    const knockbackY = finiteNumber(raw.knockbackY);
+    const knockbackFrames = finiteNumber(raw.knockbackFrames);
+    const knockbackUntil = finiteNumber(raw.knockbackUntil);
     return {
       enemyId,
       alive: raw.alive === false || hp === 0 ? false : true,
@@ -537,6 +552,10 @@ class LobbyManager {
       ...(roomId === null ? {} : { roomId: Math.trunc(roomId) }),
       ...(x === null ? {} : { x }),
       ...(y === null ? {} : { y }),
+      ...(knockbackX === null ? {} : { knockbackX }),
+      ...(knockbackY === null ? {} : { knockbackY }),
+      ...(knockbackFrames === null ? {} : { knockbackFrames: Math.max(0, Math.trunc(knockbackFrames)) }),
+      ...(knockbackUntil === null ? {} : { knockbackUntil }),
       ...(typeof raw.status === "string" ? { status: raw.status.slice(0, 32) } : {})
     };
   }

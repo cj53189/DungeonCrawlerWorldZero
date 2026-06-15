@@ -277,10 +277,16 @@ function applySafeRoomPvpFreeze() {
 
 function damageRemoteCrawler(crawler, damage) {
   if (!crawler || crawler.status !== "active") return false;
-  if (!canCrawlerInitiatePvp(player) || isCrawlerInSafeRoom(crawler)) return false;
-  crawler.hp = Math.max(0, (crawler.hp ?? crawler.maxHp ?? player.maxHp) - Math.max(0, damage));
+  if (typeof canDamageCrawler === "function" ? !canDamageCrawler(player, crawler) : (!canCrawlerInitiatePvp(player) || isCrawlerInSafeRoom(crawler))) {
+    if (typeof isFriendlyCrawler === "function" && isFriendlyCrawler(player, crawler)) addFloatingFeedbackText("friendly", crawler.x, crawler.y - crawler.r - 8, { anchor: crawler, color: "#7be0ff", size: 12 });
+    return false;
+  }
+  const before = crawler.hp ?? crawler.maxHp ?? player.maxHp;
+  crawler.hp = Math.max(0, before - Math.max(0, damage));
+  if (typeof applyKnockback === "function") applyKnockback(crawler, player.x, player.y, Math.min(12, 4 + Math.max(0, before - crawler.hp) * 0.2));
   if (crawler.hp <= 0) {
     crawler.status = "downed";
+    if (typeof awardPvpKill === "function") awardPvpKill(player, crawler);
     changeAudience(8);
     achievement("CRAWLER DOWNED", `${crawler.name || "Crawler"} was downed in PvP outside the safe room.`, `pvpDown_${crawler.id}`);
   } else {
