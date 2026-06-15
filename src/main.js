@@ -186,6 +186,7 @@ function handleQuickPartyResponseMessage(message) {
 
 function requestQuickPartyInvite(targetPlayerId, options = {}) {
   ensureQuickPartyInviteState();
+  if (typeof isLocalPlayerDead === "function" && isLocalPlayerDead()) return false;
   if (!targetPlayerId || !isMultiplayerNetworkReady?.()) return false;
   multiplayer.sentPartyInvites.set(targetPlayerId, Date.now() + 30_000);
   return sendMultiplayerMessage("party_invite_send", { targetPlayerId, ...options });

@@ -5,6 +5,7 @@ const CLIENT_MESSAGES = Object.freeze({
   JOIN_LOBBY: "join_lobby",
   PARTY_JOIN_BY_CODE: "party_join_by_code",
   QUICK_MATCH: "quick_match",
+  PVP_ARENA: "pvp_arena",
   LEAVE_LOBBY: "leave_lobby",
   PARTY_LEAVE: "party_leave",
   CRAWLER_STATE: "crawler_state",
@@ -53,7 +54,8 @@ const SERVER_MESSAGES = Object.freeze({
 
 const LOBBY_MODES = Object.freeze({
   PRIVATE: "private",
-  QUICK_MATCH: "quick_match"
+  QUICK_MATCH: "quick_match",
+  PVP_ARENA: "pvp_arena"
 });
 
 const LOBBY_STATUS = Object.freeze({

@@ -137,10 +137,11 @@ function requestServerJoinLobby(code) {
   return sendMultiplayerMessage("join_lobby", { lobbyCode: cleanedCode, profile: playerProfile });
 }
 
-function requestServerQuickMatch() {
+function requestServerQuickMatch(options = {}) {
   if (!isMultiplayerNetworkReady()) return false;
-  prepareServerLobbyState({ status: "matchmaking", lobbyCode: null, partyId: null });
-  return sendMultiplayerMessage("quick_match", { profile: playerProfile });
+  const arena = !!options.arena;
+  prepareServerLobbyState({ status: arena ? "arena" : "matchmaking", lobbyCode: null, partyId: null });
+  return sendMultiplayerMessage("quick_match", { profile: playerProfile, arena });
 }
 
 function requestServerLeaveLobby() {
@@ -312,6 +313,7 @@ function applyServerPvpDamage(message) {
     player.hp = Math.min(player.hp, hp);
     if (status === "downed" || player.hp <= 0) {
       player.hp = 0;
+      multiplayer.localStatus = "downed";
       if (typeof die === "function" && !gameLost) die();
     }
     if (Number.isFinite(Number(knockback.x))) player.knockbackX = Number(knockback.x);
@@ -376,7 +378,7 @@ function captureLocalCrawlerNetworkState() {
     hp: player.hp,
     maxHp: player.maxHp,
     currentFloor,
-    status: gameLost || player.hp <= 0 ? "downed" : (gameMode === GAME_MODES.MULTIPLAYER_STASIS ? "stasis" : "active"),
+    status: (typeof isLocalPlayerDead === "function" && isLocalPlayerDead()) ? "downed" : (gameMode === GAME_MODES.MULTIPLAYER_STASIS ? "stasis" : "active"),
     floor0Status: multiplayer.localFloor0Status || "exploring",
     isDodging: typeof isPlayerDodging === "function" ? isPlayerDodging() : false,
     dodgeProgress: player.dodgeMaxFrames > 0 ? 1 - (player.dodgeFrames / player.dodgeMaxFrames) : 0,
@@ -616,35 +618,40 @@ function handleServerFloorStart(message) {
   if (!multiplayer.enabled || !multiplayer.usingServer) return;
   if (message.lobbyCode && multiplayer.roomId && message.lobbyCode !== multiplayer.roomId) return;
   const nextFloor = Math.trunc(Number(message.floor));
-  if (!Number.isFinite(nextFloor) || nextFloor < 1 || (currentFloor === 0 && multiplayer.localFloor0Status !== "advancing")) return;
+  const isArena = message.mode === "pvp_arena";
+  if (!Number.isFinite(nextFloor) || nextFloor < 1 || (!isArena && currentFloor === 0 && multiplayer.localFloor0Status !== "advancing")) return;
   if (!message.floorSeed) { if (typeof announcer === "function") announcer("Server did not provide a floor seed; waiting for synced floor_start."); return; }
 
   const snapshot = captureRunProgress();
   currentFloor = nextFloor;
   multiplayer.currentRunId = message.runId || multiplayer.currentRunId;
   multiplayer.currentFloorSeed = String(message.floorSeed);
-  multiplayer.currentJoinState = "locked";
+  multiplayer.currentJoinState = message.joinState || (isArena ? "open" : "locked");
+  multiplayer.mode = message.mode || null;
+  multiplayer.arena = isArena;
   gameWon = false;
   gameLost = false;
   pendingFloorAdvance = false;
   setGameMode(GAME_MODES.MULTIPLAYER_ACTIVE);
   multiplayer.status = "active";
-  multiplayer.pvpEnabled = currentFloor >= 1;
+  multiplayer.localStatus = "active";
+  multiplayer.pvpEnabled = isArena || currentFloor >= 1;
   multiplayer.floorStartedAt = Date.now();
   multiplayerNetwork.playerCorpseLootSent = false;
-  multiplayer.collapseAt = multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
+  multiplayer.collapseAt = isArena ? null : multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
   multiplayer.remotePlayers = new Map();
-  resetState({ preserveRun: true, snapshot });
+  resetState({ preserveRun: true, snapshot, arena: isArena });
   applyServerFloorSpawnAssignment(message.spawnAssignment || message.spawnAssignments?.[multiplayer.playerId], message);
   applyFloor0WorldState(message.worldState);
-  if (typeof updateVisibility === "function") updateVisibility(true);
+  if (isArena && typeof revealEntireArena === "function") revealEntireArena();
+  else if (typeof updateVisibility === "function") updateVisibility(true);
   if (typeof updateHUD === "function") updateHUD();
   multiplayerNetwork.lastCrawlerStateSignature = "";
   multiplayerNetwork.lastCrawlerStateSentAt = 0;
   if (typeof maybeSendLocalCrawlerState === "function") maybeSendLocalCrawlerState(0);
   showFloorSplash();
   if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
-  if (typeof announcer === "function") announcer(message.message || `Floor ${currentFloor} started from the shared server seed.`);
+  if (typeof announcer === "function") announcer(message.message || (isArena ? "PvP Arena Test started. PvP enabled; no escape." : `Floor ${currentFloor} started from the shared server seed.`));
 }
 
 function isFloorSpawnTileClear(tx, ty, room = null) {
@@ -1117,6 +1124,7 @@ function applyFloor0WorldState(messageOrState) {
 }
 
 
+
 function normalizePlayerCorpse(corpse) {
   if (!corpse?.id || corpse.looted) return null;
   return {
@@ -1133,6 +1141,7 @@ function normalizePlayerCorpse(corpse) {
 function applyPlayerCorpseCreated(rawCorpse) {
   const corpse = normalizePlayerCorpse(rawCorpse);
   if (!corpse || Number(corpse.floor) !== currentFloor) return false;
+  if (corpse.deadPlayerId === multiplayer.playerId) corpse.selfCorpse = true;
   const existing = getCorpseById(corpse.id);
   if (existing) Object.assign(existing, corpse);
   else corpses.push(corpse);
@@ -1160,6 +1169,7 @@ function applyPlayerCorpseLooted(corpseId) {
 
 function takeServerPlayerCorpseLoot(corpse, index, takeAll = false) {
   if (!corpse?.playerCorpse || !multiplayer.enabled || !multiplayer.usingServer) return false;
+  if (corpse.deadPlayerId === multiplayer.playerId) { if (typeof announcer === "function") announcer("You cannot loot your own corpse in this PvP test."); return false; }
   return sendMultiplayerMessage("player_corpse_loot_take", { corpseId: corpse.id, lootIndex: index, takeAll });
 }
 

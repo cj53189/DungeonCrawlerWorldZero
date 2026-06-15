@@ -24,12 +24,23 @@ function isPlayerDodgeInvulnerable() {
   return player.dodgeInvulnFrames > 0;
 }
 
+function isLocalPlayerDead() {
+  return player.hp <= 0 || gameLost === true || multiplayer?.localStatus === "downed" || multiplayer?.status === "downed";
+}
+
+function stopDeadPlayerActions() {
+  inputState.mouseAttackActive = false;
+  touchState.attackActive = false;
+  touchState.attackTouchId = null;
+  resetPlayerDodgeState();
+}
+
 function isMajorUiOpen() {
   return typeof getActiveControllerWindow === "function" && !!getActiveControllerWindow();
 }
 
 function isDodgeBlockedByGameState() {
-  return gameWon || gameLost || pendingFloorAdvance || isGameplayUpdatePaused() || player.pvpFreezeFrames > 0 || isMajorUiOpen();
+  return gameWon || gameLost || isLocalPlayerDead() || pendingFloorAdvance || isGameplayUpdatePaused() || player.pvpFreezeFrames > 0 || isMajorUiOpen();
 }
 
 function spawnDodgePuff(x, y, dirX, dirY, phase = "start") {
@@ -252,6 +263,14 @@ function updateBossLocks(){
 }
 
 function updatePlayer() {
+  if (isLocalPlayerDead()) {
+    stopDeadPlayerActions();
+    player.attackCooldown = Math.max(0, player.attackCooldown - 1);
+    player.dodgeCooldown = Math.max(0, player.dodgeCooldown - 1);
+    player.knockbackFrames = Math.max(0, (player.knockbackFrames || 0) - 1);
+    updateDodgeButtonCooldown();
+    return;
+  }
   if (isMajorUiOpen()) {
     player.attackCooldown = Math.max(0, player.attackCooldown - 1);
     player.dodgeCooldown = Math.max(0, player.dodgeCooldown - 1);
@@ -279,6 +298,7 @@ function updatePlayer() {
   } else if (touchAttackAimLength > 0) {
     updatePlayerAim(touchState.attackX, touchState.attackY);
   } else if (typeof shouldUseMouseAim === "function" && shouldUseMouseAim()) {
+    if (typeof refreshMouseWorldFromLastScreenPosition === "function") refreshMouseWorldFromLastScreenPosition();
     updatePlayerAim(inputState.mouseWorldX - player.x, inputState.mouseWorldY - player.y);
   } else if (Math.hypot(fallbackAimX, fallbackAimY) > 0) {
     updatePlayerAim(fallbackAimX, fallbackAimY);
@@ -739,6 +759,7 @@ function addAttackTelegraph(attacker = player, weapon) {
 
 function attack(attacker = player) {
   if (attacker !== player) return;
+  if (isLocalPlayerDead()) { stopDeadPlayerActions(); return; }
   if (player.attackCooldown > 0 || player.pvpFreezeFrames > 0 || isPlayerDodging() || gameWon || gameLost) return;
   if (isPvpFloorActive() && isCrawlerInSafeRoom(player)) {
     applySafeRoomPvpFreeze();
@@ -847,7 +868,8 @@ function updateProjectiles() {
     if (hit) projectiles.splice(i, 1);
   }
 
-  if (inputState.mouseAttackActive) attack();
+  if (isLocalPlayerDead()) stopDeadPlayerActions();
+  if (inputState.mouseAttackActive && !isLocalPlayerDead()) attack();
 
   for (let i = attackTelegraphs.length - 1; i >= 0; i--) {
     attackTelegraphs[i].life--;
@@ -871,7 +893,7 @@ function updateTutorialSigns() {
 }
 
 function interact() {
-  if (gameWon || gameLost || isPlayerDodging()) return;
+  if (isLocalPlayerDead() || gameWon || gameLost || isPlayerDodging()) return;
   if (typeof petMerchantInReach === "function" && petMerchantInReach()) { showPetMerchantPanel(); return; }
 
   for (const corpse of corpses) {
@@ -879,6 +901,13 @@ function interact() {
     const dist = Math.hypot(player.x - corpse.x, player.y - corpse.y);
     if (dist < player.r + corpse.r + 24) {
       lootCorpse(corpse);
+      if (corpse.playerCorpse && activeLootCorpseId !== corpse.id && corpse.deadPlayerId !== multiplayer?.playerId) {
+        const now = Date.now();
+        if (now - (window.__lastPlayerCorpseInteractWarningAt || 0) > 2000) {
+          window.__lastPlayerCorpseInteractWarningAt = now;
+          console.warn("E pressed near synced player corpse but no loot window opened", { corpseId: corpse.id, distance: dist, lootLength: corpse.loot?.length || 0, floor: corpse.floor, currentFloor });
+        }
+      }
       return;
     }
   }

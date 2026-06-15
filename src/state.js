@@ -136,7 +136,9 @@ const multiplayer = {
     openedChestIds: new Set(),
     takenLootIds: new Set(),
     enemyStates: new Map()
-  }
+  },
+  mode: null,
+  arena: false
 };
 
 const MAX_ACTIVE_POPUPS = 2;
@@ -274,7 +276,7 @@ function updatePlayerAim(dx, dy) {
 }
 
 const keys = {};
-const inputState = { lastActiveInputMethod: null, lastTouchAt: 0, touchControlsEnabled: false, mouseWorldX: null, mouseWorldY: null, mouseAimActive: false, mouseAttackActive: false, shiftDodgeHeld: false };
+const inputState = { lastActiveInputMethod: null, lastTouchAt: 0, touchControlsEnabled: false, mouseWorldX: null, mouseWorldY: null, mouseClientX: null, mouseClientY: null, mouseAimActive: false, mouseOverCanvas: false, mouseAttackActive: false, shiftDodgeHeld: false };
 const gamepadState = { connected: false, name: "", moveX: 0, moveY: 0, aimX: 0, aimY: 0, hasAimInput: false, previousButtons: [] };
 const touchState = {
   moveX: 0,

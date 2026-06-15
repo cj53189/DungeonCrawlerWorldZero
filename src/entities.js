@@ -398,6 +398,10 @@ function autoLootGoldOnlyCorpse(corpse) {
 
 function lootCorpse(corpse) {
   if (!corpse || corpse.looted) return;
+  if (corpse.playerCorpse && corpse.deadPlayerId === multiplayer?.playerId) {
+    announcer("You cannot loot your own corpse in this PvP test.");
+    return;
+  }
   if (autoLootGoldOnlyCorpse(corpse)) return;
   openCorpseLootWindow(corpse);
 }

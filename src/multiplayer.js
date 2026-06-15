@@ -155,6 +155,13 @@ function startQuickMatch() {
   startMultiplayerFloor0({ lobbyCode: null, leader: false, status: "matchmaking" });
 }
 
+function startPvpArena() {
+  if (typeof announcer === "function") announcer("Joining PvP Arena...");
+  if (typeof requestServerQuickMatch === "function" && requestServerQuickMatch({ arena: true })) return;
+  startMultiplayerFloor0({ lobbyCode: null, leader: false, status: "matchmaking" });
+  multiplayer.arena = true;
+}
+
 function addMockLobbyCrawler() {
   if (!multiplayer.enabled) return;
   if (getLobbyMembers().length >= multiplayer.targetPlayers) return;
@@ -198,6 +205,7 @@ function startMockFloorOne() {
   currentFloor = 1;
   setGameMode(GAME_MODES.MULTIPLAYER_ACTIVE);
   multiplayer.status = "active";
+  multiplayer.localStatus = "active";
   multiplayer.pvpEnabled = true;
   multiplayer.floorStartedAt = Date.now();
   multiplayer.collapseAt = multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
@@ -268,7 +276,7 @@ function isCrawlerInSafeRoom(crawler) {
 }
 
 function canCrawlerInitiatePvp(crawler) {
-  return isPvpFloorActive() && !isCrawlerInSafeRoom(crawler);
+  return isPvpFloorActive() && (multiplayer?.arena || !isCrawlerInSafeRoom(crawler));
 }
 
 function applySafeRoomPvpFreeze() {

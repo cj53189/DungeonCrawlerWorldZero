@@ -142,7 +142,9 @@ function applyQuickPartyExtension(LobbyManager) {
     return lobby;
   };
 
-  proto.joinQuickMatch = function joinQuickMatchWithSoloParty(playerId) {
+  const originalJoinQuickMatch = proto.joinQuickMatch;
+  proto.joinQuickMatch = function joinQuickMatchWithSoloParty(playerId, options = {}) {
+    if (options?.arena) return originalJoinQuickMatch.call(this, playerId, options);
     const client = this.requireClient(playerId);
     this.leaveLobby(playerId, { silent: true });
 
