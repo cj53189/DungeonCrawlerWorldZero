@@ -470,6 +470,21 @@ function drawRemoteCrawlerBadge(crawler) {
   ctx.restore();
 }
 
+function drawPvpKillMarker(crawler, yOffset = 55) {
+  const kills = Math.max(0, Math.trunc(Number(crawler?.pvpKills) || 0));
+  if (kills <= 0) return;
+  ctx.save();
+  ctx.font = "bold 11px Arial";
+  ctx.textAlign = "center";
+  ctx.lineWidth = 3;
+  const text = `☠ x${kills}`;
+  ctx.strokeStyle = "rgba(0,0,0,0.72)";
+  ctx.fillStyle = "#ffd8d8";
+  ctx.strokeText(text, crawler.x, crawler.y - yOffset);
+  ctx.fillText(text, crawler.x, crawler.y - yOffset);
+  ctx.restore();
+}
+
 function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
   const characterDef = getCharacterDef(crawler?.characterId);
   const characterSheet = getCharacterSpriteSheet(characterDef.id);
@@ -1346,6 +1361,7 @@ function draw() {
       ctx.font = "10px Arial";
       ctx.textAlign = "center";
       ctx.fillText(crawler.status === "downed" ? `${crawler.name || "Crawler"} DOWN` : (crawler.name || "Crawler"), crawler.x, crawler.y - 43);
+      drawPvpKillMarker(crawler, 56);
     }
   }
 
@@ -1358,6 +1374,7 @@ function draw() {
     ctx.font = "10px Arial";
     ctx.textAlign = "center";
     ctx.fillText(playerProfile?.name || "Crawler", player.x, player.y - 43);
+    drawPvpKillMarker(player, 56);
   }
 
   drawAimIndicator();

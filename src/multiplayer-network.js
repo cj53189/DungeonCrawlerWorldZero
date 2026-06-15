@@ -290,7 +290,11 @@ function crawlerStateSignature(state) {
     state.characterId || DEFAULT_CHARACTER_ID,
     state.isDodging ? "dodge" : "still",
     networkNumberSignature(state.dodgeProgress, 2),
-    state.currentRoomId ?? ""
+    state.currentRoomId ?? "",
+    state.pvpKills || 0,
+    networkNumberSignature(state.knockbackX, 1),
+    networkNumberSignature(state.knockbackY, 1),
+    state.knockbackFrames || 0
   ].join("|");
 }
 
@@ -308,6 +312,12 @@ function captureLocalCrawlerNetworkState() {
     isDodging: typeof isPlayerDodging === "function" ? isPlayerDodging() : false,
     dodgeProgress: player.dodgeMaxFrames > 0 ? 1 - (player.dodgeFrames / player.dodgeMaxFrames) : 0,
     currentRoomId: Number.isFinite(Number(player.currentRoomId)) ? Math.trunc(Number(player.currentRoomId)) : undefined,
+    pvpKills: Math.max(0, Math.trunc(Number(player.pvpKills) || 0)),
+    partyId: multiplayer.partyId || player.partyId || null,
+    knockbackX: Number(player.knockbackX) || 0,
+    knockbackY: Number(player.knockbackY) || 0,
+    knockbackFrames: Math.max(0, Math.trunc(Number(player.knockbackFrames) || 0)),
+    knockbackUntil: Number(player.knockbackUntil) || 0,
     name: playerProfile?.name || "Crawler",
     characterId: getCharacterDef(playerProfile?.characterId).id
   };
@@ -374,6 +384,12 @@ function applyServerCrawlerSnapshot(snapshot) {
       isDodging: !!crawler.isDodging,
       dodgeProgress: Math.max(0, Math.min(1, Number(crawler.dodgeProgress) || 0)),
       color: member?.color || crawler.color || "#75c7ff",
+      partyId: crawler.partyId || member?.partyId || null,
+      pvpKills: Math.max(0, Math.trunc(Number(crawler.pvpKills) || 0)),
+      knockbackX: Number(crawler.knockbackX) || 0,
+      knockbackY: Number(crawler.knockbackY) || 0,
+      knockbackFrames: Math.max(0, Math.trunc(Number(crawler.knockbackFrames) || 0)),
+      knockbackUntil: Number(crawler.knockbackUntil) || 0,
       moving,
       updatedAt
     });
@@ -795,6 +811,10 @@ function floor0EnemyPayload(enemy) {
     roomId: floor0EnemyRoomId(enemy),
     x: enemy.x,
     y: enemy.y,
+    knockbackX: Number(enemy.knockbackX) || 0,
+    knockbackY: Number(enemy.knockbackY) || 0,
+    knockbackFrames: Math.max(0, Math.trunc(Number(enemy.knockbackFrames) || 0)),
+    knockbackUntil: Number(enemy.knockbackUntil) || 0,
     status: enemy.hp > 0 ? "active" : "dead"
   };
 }

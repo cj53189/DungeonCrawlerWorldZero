@@ -42,6 +42,11 @@ function resetRunProgress() {
   player.coins = 0;
   player.attackCooldown = 0;
   player.pvpFreezeFrames = 0;
+  player.pvpKills = 0;
+  player.knockbackX = 0;
+  player.knockbackY = 0;
+  player.knockbackFrames = 0;
+  player.knockbackUntil = 0;
   resetPlayerDodgeState();
   player.currentWeaponId = "fists";
   if (typeof initProgression === "function") initProgression({ reset: true, skipLoad: true });
@@ -113,6 +118,11 @@ function resetState(options = {}) {
   roomRevealState = { roomId: null, startFrame: 0, originX: 0, originY: 0, maxDist: 0, complete: false };
   player.attackCooldown = 0;
   player.pvpFreezeFrames = 0;
+  player.pvpKills = 0;
+  player.knockbackX = 0;
+  player.knockbackY = 0;
+  player.knockbackFrames = 0;
+  player.knockbackUntil = 0;
   resetPlayerDodgeState();
   projectiles = [];
   attackTelegraphs = [];

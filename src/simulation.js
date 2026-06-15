@@ -218,12 +218,14 @@ function moveEntity(entity, dx, dy, options = {}) {
 }
 
 function applyKnockback(entity, fromX, fromY, distance) {
-  if (!entity || !Number.isFinite(distance) || distance <= 0) return;
-  if (entity === player && isPlayerDodging()) return;
+  if (!entity || !Number.isFinite(distance) || distance <= 0) return false;
+  if (entity === player && isPlayerDodging()) return false;
   const dx = entity.x - fromX;
   const dy = entity.y - fromY;
   const len = Math.hypot(dx, dy) || 1;
   const capped = Math.min(distance, entity === player ? 9 : 18);
+  const startX = entity.x;
+  const startY = entity.y;
   const step = 3;
   let remaining = capped;
   while (remaining > 0) {
@@ -231,6 +233,15 @@ function applyKnockback(entity, fromX, fromY, distance) {
     moveEntity(entity, dx / len * amount, dy / len * amount, { countWallBump: false });
     remaining -= amount;
   }
+  const movedX = entity.x - startX;
+  const movedY = entity.y - startY;
+  if (Math.hypot(movedX, movedY) > 0.1) {
+    entity.knockbackX = movedX;
+    entity.knockbackY = movedY;
+    entity.knockbackFrames = 8;
+    entity.knockbackUntil = Date.now() + 160;
+  }
+  return true;
 }
 
 
@@ -267,7 +278,7 @@ function updatePlayer() {
     updatePlayerAim(gamepadState.aimX, gamepadState.aimY);
   } else if (touchAttackAimLength > 0) {
     updatePlayerAim(touchState.attackX, touchState.attackY);
-  } else if (inputState.mouseAimActive && Number.isFinite(inputState.mouseWorldX) && Number.isFinite(inputState.mouseWorldY)) {
+  } else if (typeof shouldUseMouseAim === "function" && shouldUseMouseAim()) {
     updatePlayerAim(inputState.mouseWorldX - player.x, inputState.mouseWorldY - player.y);
   } else if (Math.hypot(fallbackAimX, fallbackAimY) > 0) {
     updatePlayerAim(fallbackAimX, fallbackAimY);
@@ -292,6 +303,7 @@ function updatePlayer() {
   }
   player.attackCooldown = Math.max(0, player.attackCooldown - 1);
   player.dodgeCooldown = Math.max(0, player.dodgeCooldown - 1);
+  player.knockbackFrames = Math.max(0, (player.knockbackFrames || 0) - 1);
   updateDodgeEffects();
   updateDodgeButtonCooldown();
   if (touchState.attackActive && player.pvpFreezeFrames <= 0 && !isPlayerDodging()) attack();
@@ -623,6 +635,30 @@ function getWeaponDamage(weapon) {
   const critChance = typeof getProgressionCritChance === "function" ? getProgressionCritChance() : 0;
   const critMult = Math.random() < critChance ? 1.25 : 1;
   return Math.round(base * skillMult * meleeMult * critMult);
+}
+
+function crawlerPartyId(crawler) {
+  if (crawler === player) return multiplayer?.partyId || player.partyId || null;
+  return crawler?.partyId || null;
+}
+
+function isFriendlyCrawler(attacker, target) {
+  const attackerPartyId = crawlerPartyId(attacker);
+  const targetPartyId = crawlerPartyId(target);
+  return !!(attacker && target && attacker !== target && attackerPartyId && targetPartyId && attackerPartyId === targetPartyId);
+}
+
+function canDamageCrawler(attacker, target) {
+  if (!attacker || !target || attacker === target) return false;
+  if (!isPvpFloorActive()) return false;
+  if (!isCrawlerActive(target) || isCrawlerInSafeRoom(attacker) || isCrawlerInSafeRoom(target)) return false;
+  return !isFriendlyCrawler(attacker, target);
+}
+
+function awardPvpKill(killer, victim) {
+  if (!killer || !victim?.id || victim.pvpKillAwarded) return;
+  victim.pvpKillAwarded = true;
+  killer.pvpKills = (killer.pvpKills || 0) + 1;
 }
 
 function damageEnemy(enemy, damage, sourceWeapon = null, attacker = player) {

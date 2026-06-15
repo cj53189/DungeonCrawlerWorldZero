@@ -78,6 +78,10 @@ function setupAdaptiveInputDetection() {
 
   const markTouch = () => {
     inputState.lastTouchAt = performance.now();
+    inputState.mouseAimActive = false;
+    inputState.mouseAttackActive = false;
+    inputState.mouseWorldX = null;
+    inputState.mouseWorldY = null;
     if (inputState.touchControlsEnabled === true) setLastActiveInputMethod("touch");
   };
 
@@ -548,14 +552,31 @@ function screenToWorld(clientX, clientY) {
   };
 }
 
+function shouldUseMouseAim() {
+  if (!inputState?.mouseAimActive) return false;
+  if (inputState.lastActiveInputMethod === "touch") return false;
+  if (inputState.touchControlsEnabled && (touchState.activeTouchId !== null || touchState.attackTouchId !== null || touchState.attackActive)) return false;
+  if (gamepadState?.hasAimInput || inputState.lastActiveInputMethod === "gamepad") return false;
+  if (typeof isMajorUiOpen === "function" && isMajorUiOpen()) return false;
+  return Number.isFinite(inputState.mouseWorldX) && Number.isFinite(inputState.mouseWorldY);
+}
+
+function getActiveAimSource() {
+  if (gamepadState?.hasAimInput && Math.hypot(gamepadState.aimX, gamepadState.aimY) > 0) return "gamepad";
+  if (touchState.attackActive && Math.hypot(touchState.attackX, touchState.attackY) > 0) return "touchAttack";
+  if (shouldUseMouseAim()) return "mouse";
+  return "movement";
+}
+
 function updateMouseAimFromEvent(event) {
-  if (!event || event.target !== canvas) return;
+  if (!event || event.target !== canvas || event.pointerType === "touch") return;
+  if (inputState.lastActiveInputMethod === "touch" || (inputState.touchControlsEnabled && inputState.lastTouchAt && performance.now() - inputState.lastTouchAt < 700)) return;
   const world = screenToWorld(event.clientX, event.clientY);
   inputState.mouseWorldX = world.x;
   inputState.mouseWorldY = world.y;
   inputState.mouseAimActive = true;
   setLastActiveInputMethod("mouse");
-  updatePlayerAim(world.x - player.x, world.y - player.y);
+  if (shouldUseMouseAim()) updatePlayerAim(world.x - player.x, world.y - player.y);
 }
 
 canvas.addEventListener("mousemove", updateMouseAimFromEvent);
