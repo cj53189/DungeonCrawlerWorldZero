@@ -97,12 +97,14 @@ class LobbyManager {
     existing.disconnectedAt = null;
     this.clients.set(playerId, existing);
     safeSend(ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: lobby.code, runId: lobby.runId, mode: lobby.mode, floor: lobby.floor, joinState: lobby.joinState });
+    const spawnAssignments = this.assignSpawnPoints(lobby, lobby.players, lobby.floor);
     safeSend(ws, SERVER_MESSAGES.FLOOR_START, {
       lobbyCode: lobby.code,
       runId: lobby.runId,
       floor: lobby.floor,
       floorSeed: lobby.floorSeed,
-      spawnAssignments: this.assignSpawnPoints(lobby, lobby.players.filter(player => player.id === playerId), lobby.floor),
+      spawnAssignments,
+      spawnAssignment: spawnAssignments[playerId] || null,
       worldState: this.floorWorldStatePayload(lobby),
       players: lobby.players.map(player => this.playerStatusPayload(player))
     });
@@ -753,17 +755,23 @@ class LobbyManager {
 
   assignSpawnPoints(lobby, players, floor = lobby.floor) {
     const assignments = {};
-    const baseX = floor === 0 ? 8 : 10;
-    const baseY = floor === 0 ? 8 : 10;
-    players.forEach((player, index) => {
+    const roster = (players?.length ? players : lobby.players) || [];
+    roster.forEach((player, index) => {
       const offset = FLOOR0_SPAWN_OFFSETS[index % FLOOR0_SPAWN_OFFSETS.length];
       assignments[player.id] = {
         playerId: player.id,
         floor,
-        roomId: floor === 0 ? 1 : 2,
+        slot: index,
+        playerIndex: index,
+        roomId: null,
         roomType: "normal",
-        x: baseX + offset.dx,
-        y: baseY + offset.dy,
+        // Server does not own exact client dungeon geometry for Floor 1+.
+        // These coordinates are stable hints only; clients validate and resolve
+        // the slot to a valid generated room tile from the shared floor seed.
+        x: floor === 0 ? 8 + offset.dx : null,
+        y: floor === 0 ? 8 + offset.dy : null,
+        dx: offset.dx,
+        dy: offset.dy,
         tileBlocked: false,
         safeRoom: false,
         bossRoom: false,

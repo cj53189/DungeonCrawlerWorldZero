@@ -503,21 +503,104 @@ function handleServerFloorStart(message) {
   multiplayer.collapseAt = multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
   multiplayer.remotePlayers = new Map();
   resetState({ preserveRun: true, snapshot });
-  applyServerFloorSpawnAssignment(message.spawnAssignment || message.spawnAssignments?.[multiplayer.playerId]);
+  applyServerFloorSpawnAssignment(message.spawnAssignment || message.spawnAssignments?.[multiplayer.playerId], message);
   applyFloor0WorldState(message.worldState);
+  if (typeof updateVisibility === "function") updateVisibility(true);
+  if (typeof updateHUD === "function") updateHUD();
+  multiplayerNetwork.lastCrawlerStateSignature = "";
+  multiplayerNetwork.lastCrawlerStateSentAt = 0;
+  if (typeof maybeSendLocalCrawlerState === "function") maybeSendLocalCrawlerState(0);
   showFloorSplash();
   if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
   if (typeof announcer === "function") announcer(message.message || `Floor ${currentFloor} started from the shared server seed.`);
 }
 
-function applyServerFloorSpawnAssignment(assignment) {
-  if (!assignment) return;
-  const x = Number(assignment.x);
-  const y = Number(assignment.y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-  player.x = x * TILE + TILE / 2;
-  player.y = y * TILE + TILE / 2;
-  player.currentRoomId = Number.isFinite(Number(assignment.roomId)) ? Math.trunc(Number(assignment.roomId)) : null;
+function isFloorSpawnTileClear(tx, ty, room = null) {
+  if (!Number.isInteger(tx) || !Number.isInteger(ty) || tx < 0 || ty < 0 || tx >= MAP_COLS || ty >= MAP_ROWS) return false;
+  if (map?.[ty]?.[tx] !== ".") return false;
+  const resolvedRoom = room || (typeof roomForTile === "function" ? roomForTile(tx, ty) : null);
+  if (!resolvedRoom) return false;
+  if (resolvedRoom.type === "safe" || resolvedRoom.type === "boss" || resolvedRoom.locked) return false;
+  if (bossRoom && resolvedRoom.id === bossRoom.id) return false;
+  if (Number.isFinite(stairwellX) && Number.isFinite(stairwellY) && tx === stairwellX && ty === stairwellY) return false;
+  const blockedActors = [...(enemies || []), bossEnemy].filter(Boolean);
+  if (blockedActors.some(entity => entity.hp !== 0 && Math.floor(entity.x / TILE) === tx && Math.floor(entity.y / TILE) === ty)) return false;
+  if ((corpses || []).some(entity => Math.floor(entity.x / TILE) === tx && Math.floor(entity.y / TILE) === ty)) return false;
+  if ((tutorialSigns || []).some(sign => Math.trunc(Number(sign.x)) === tx && Math.trunc(Number(sign.y)) === ty)) return false;
+  if (petMerchant && Math.floor(petMerchant.x / TILE) === tx && Math.floor(petMerchant.y / TILE) === ty) return false;
+  return true;
+}
+
+function roomWalkableSpawnTiles(room) {
+  const tiles = [];
+  if (!room || room.type === "safe" || room.type === "boss" || room.locked) return tiles;
+  for (let y = room.y + 1; y < room.y + room.h - 1; y++) {
+    for (let x = room.x + 1; x < room.x + room.w - 1; x++) {
+      if (isFloorSpawnTileClear(x, y, room)) tiles.push({ x, y, room });
+    }
+  }
+  return tiles;
+}
+
+function localSpawnSlotFromAssignment(assignment) {
+  const slot = Number(assignment?.slot ?? assignment?.spawnSlot ?? assignment?.playerIndex);
+  if (Number.isFinite(slot)) return Math.max(0, Math.trunc(slot));
+  const roster = multiplayer.lobbyMembers?.length ? multiplayer.lobbyMembers : multiplayer.partyMembers;
+  return Math.max(0, (roster || []).findIndex(member => member.id === multiplayer.playerId || member.local));
+}
+
+function findFallbackFloorSpawn(assignment) {
+  const slot = localSpawnSlotFromAssignment(assignment);
+  const candidateRooms = (rooms || [])
+    .filter(room => room && room.type !== "safe" && room.type !== "boss" && !room.locked && (!bossRoom || room.id !== bossRoom.id))
+    .map(room => ({ room, tiles: roomWalkableSpawnTiles(room) }))
+    .filter(entry => entry.tiles.length >= 4)
+    .sort((a, b) => (a.room.type === "normal" ? -1 : 0) - (b.room.type === "normal" ? -1 : 0) || b.tiles.length - a.tiles.length);
+  const entry = candidateRooms[slot % Math.max(1, candidateRooms.length)] || candidateRooms[0];
+  if (!entry) return null;
+  const centerSorted = entry.tiles.sort((a, b) => Math.hypot(a.x - entry.room.cx, a.y - entry.room.cy) - Math.hypot(b.x - entry.room.cx, b.y - entry.room.cy));
+  const tile = centerSorted[slot % centerSorted.length] || centerSorted[0];
+  return { ...tile, roomId: entry.room.id, fallback: true, slot };
+}
+
+function warnInvalidFloorSpawn(assignment, fallback, reason) {
+  console.warn("Invalid floor_start spawn assignment; using fallback.", {
+    playerId: multiplayer?.playerId,
+    floor: currentFloor,
+    seed: multiplayer?.currentFloorSeed,
+    assignment,
+    fallback,
+    reason
+  });
+}
+
+function applyServerFloorSpawnAssignment(assignment, floorStartMessage = {}) {
+  const x = Number(assignment?.x);
+  const y = Number(assignment?.y);
+  let tileX = Number.isFinite(x) ? Math.trunc(x) : NaN;
+  let tileY = Number.isFinite(y) ? Math.trunc(y) : NaN;
+  let room = Number.isFinite(tileX) && Number.isFinite(tileY) && typeof roomForTile === "function" ? roomForTile(tileX, tileY) : null;
+  let valid = isFloorSpawnTileClear(tileX, tileY, room);
+  let fallback = null;
+  if (!valid) {
+    fallback = findFallbackFloorSpawn(assignment);
+    warnInvalidFloorSpawn(assignment, fallback, assignment ? "invalid_tile" : "missing_assignment");
+    if (!fallback) return;
+    tileX = fallback.x;
+    tileY = fallback.y;
+    room = fallback.room || (typeof roomForTile === "function" ? roomForTile(tileX, tileY) : null);
+    valid = true;
+  }
+  player.x = tileX * TILE + TILE / 2;
+  player.y = tileY * TILE + TILE / 2;
+  player.currentRoomId = room?.id ?? (Number.isFinite(Number(assignment?.roomId)) ? Math.trunc(Number(assignment.roomId)) : null);
+  if (!Number.isFinite(Number(player.currentRoomId))) {
+    const resolved = typeof roomForTile === "function" ? roomForTile(tileX, tileY) : null;
+    player.currentRoomId = resolved?.id ?? fallback?.roomId ?? null;
+    if (!Number.isFinite(Number(player.currentRoomId))) console.warn("Could not resolve currentRoomId after floor_start spawn.", { playerId: multiplayer?.playerId, floor: currentFloor, seed: multiplayer?.currentFloorSeed, assignment, fallback });
+  }
+  player.safe = false;
+  player.wasSafe = false;
   visibilityDirty = true;
 }
 

@@ -78,6 +78,8 @@ test('Floor 0 resolution locks Floor 1 and quick match uses a different open Flo
   const floorStarts = [last(a, 'floor_start'), last(b, 'floor_start')];
   assert.equal(floorStarts[0].floorSeed, run.floorSeed);
   assert.equal(floorStarts[1].floorSeed, run.floorSeed);
+  assert.deepEqual(Object.keys(floorStarts[0].spawnAssignments).sort(), ['player_a', 'player_b']);
+  assert.notEqual(floorStarts[0].spawnAssignments.player_a.slot, floorStarts[0].spawnAssignments.player_b.slot);
   for (const start of floorStarts) {
     assert.equal(start.runId, run.runId);
     assert.ok(start.worldState);
@@ -108,6 +110,7 @@ test('reconnect is allowed only for players already registered in a locked run',
   const returning = ws();
   assert.equal(manager.reconnectClient(returning, 'player_a', run.runId), true);
   assert.equal(last(returning, 'floor_start').floorSeed, run.floorSeed);
+  assert.equal(last(returning, 'floor_start').spawnAssignment.playerId, 'player_a');
 
   const stranger = ws();
   assert.equal(manager.reconnectClient(stranger, 'player_x', run.runId), false);
