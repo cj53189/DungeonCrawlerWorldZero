@@ -230,8 +230,12 @@
     if (currentFloor !== 0) return false;
     if (!isLocalAdvancing()) return false;
 
+    if (!message.floorSeed) return false;
     const snapshot = typeof captureRunProgress === "function" ? captureRunProgress() : null;
-    currentFloor = 1;
+    currentFloor = Number(message.floor) || 1;
+    multiplayer.currentRunId = message.runId || multiplayer.currentRunId;
+    multiplayer.currentFloorSeed = String(message.floorSeed);
+    multiplayer.currentJoinState = "locked";
     gameWon = false;
     gameLost = false;
     pendingFloorAdvance = false;
@@ -243,6 +247,8 @@
     multiplayer.remotePlayers = new Map();
 
     if (typeof resetState === "function") resetState({ preserveRun: true, snapshot });
+    if (typeof applyServerFloorSpawnAssignment === "function") applyServerFloorSpawnAssignment(message.spawnAssignment || message.spawnAssignments?.[multiplayer.playerId]);
+    if (typeof applyFloor0WorldState === "function") applyFloor0WorldState(message.worldState);
     const center = document.getElementById("centerMessage");
     if (center) center.style.display = "none";
     if (typeof showFloorSplash === "function") showFloorSplash();
@@ -256,9 +262,7 @@
     handleServerFloor0Resolved = function handleServerFloor0ResolvedWithImmediateStart(message) {
       originalHandleServerFloor0Resolved(message);
       const advancing = new Set(message?.advancedPlayerIds || []);
-      if (advancing.has(multiplayer.playerId) || multiplayer.localFloor0Status === "advancing") {
-        startFloorOneFromServerResolution({ ...message, message: "Floor 0 resolved. Advancing to Floor 1." });
-      }
+      // Wait for the authoritative floor_start message so Floor 1+ always uses a server-provided seed.
     };
     handleServerFloor0Resolved.__floor0TransitionFixWrapped = true;
   }

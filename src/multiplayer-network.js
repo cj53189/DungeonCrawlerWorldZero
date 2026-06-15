@@ -331,7 +331,8 @@ function maybeSendLocalCrawlerState(now = Date.now()) {
 function applyServerCrawlerSnapshot(snapshot) {
   if (!multiplayer.enabled || !multiplayer.usingServer) return;
   if (snapshot.lobbyCode && multiplayer.roomId && snapshot.lobbyCode !== multiplayer.roomId) return;
-  if (snapshot.currentFloor !== 0 || currentFloor !== 0) {
+  const snapshotFloor = Number.isFinite(Number(snapshot.currentFloor)) ? Number(snapshot.currentFloor) : currentFloor;
+  if (snapshotFloor !== currentFloor) {
     multiplayer.remotePlayers = new Map();
     return;
   }
@@ -366,7 +367,7 @@ function applyServerCrawlerSnapshot(snapshot) {
       direction: crawler.direction,
       hp: Math.max(0, Number(crawler.hp) || 0),
       maxHp: Math.max(1, Number(crawler.maxHp) || player.maxHp),
-      currentFloor: 0,
+      currentFloor: snapshotFloor,
       status: crawler.status || "active",
       floor0Status: normalizeFloor0StatusValue(crawler.floor0Status || member?.floor0Status),
       isDodging: !!crawler.isDodging,
@@ -388,6 +389,9 @@ function applyServerLobbyUpdate(update) {
   multiplayer.lobbyCode = update.mode === "quick_match" ? null : update.lobbyCode;
   multiplayer.partyCode = multiplayer.lobbyCode;
   multiplayer.status = translateServerLobbyStatus(update.status, update.mode);
+  multiplayer.currentRunId = update.runId || multiplayer.currentRunId;
+  multiplayer.currentJoinState = update.joinState || multiplayer.currentJoinState || "open";
+  if (update.floorSeed) multiplayer.currentFloorSeed = String(update.floorSeed);
   multiplayer.floor0Metadata = normalizeFloor0Metadata(update.floor0, update.floor0CollapseAt || update.stagingEndsAt);
   multiplayer.stagingEndsAt = multiplayer.floor0Metadata?.collapseAtMs || (update.floor0CollapseAt ? Date.parse(update.floor0CollapseAt) : (update.stagingEndsAt ? Date.parse(update.stagingEndsAt) : null));
   multiplayer.collapseAt = multiplayer.stagingEndsAt;
@@ -479,10 +483,15 @@ function handleServerFloor0Resolved(message) {
 function handleServerFloorStart(message) {
   if (!multiplayer.enabled || !multiplayer.usingServer) return;
   if (message.lobbyCode && multiplayer.roomId && message.lobbyCode !== multiplayer.roomId) return;
-  if (Number(message.floor) !== 1 || multiplayer.localFloor0Status !== "advancing") return;
+  const nextFloor = Math.trunc(Number(message.floor));
+  if (!Number.isFinite(nextFloor) || nextFloor < 1 || (currentFloor === 0 && multiplayer.localFloor0Status !== "advancing")) return;
+  if (!message.floorSeed) { if (typeof announcer === "function") announcer("Server did not provide a floor seed; waiting for synced floor_start."); return; }
 
   const snapshot = captureRunProgress();
-  currentFloor = 1;
+  currentFloor = nextFloor;
+  multiplayer.currentRunId = message.runId || multiplayer.currentRunId;
+  multiplayer.currentFloorSeed = String(message.floorSeed);
+  multiplayer.currentJoinState = "locked";
   gameWon = false;
   gameLost = false;
   pendingFloorAdvance = false;
@@ -493,9 +502,22 @@ function handleServerFloorStart(message) {
   multiplayer.collapseAt = multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
   multiplayer.remotePlayers = new Map();
   resetState({ preserveRun: true, snapshot });
+  applyServerFloorSpawnAssignment(message.spawnAssignment || message.spawnAssignments?.[multiplayer.playerId]);
+  applyFloor0WorldState(message.worldState);
   showFloorSplash();
   if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
-  if (typeof announcer === "function") announcer(message.message || "Floor 1 placeholder started for advancing crawlers only.");
+  if (typeof announcer === "function") announcer(message.message || `Floor ${currentFloor} started from the shared server seed.`);
+}
+
+function applyServerFloorSpawnAssignment(assignment) {
+  if (!assignment) return;
+  const x = Number(assignment.x);
+  const y = Number(assignment.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+  player.x = x * TILE + TILE / 2;
+  player.y = y * TILE + TILE / 2;
+  player.currentRoomId = Number.isFinite(Number(assignment.roomId)) ? Math.trunc(Number(assignment.roomId)) : null;
+  visibilityDirty = true;
 }
 
 function syncSharedFloor0StairsFromDungeon() {
