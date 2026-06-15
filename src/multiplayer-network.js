@@ -263,12 +263,71 @@ function handleMultiplayerServerMessage(message) {
     case "floor0_enemy_snapshot":
       applyFloor0EnemySnapshot(message);
       break;
+    case "pvp_damage_applied":
+      applyServerPvpDamage(message);
+      break;
     case "error":
       handleMultiplayerNetworkError(formatServerErrorMessage(message.message || "Floor 0 collapse server request failed."));
       break;
   }
 
   if (typeof updateMultiplayerPanel === "function") updateMultiplayerPanel();
+}
+
+function sendServerPvpDamage(crawler, damage, metadata = {}) {
+  if (!multiplayer.enabled || !multiplayer.usingServer || !isMultiplayerNetworkReady()) return false;
+  if (!crawler?.id) return false;
+  return sendMultiplayerMessage("pvp_damage", {
+    attackerId: multiplayer.playerId,
+    targetPlayerId: crawler.id,
+    damage: Math.max(0, Math.round(Number(damage) || 0)),
+    weaponId: metadata.weapon?.id || metadata.weaponId || player.currentWeaponId || "unknown",
+    weaponType: metadata.weapon?.attackShape?.type || metadata.weaponType || "unknown",
+    floor: currentFloor,
+    hit: { x: Number(metadata.hitX ?? crawler.x) || 0, y: Number(metadata.hitY ?? crawler.y) || 0 },
+    knockback: { x: Number(metadata.knockbackX) || 0, y: Number(metadata.knockbackY) || 0 }
+  });
+}
+
+function applyServerPvpDamage(message) {
+  if (!multiplayer.enabled || !multiplayer.usingServer) return;
+  if (Number(message.floor) !== currentFloor) return;
+  const targetId = message.targetPlayerId;
+  const attackerId = message.attackerId;
+  const hp = Math.max(0, Number(message.hp) || 0);
+  const status = message.status || (hp <= 0 ? "downed" : "active");
+  const knockback = message.knockback || {};
+  if (targetId === multiplayer.playerId) {
+    const before = player.hp;
+    player.hp = Math.min(player.hp, hp);
+    if (status === "downed" || player.hp <= 0) {
+      player.hp = 0;
+      if (typeof die === "function" && !gameLost) die();
+    }
+    if (Number.isFinite(Number(knockback.x))) player.knockbackX = Number(knockback.x);
+    if (Number.isFinite(Number(knockback.y))) player.knockbackY = Number(knockback.y);
+    player.knockbackFrames = Math.max(player.knockbackFrames || 0, Math.trunc(Number(knockback.frames) || 8));
+    player.knockbackUntil = Date.now() + 160;
+    multiplayerNetwork.lastCrawlerStateSignature = "";
+    if (typeof maybeSendLocalCrawlerState === "function") maybeSendLocalCrawlerState(0);
+    console.warn("PvP damage applied by server", { attackerId, targetId, damage: before - player.hp, floor: currentFloor });
+  } else {
+    const crawler = multiplayer.remotePlayers?.get(targetId);
+    if (crawler) {
+      crawler.hp = hp;
+      crawler.status = status;
+      crawler.knockbackX = Number(knockback.x) || crawler.knockbackX || 0;
+      crawler.knockbackY = Number(knockback.y) || crawler.knockbackY || 0;
+      crawler.knockbackFrames = Math.max(crawler.knockbackFrames || 0, Math.trunc(Number(knockback.frames) || 8));
+      crawler.knockbackUntil = Date.now() + 160;
+    }
+  }
+  if (attackerId === multiplayer.playerId && Number.isFinite(Number(message.attackerPvpKills))) {
+    player.pvpKills = Math.max(player.pvpKills || 0, Math.trunc(Number(message.attackerPvpKills)));
+  } else {
+    const attacker = multiplayer.remotePlayers?.get(attackerId);
+    if (attacker && Number.isFinite(Number(message.attackerPvpKills))) attacker.pvpKills = Math.max(attacker.pvpKills || 0, Math.trunc(Number(message.attackerPvpKills)));
+  }
 }
 
 function networkNumberSignature(value, precision = 1) {
@@ -514,7 +573,7 @@ function handleServerFloorStart(message) {
   pendingFloorAdvance = false;
   setGameMode(GAME_MODES.MULTIPLAYER_ACTIVE);
   multiplayer.status = "active";
-  multiplayer.pvpEnabled = false;
+  multiplayer.pvpEnabled = currentFloor >= 1;
   multiplayer.floorStartedAt = Date.now();
   multiplayer.collapseAt = multiplayer.floorStartedAt + getFloorTimeLimit() * 1000;
   multiplayer.remotePlayers = new Map();

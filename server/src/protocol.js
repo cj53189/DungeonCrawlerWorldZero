@@ -17,7 +17,8 @@ const CLIENT_MESSAGES = Object.freeze({
   PARTY_RESPONSE: "party_response",
   FLOOR0_STAIRS_REACHED: "floor0_stairs_reached",
   FLOOR0_WORLD_EVENT: "floor0_world_event",
-  FLOOR0_ENEMY_SNAPSHOT: "floor0_enemy_snapshot"
+  FLOOR0_ENEMY_SNAPSHOT: "floor0_enemy_snapshot",
+  PVP_DAMAGE: "pvp_damage"
 });
 
 const SERVER_MESSAGES = Object.freeze({
@@ -41,6 +42,7 @@ const SERVER_MESSAGES = Object.freeze({
   FLOOR0_WORLD_STATE: "floor0_world_state",
   FLOOR0_WORLD_EVENT: "floor0_world_event",
   FLOOR0_ENEMY_SNAPSHOT: "floor0_enemy_snapshot",
+  PVP_DAMAGE_APPLIED: "pvp_damage_applied",
   ERROR: "error"
 });
 

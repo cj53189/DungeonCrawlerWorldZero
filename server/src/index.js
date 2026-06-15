@@ -158,6 +158,9 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.FLOOR0_ENEMY_SNAPSHOT:
           rooms.updateFloor0EnemySnapshot(playerId, message);
           break;
+        case CLIENT_MESSAGES.PVP_DAMAGE:
+          rooms.handlePvpDamage(playerId, message);
+          break;
         default:
           safeSend(ws, SERVER_MESSAGES.ERROR, { message: `Unsupported message type: ${message.type}` });
       }
