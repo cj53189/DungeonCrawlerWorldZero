@@ -749,8 +749,13 @@ function attack(attacker = player) {
   const damage = getWeaponDamage(weapon);
   player.attackCooldown = weapon.cooldown;
   addAttackTelegraph(attacker, weapon);
+  const hasRemotePvpCandidates = currentFloor >= 1 && !!multiplayer.remotePlayers?.size;
+  const playerCanInitiatePvp = canCrawlerInitiatePvp(player);
 
   if (shape.type === "projectile") {
+    if (hasRemotePvpCandidates && !playerCanInitiatePvp && typeof debugPvpActivationState === "function") {
+      debugPvpActivationState("projectile creation disabled");
+    }
     projectiles.push({
       x: player.x + player.aimX * (player.r + 6),
       y: player.y + player.aimY * (player.r + 6),
@@ -762,7 +767,7 @@ function attack(attacker = player) {
       color: weapon.telegraphColor,
       hitEnemies: new Set(),
       hitCrawlers: new Set(),
-      pvpEnabled: canCrawlerInitiatePvp(player),
+      pvpEnabled: playerCanInitiatePvp,
       hit: false,
       weapon
     });
@@ -779,7 +784,11 @@ function attack(attacker = player) {
     if (inShape) hit = damageEnemy(enemy, damage, weapon, attacker) || hit;
   }
 
-  if (canCrawlerInitiatePvp(player) && multiplayer.remotePlayers?.size) {
+  if (hasRemotePvpCandidates && !playerCanInitiatePvp && typeof debugPvpActivationState === "function") {
+    debugPvpActivationState("melee remote crawler checks skipped");
+  }
+
+  if (playerCanInitiatePvp && multiplayer.remotePlayers?.size) {
     for (const crawler of multiplayer.remotePlayers.values()) {
       if (crawler.status !== "active") continue;
       let inShape = false;
@@ -1203,5 +1212,4 @@ function makeDungeonObservation() {
   ][Math.floor(Math.random() * 5)]);
   announcer(obs[Math.floor(Math.random() * obs.length)]);
 }
-
 

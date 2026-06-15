@@ -299,6 +299,23 @@ function logPvpDebug(key, message, payload = {}) {
   console.warn(message, payload);
 }
 
+function debugPvpActivationState(reason = "pvp activation blocked") {
+  logPvpDebug(`pvp-activation-${reason}`, "PvP activation state", {
+    reason,
+    currentFloor,
+    gameMode,
+    multiplayerStatus: multiplayer.status,
+    pvpEnabled: multiplayer.pvpEnabled,
+    multiplayerEnabled: multiplayer.enabled,
+    usingServer: multiplayer.usingServer,
+    remotePlayers: multiplayer.remotePlayers?.size || 0,
+    playerSafe: isCrawlerInSafeRoom(player),
+    currentRoomId: player.currentRoomId ?? null,
+    currentRunId: multiplayer.currentRunId ?? null,
+    currentJoinState: multiplayer.currentJoinState ?? null
+  });
+}
+
 function damageRemoteCrawler(crawler, damage, metadata = {}) {
   const reason = pvpBlockReason(crawler);
   if (reason) {
