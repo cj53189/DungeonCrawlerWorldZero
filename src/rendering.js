@@ -1386,6 +1386,18 @@ function draw() {
   }
 
   ctx.restore();
+  if (multiplayer?.arena) {
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(14, 72, 245, 62);
+    ctx.fillStyle = "#ffdf6b";
+    ctx.font = "700 18px Arial";
+    ctx.fillText("PvP Arena Test", 28, 96);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "12px Arial";
+    ctx.fillText("PvP Enabled · No escape", 28, 116);
+    ctx.restore();
+  }
   drawMinimap();
 }
 

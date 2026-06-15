@@ -142,28 +142,32 @@ class LobbyManager {
     return lobby;
   }
 
-  joinQuickMatch(playerId) {
+  joinQuickMatch(playerId, options = {}) {
     const client = this.requireClient(playerId);
     this.leaveLobby(playerId, { silent: true });
 
+    const arena = !!options.arena;
     let lobby = Array.from(this.lobbies.values()).find(candidate => (
-      candidate.mode === LOBBY_MODES.QUICK_MATCH &&
-      candidate.floor === 0 &&
+      candidate.mode === (arena ? LOBBY_MODES.PVP_ARENA : LOBBY_MODES.QUICK_MATCH) &&
+      candidate.floor === (arena ? 1 : 0) &&
       candidate.joinState === "open"
     ));
 
     if (!lobby) {
-      const code = `QUICK-${String(this.quickLobbyCounter++).padStart(4, "0")}`;
-      lobby = this.createLobby({ code, mode: LOBBY_MODES.QUICK_MATCH });
+      const code = `${arena ? "ARENA" : "QUICK"}-${String(this.quickLobbyCounter++).padStart(4, "0")}`;
+      lobby = this.createLobby({ code, mode: arena ? LOBBY_MODES.PVP_ARENA : LOBBY_MODES.QUICK_MATCH });
+      if (arena) this.startArenaRun(lobby);
     }
 
     this.addPlayerToLobby(lobby, client, { partyId: null, isPartyLeader: false });
     safeSend(client.ws, SERVER_MESSAGES.MATCHMAKING_UPDATE, {
       lobbyCode: lobby.code,
       players: lobby.players.length,
-      targetPlayers: TARGET_PLAYERS
+      targetPlayers: TARGET_PLAYERS,
+      mode: lobby.mode
     });
     safeSend(client.ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: lobby.code, mode: lobby.mode, partyId: null, isPartyLeader: false });
+    if (arena) this.sendArenaFloorStart(lobby, client.playerId);
     this.broadcastLobbyUpdate(lobby);
     return lobby;
   }
@@ -213,6 +217,7 @@ class LobbyManager {
       collapseAt: now + FLOOR0_COLLAPSE_CAPS_MS[1],
       floor0CollapseAt: now + FLOOR0_COLLAPSE_CAPS_MS[1],
       floor0: null,
+      arena: mode === LOBBY_MODES.PVP_ARENA,
       worldState: this.createFloorWorldState(),
       floorWorldStates: new Map(),
       floor0WorldState: null,
@@ -250,7 +255,8 @@ class LobbyManager {
       lastPvpDownCredit: null,
       pvpDamageAuthorityUntil: 0
     });
-    this.applyFloor0LateJoinTimer(lobby);
+    if (!lobby.arena) this.applyFloor0LateJoinTimer(lobby);
+    if (lobby.arena) return;
     safeSend(client.ws, SERVER_MESSAGES.FLOOR0_WORLD_STATE, {
       lobbyCode: lobby.code,
       runId: lobby.runId,
@@ -261,6 +267,31 @@ class LobbyManager {
     });
     this.syncFloor0CollapseMetadata(lobby);
     this.scheduleFloor0Collapse(lobby);
+  }
+
+  startArenaRun(lobby) {
+    lobby.floor = 1;
+    lobby.floorSeed = this.makeFloorSeed(1);
+    lobby.status = "active";
+    lobby.joinState = "open";
+    lobby.collapseAt = null;
+    lobby.floor0CollapseAt = null;
+    if (lobby.floor0CollapseTimer) clearTimeout(lobby.floor0CollapseTimer);
+    lobby.worldState = this.createFloorWorldState();
+    lobby.floorWorldStates.set(1, lobby.worldState);
+  }
+
+  sendArenaFloorStart(lobby, playerId = null) {
+    const spawnAssignments = this.assignSpawnPoints(lobby, lobby.players, 1);
+    const roster = lobby.players.map(player => this.playerStatusPayload(player));
+    const recipients = playerId ? lobby.players.filter(player => player.id === playerId) : lobby.players;
+    for (const player of recipients) {
+      const client = this.clients.get(player.id);
+      if (client) safeSend(client.ws, SERVER_MESSAGES.FLOOR_START, {
+        lobbyCode: lobby.code, runId: lobby.runId, mode: LOBBY_MODES.PVP_ARENA, floor: 1, floorSeed: lobby.floorSeed, joinState: "open",
+        spawnAssignments, spawnAssignment: spawnAssignments[player.id] || null, worldState: this.floorWorldStatePayload(lobby, 1), players: roster, message: "PvP Arena Test started. PvP enabled; no escape."
+      });
+    }
   }
 
   applyFloor0LateJoinTimer(lobby) {
@@ -741,15 +772,15 @@ class LobbyManager {
       })),
       targetPlayers: TARGET_PLAYERS,
       status: lobby.status,
-      stagingEndsAt: new Date(lobby.floor0CollapseAt).toISOString(),
-      floor0CollapseAt: new Date(lobby.floor0CollapseAt).toISOString(),
+      stagingEndsAt: lobby.floor0CollapseAt ? new Date(lobby.floor0CollapseAt).toISOString() : null,
+      floor0CollapseAt: lobby.floor0CollapseAt ? new Date(lobby.floor0CollapseAt).toISOString() : null,
       floor0: this.floor0Payload(lobby),
       runId: lobby.runId,
       floor: lobby.floor,
       floorSeed: lobby.floorSeed,
       joinState: lobby.joinState,
       collapseStartedAt: new Date(lobby.collapseStartedAt).toISOString(),
-      collapseAt: new Date(lobby.collapseAt).toISOString(),
+      collapseAt: lobby.collapseAt ? new Date(lobby.collapseAt).toISOString() : null,
       floor0WorldState: this.floorWorldStatePayload(lobby),
       worldState: this.floorWorldStatePayload(lobby)
     };
@@ -858,6 +889,15 @@ class LobbyManager {
   assignSpawnPoints(lobby, players, floor = lobby.floor) {
     const assignments = {};
     const roster = (players?.length ? players : lobby.players) || [];
+    if (lobby?.arena && floor === 1) {
+      roster.forEach((player, index) => {
+        const offsets = [{x:34,y:33},{x:58,y:33},{x:46,y:23},{x:46,y:43},{x:34,y:23},{x:58,y:43}];
+        const pos = offsets[index % offsets.length];
+        assignments[player.id] = { playerId: player.id, floor, slot: index, playerIndex: index, roomId: 1, roomType: "arena", x: pos.x, y: pos.y, dx: 0, dy: 0, tileBlocked: false, safeRoom: false, bossRoom: false, lockedRoom: false, stairwellRoom: false, exitRoom: false };
+      });
+      return assignments;
+    }
+
     if (floor === 0) {
       roster.forEach((player, index) => {
         const offset = FLOOR0_SPAWN_OFFSETS[index % FLOOR0_SPAWN_OFFSETS.length];
@@ -946,7 +986,7 @@ class LobbyManager {
     if (!lobby) return false;
     const world = this.currentWorldState(lobby);
     const corpse = world.playerCorpses?.get(String(message.corpseId || ""));
-    if (!corpse || corpse.looted) return false;
+    if (!corpse || corpse.looted || corpse.deadPlayerId === playerId) return false;
     const takeAll = !!message.takeAll;
     const taken = [];
     if (takeAll) taken.push(...corpse.loot.splice(0));

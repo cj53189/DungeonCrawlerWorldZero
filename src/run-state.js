@@ -61,6 +61,7 @@ function resetState(options = {}) {
   if (typeof resetTransientInputState === "function") resetTransientInputState();
   if (typeof setActiveInventoryCategory === "function") setActiveInventoryCategory("gear");
   const preserveRun = !!options.preserveRun;
+  if (Object.prototype.hasOwnProperty.call(options, "arena")) multiplayer.arena = !!options.arena;
   const snapshot = options.snapshot || null;
 
   if (!preserveRun) {

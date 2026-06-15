@@ -904,6 +904,7 @@ function setupTitleScreenHandlers() {
 
   bind("startSingleBtn", startSinglePlayer);
   bind("quickMatchBtn", startQuickMatch);
+  bind("pvpArenaBtn", startPvpArena);
   bind("characterCreatorBtn", showCharacterCreator);
   bind("backToTitleBtn", showTitleScreen);
   bind("saveCharacterBtn", saveCharacterProfileFromCreator);

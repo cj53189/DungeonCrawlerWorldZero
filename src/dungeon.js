@@ -1,7 +1,51 @@
 function generateDungeon() {
+  if (multiplayer?.arena) return generatePvpArena();
   const seed = getSharedMultiplayerFloorSeed();
   if (!seed) return generateDungeonLayout();
   return withSeededRandom(seed, generateDungeonLayout);
+}
+
+
+function generatePvpArena() {
+  map = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill("#"));
+  seen = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(false));
+  visible = Array.from({ length: MAP_ROWS }, () => Array(MAP_COLS).fill(false));
+  const room = { id: 1, x: 20, y: 16, w: 52, h: 34, cx: 46, cy: 33, type: "arena", name: "PvP Arena Test", subtitle: "Quick Match rules · No escape · All weapons", seen: true };
+  rooms = [room];
+  for (let y = room.y; y < room.y + room.h; y++) {
+    for (let x = room.x; x < room.x + room.w; x++) {
+      map[y][x] = (x === room.x || y === room.y || x === room.x + room.w - 1 || y === room.y + room.h - 1) ? "#" : ".";
+      seen[y][x] = true;
+      visible[y][x] = true;
+    }
+  }
+  player.x = room.cx * TILE + TILE / 2;
+  player.y = room.cy * TILE + TILE / 2;
+  player.currentRoomId = room.id;
+  player.safe = false;
+  player.wasSafe = false;
+  enemies = [];
+  corpses = corpses || [];
+  tutorialSigns = [];
+  petMerchant = null;
+  bossRoom = null;
+  bossEnemy = null;
+  stairwellFound = false;
+  stairwellX = null;
+  stairwellY = null;
+  currentRoomName = room.name;
+  currentRoomSubtitle = room.subtitle;
+  buildDungeonVisuals();
+  stats.floorRooms = 1;
+}
+
+function revealEntireArena() {
+  if (!multiplayer?.arena || !rooms?.length) return;
+  for (let y = 0; y < MAP_ROWS; y++) for (let x = 0; x < MAP_COLS; x++) {
+    const inArena = map?.[y]?.[x] === "." || (rooms[0] && x >= rooms[0].x && x < rooms[0].x + rooms[0].w && y >= rooms[0].y && y < rooms[0].y + rooms[0].h);
+    seen[y][x] = !!inArena;
+    visible[y][x] = !!inArena;
+  }
 }
 
 function getSharedMultiplayerFloorSeed() {

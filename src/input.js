@@ -82,6 +82,9 @@ function setupAdaptiveInputDetection() {
     inputState.mouseAttackActive = false;
     inputState.mouseWorldX = null;
     inputState.mouseWorldY = null;
+    inputState.mouseClientX = null;
+    inputState.mouseClientY = null;
+    inputState.mouseOverCanvas = false;
     if (inputState.touchControlsEnabled === true) setLastActiveInputMethod("touch");
   };
 
@@ -558,7 +561,7 @@ function shouldUseMouseAim() {
   if (inputState.touchControlsEnabled && (touchState.activeTouchId !== null || touchState.attackTouchId !== null || touchState.attackActive)) return false;
   if (gamepadState?.hasAimInput || inputState.lastActiveInputMethod === "gamepad") return false;
   if (typeof isMajorUiOpen === "function" && isMajorUiOpen()) return false;
-  return Number.isFinite(inputState.mouseWorldX) && Number.isFinite(inputState.mouseWorldY);
+  return inputState.mouseOverCanvas && Number.isFinite(inputState.mouseClientX) && Number.isFinite(inputState.mouseClientY) && Number.isFinite(inputState.mouseWorldX) && Number.isFinite(inputState.mouseWorldY);
 }
 
 function getActiveAimSource() {
@@ -568,15 +571,24 @@ function getActiveAimSource() {
   return "movement";
 }
 
+function refreshMouseWorldFromLastScreenPosition() {
+  if (!Number.isFinite(inputState.mouseClientX) || !Number.isFinite(inputState.mouseClientY)) return null;
+  const world = screenToWorld(inputState.mouseClientX, inputState.mouseClientY);
+  inputState.mouseWorldX = world.x;
+  inputState.mouseWorldY = world.y;
+  return world;
+}
+
 function updateMouseAimFromEvent(event) {
   if (!event || event.target !== canvas || event.pointerType === "touch") return;
   if (inputState.lastActiveInputMethod === "touch" || (inputState.touchControlsEnabled && inputState.lastTouchAt && performance.now() - inputState.lastTouchAt < 700)) return;
-  const world = screenToWorld(event.clientX, event.clientY);
-  inputState.mouseWorldX = world.x;
-  inputState.mouseWorldY = world.y;
+  inputState.mouseClientX = event.clientX;
+  inputState.mouseClientY = event.clientY;
+  inputState.mouseOverCanvas = true;
+  const world = refreshMouseWorldFromLastScreenPosition();
   inputState.mouseAimActive = true;
   setLastActiveInputMethod("mouse");
-  if (shouldUseMouseAim()) updatePlayerAim(world.x - player.x, world.y - player.y);
+  if (world && shouldUseMouseAim()) updatePlayerAim(world.x - player.x, world.y - player.y);
 }
 
 canvas.addEventListener("mousemove", updateMouseAimFromEvent);
@@ -592,4 +604,5 @@ canvas.addEventListener("mousedown", event => {
 window.addEventListener("mouseup", event => {
   if (event.button === 0) inputState.mouseAttackActive = false;
 });
-canvas.addEventListener("mouseleave", () => { inputState.mouseAttackActive = false; });
+canvas.addEventListener("mouseenter", event => { inputState.mouseOverCanvas = true; updateMouseAimFromEvent(event); });
+canvas.addEventListener("mouseleave", () => { inputState.mouseAttackActive = false; inputState.mouseOverCanvas = false; inputState.mouseAimActive = false; });

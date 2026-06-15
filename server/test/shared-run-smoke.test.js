@@ -257,3 +257,61 @@ test('player corpses persist until server-authoritative loot is fully taken', ()
 
   manager.destroyLobby(run);
 });
+
+test('PvP Arena quick match creates an active arena run and second arena player joins it', () => {
+  const manager = new LobbyManager();
+  const a = addClient(manager, 'arena_a');
+  const b = addClient(manager, 'arena_b');
+
+  const run = manager.joinQuickMatch('arena_a', { arena: true });
+  assert.equal(run.mode, 'pvp_arena');
+  assert.equal(run.floor, 1);
+  assert.equal(run.joinState, 'open');
+  assert.equal(run.status, 'active');
+  assert.equal(run.floor0CollapseTimer, null);
+  assert.match(run.floorSeed, /^floor1-/);
+
+  const same = manager.joinQuickMatch('arena_b', { arena: true });
+  assert.equal(same.runId, run.runId);
+  assert.equal(run.players.length, 2);
+
+  const startA = last(a, 'floor_start');
+  const startB = last(b, 'floor_start');
+  assert.equal(startA.mode, 'pvp_arena');
+  assert.equal(startB.mode, 'pvp_arena');
+  assert.equal(startA.floor, 1);
+  assert.equal(startA.joinState, 'open');
+  assert.ok(startB.spawnAssignments.arena_a);
+  assert.ok(startB.spawnAssignments.arena_b);
+  assert.equal(startB.spawnAssignments.arena_a.safeRoom, false);
+  assert.equal(startB.spawnAssignments.arena_b.bossRoom, false);
+  assert.equal(run.floor0CollapseAt, null);
+
+  manager.destroyLobby(run);
+});
+
+test('PvP Arena damage uses PvP rules and blocks same-party friendly fire', () => {
+  const manager = new LobbyManager();
+  const a = addClient(manager, 'arena_a');
+  addClient(manager, 'arena_b');
+  addClient(manager, 'arena_c');
+  const run = manager.joinQuickMatch('arena_a', { arena: true });
+  manager.joinQuickMatch('arena_b', { arena: true });
+  manager.joinQuickMatch('arena_c', { arena: true });
+
+  manager.updateCrawlerState('arena_a', { x: 100, y: 100, hp: 100, maxHp: 100, currentFloor: 1, status: 'active', pvpKills: 0 });
+  manager.updateCrawlerState('arena_b', { x: 130, y: 100, hp: 100, maxHp: 100, currentFloor: 1, status: 'active', pvpKills: 0 });
+  manager.handlePvpDamage('arena_a', { targetPlayerId: 'arena_b', damage: 30, floor: 1 });
+  assert.equal(run.players.find(player => player.id === 'arena_b').crawlerState.hp, 70);
+
+  const playerA = run.players.find(player => player.id === 'arena_a');
+  const playerC = run.players.find(player => player.id === 'arena_c');
+  playerA.partyId = 'party:arena';
+  playerC.partyId = 'party:arena';
+  manager.updateCrawlerState('arena_c', { x: 150, y: 100, hp: 100, maxHp: 100, currentFloor: 1, status: 'active', partyId: 'party:arena' });
+  manager.handlePvpDamage('arena_a', { targetPlayerId: 'arena_c', damage: 30, floor: 1 });
+  assert.equal(playerC.crawlerState.hp, 100);
+  assert.match(last(a, 'error').message, /same party/);
+
+  manager.destroyLobby(run);
+});

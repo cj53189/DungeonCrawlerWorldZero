@@ -127,7 +127,7 @@ wss.on("connection", (ws) => {
           break;
         case CLIENT_MESSAGES.QUICK_MATCH:
           rooms.updateClientProfile(playerId, message.profile || message);
-          rooms.joinQuickMatch(playerId);
+          rooms.joinQuickMatch(playerId, { arena: !!message.arena });
           break;
         case CLIENT_MESSAGES.PARTY_LEAVE:
         case CLIENT_MESSAGES.LEAVE_LOBBY:
