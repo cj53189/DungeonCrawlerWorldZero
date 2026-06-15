@@ -498,17 +498,21 @@ function applyServerCrawlerSnapshot(snapshot) {
 function applyServerLobbyUpdate(update) {
   multiplayer.enabled = true;
   multiplayer.usingServer = true;
+  const updateFloor = Number.isFinite(Number(update.floor)) ? Number(update.floor) : currentFloor;
+  const isActiveSyncedFloor = updateFloor >= 1 || currentFloor >= 1 || update.joinState === "locked";
   multiplayer.targetPlayers = update.targetPlayers || MULTIPLAYER_TARGET_PLAYERS;
   multiplayer.roomId = update.lobbyCode;
   multiplayer.lobbyCode = update.mode === "quick_match" ? null : update.lobbyCode;
   multiplayer.partyCode = multiplayer.lobbyCode;
-  multiplayer.status = translateServerLobbyStatus(update.status, update.mode);
+  multiplayer.status = isActiveSyncedFloor && currentFloor >= 1
+    ? "active"
+    : translateServerLobbyStatus(update.status, update.mode);
   multiplayer.currentRunId = update.runId || multiplayer.currentRunId;
   multiplayer.currentJoinState = update.joinState || multiplayer.currentJoinState || "open";
   if (update.floorSeed) multiplayer.currentFloorSeed = String(update.floorSeed);
   multiplayer.floor0Metadata = normalizeFloor0Metadata(update.floor0, update.floor0CollapseAt || update.stagingEndsAt);
   multiplayer.stagingEndsAt = multiplayer.floor0Metadata?.collapseAtMs || (update.floor0CollapseAt ? Date.parse(update.floor0CollapseAt) : (update.stagingEndsAt ? Date.parse(update.stagingEndsAt) : null));
-  multiplayer.collapseAt = multiplayer.stagingEndsAt;
+  if (!isActiveSyncedFloor || currentFloor === 0) multiplayer.collapseAt = multiplayer.stagingEndsAt;
   multiplayer.lobbyMembers = (update.players || []).map((player, index) => ({
     id: player.id,
     name: player.id === multiplayer.playerId ? (playerProfile?.name || player.name || "Crawler") : (player.name || `Crawler ${index + 1}`),
@@ -525,10 +529,24 @@ function applyServerLobbyUpdate(update) {
   multiplayer.isPartyLeader = !!localMember?.isPartyLeader;
   multiplayer.partyMembers = multiplayer.lobbyMembers.filter(member => member.partyId && member.partyId === multiplayer.partyId);
 
-  setGameMode(update.mode === "quick_match" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
-  ensureServerFloor0Dungeon();
-  applyFloor0WorldState(update.floor0WorldState);
-  syncFloor0TimerFromServer();
+  if (isActiveSyncedFloor) {
+    if (currentFloor >= 1) {
+      setGameMode(GAME_MODES.MULTIPLAYER_ACTIVE);
+      multiplayer.status = "active";
+      multiplayer.pvpEnabled = true;
+      if (update.collapseAt) {
+        const collapseAt = Date.parse(update.collapseAt);
+        if (Number.isFinite(collapseAt)) multiplayer.collapseAt = collapseAt;
+      }
+    }
+  } else {
+    setGameMode(update.mode === "quick_match" ? GAME_MODES.MULTIPLAYER_MATCHMAKING : GAME_MODES.MULTIPLAYER_FLOOR0);
+    if (currentFloor === 0) {
+      ensureServerFloor0Dungeon();
+      applyFloor0WorldState(update.floor0WorldState);
+      syncFloor0TimerFromServer();
+    }
+  }
   if (currentFloor === 0 && multiplayer.remotePlayers?.size) {
     const rosterIds = new Set((multiplayer.lobbyMembers?.length ? multiplayer.lobbyMembers : multiplayer.partyMembers).map(member => member.id));
     multiplayer.remotePlayers = new Map(Array.from(multiplayer.remotePlayers).filter(([id]) => rosterIds.has(id)));
