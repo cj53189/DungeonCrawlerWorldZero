@@ -844,17 +844,18 @@ function updateMultiplayerPanel() {
   const countdownText = multiplayer.stagingEndsAt && typeof formatFloor0CollapseCountdown === "function"
     ? ` ${formatFloor0CollapseCountdown(multiplayer.stagingEndsAt)}`
     : currentFloor === 0 ? ` ${formatTimer(floorTimeLeft)}` : "";
-  setText("mpStatus", `${statusLabel}${countdownText}`);
-  setText("mpCount", `${count} / ${multiplayer.targetPlayers} Crawlers Registered`);
+  const joinStateLabel = multiplayer.currentJoinState === "locked" ? "Locked" : "Open";
+  setText("mpStatus", `${statusLabel}${countdownText} · Floor ${currentFloor} · Run ${joinStateLabel}`);
+  setText("mpCount", `${count} Crawlers in Run`);
   const partySummary = multiplayer.partyId
-    ? `Party: Connected${multiplayer.partyMembers?.length ? ` (${multiplayer.partyMembers.length})` : ""}`
-    : "Solo Crawler";
+    ? `Party UI: Connected${multiplayer.partyMembers?.length ? ` (${multiplayer.partyMembers.length})` : ""}`
+    : "Party UI: Solo Crawler";
   setText("mpPartyCode", (multiplayer.lobbyCode || multiplayer.partyCode)
-    ? `Lobby Code: ${multiplayer.lobbyCode || multiplayer.partyCode} · ${partySummary}`
-    : `Quick Match Floor 0 Collapse · ${partySummary}`);
+    ? `Run Code: ${multiplayer.lobbyCode || multiplayer.partyCode} · ${partySummary}`
+    : `Quick Match Run · ${partySummary}`);
   updateTesterReadinessUI();
   const serverRule = multiplayer.usingServer
-    ? "Server-owned Floor 0 collapse timer. Crawlers Registered only shorten the remaining time. Find the stairs before collapse."
+    ? "Server-owned shared run. Quick Match joins open Floor 0 runs; Floor 1+ runs are locked to new joins."
     : "Floor 0 Collapse: Crawlers Registered shorten the timer. Find the stairs before collapse. No PvP on Floor 0.";
   setText("mpRuleText", currentFloor === 0
     ? serverRule

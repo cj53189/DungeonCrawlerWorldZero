@@ -1,12 +1,17 @@
 function generateDungeon() {
-  const seed = getSharedFloor0Seed();
+  const seed = getSharedMultiplayerFloorSeed();
   if (!seed) return generateDungeonLayout();
   return withSeededRandom(seed, generateDungeonLayout);
 }
 
+function getSharedMultiplayerFloorSeed() {
+  if (!multiplayer?.enabled || !multiplayer.usingServer) return null;
+  if (currentFloor === 0) return multiplayer.floor0Metadata?.seed || multiplayer.currentFloorSeed || null;
+  return multiplayer.currentFloorSeed || null;
+}
+
 function getSharedFloor0Seed() {
-  if (!multiplayer?.enabled || !multiplayer.usingServer || currentFloor !== 0) return null;
-  return multiplayer.floor0Metadata?.seed || null;
+  return currentFloor === 0 ? getSharedMultiplayerFloorSeed() : null;
 }
 
 function hashDungeonSeed(seed) {
@@ -172,7 +177,7 @@ function placeFloor0TutorialSigns(spawnRoom, exitRoom) {
   if (firstLoot) addTutorialSign(FLOOR0_TUTORIAL_SIGN_DEFINITIONS[3], firstLoot, roomForTile(firstLoot.x, firstLoot.y));
 
   if (stairwellX !== null && stairwellY !== null) {
-    addTutorialSign(FLOOR0_TUTORIAL_SIGN_DEFINITIONS[4], { x: stairwellX, y: stairwellY }, exitRoom);
+    addTutorialSign(FLOOR0_TUTORIAL_SIGN_DEFINITIONS[4], { x: stairwellX + 2, y: stairwellY }, exitRoom);
   }
 }
 

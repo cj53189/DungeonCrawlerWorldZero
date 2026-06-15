@@ -1,3 +1,5 @@
+const { randomUUID } = require("crypto");
+
 const {
   LOBBY_MODES,
   LOBBY_STATUS,
@@ -12,8 +14,14 @@ const FLOOR0_SPAWN_OFFSETS = Object.freeze([
   { dx: 0, dy: 0 },
   { dx: 1, dy: 0 },
   { dx: -1, dy: 0 },
-  { dx: 0, dy: 1 }
+  { dx: 0, dy: 1 },
+  { dx: 0, dy: -1 },
+  { dx: 1, dy: 1 },
+  { dx: -1, dy: 1 },
+  { dx: 1, dy: -1 },
+  { dx: -1, dy: -1 }
 ]);
+const FLOOR0_LATE_JOIN_GRACE_MS = 120 * 1000;
 const PLAYER_COLORS = ["#75c7ff", "#ff9bd1", "#ffd86b", "#9cffb1"];
 const CRAWLER_STATE_BROADCAST_MS = 100;
 const FLOOR0_ENEMY_SNAPSHOT_MS = 150;
@@ -68,8 +76,37 @@ class LobbyManager {
   }
 
   unregisterClient(playerId) {
+    const client = this.clients.get(playerId);
+    const lobby = client?.lobbyCode ? this.lobbies.get(client.lobbyCode) : null;
+    if (lobby?.joinState === "locked" && lobby.players.some(player => player.id === playerId)) {
+      client.disconnectedAt = Date.now();
+      client.ws = { readyState: 3, OPEN: 1, send() {} };
+      this.broadcastLobbyUpdate(lobby);
+      return;
+    }
     this.leaveLobby(playerId, { silent: false });
     this.clients.delete(playerId);
+  }
+
+  reconnectClient(ws, playerId, runId) {
+    const lobby = Array.from(this.lobbies.values()).find(candidate => candidate.runId === runId && candidate.players.some(player => player.id === playerId));
+    if (!lobby || lobby.joinState !== "locked") return false;
+    const existing = this.clients.get(playerId) || { playerId, name: `Crawler ${String(playerId).slice(-4).toUpperCase()}` };
+    existing.ws = ws;
+    existing.lobbyCode = lobby.code;
+    existing.disconnectedAt = null;
+    this.clients.set(playerId, existing);
+    safeSend(ws, SERVER_MESSAGES.LOBBY_JOINED, { lobbyCode: lobby.code, runId: lobby.runId, mode: lobby.mode, floor: lobby.floor, joinState: lobby.joinState });
+    safeSend(ws, SERVER_MESSAGES.FLOOR_START, {
+      lobbyCode: lobby.code,
+      runId: lobby.runId,
+      floor: lobby.floor,
+      floorSeed: lobby.floorSeed,
+      spawnAssignments: this.assignSpawnPoints(lobby, lobby.players.filter(player => player.id === playerId), lobby.floor),
+      worldState: this.floorWorldStatePayload(lobby),
+      players: lobby.players.map(player => this.playerStatusPayload(player))
+    });
+    return true;
   }
 
   createPrivateLobby(playerId) {
@@ -109,8 +146,8 @@ class LobbyManager {
 
     let lobby = Array.from(this.lobbies.values()).find(candidate => (
       candidate.mode === LOBBY_MODES.QUICK_MATCH &&
-      candidate.status === LOBBY_STATUS.STAGING &&
-      candidate.players.length < TARGET_PLAYERS
+      candidate.floor === 0 &&
+      candidate.joinState === "open"
     ));
 
     if (!lobby) {
@@ -166,15 +203,26 @@ class LobbyManager {
           players: [],
       status: LOBBY_STATUS.STAGING,
       createdAt: now,
+      runId: `run_${randomUUID().replace(/-/g, "").slice(0, 12)}`,
+      floor: 0,
+      floorSeed: this.makeFloorSeed(0),
+      joinState: "open",
+      collapseStartedAt: now,
+      collapseAt: now + FLOOR0_COLLAPSE_CAPS_MS[1],
       floor0CollapseAt: now + FLOOR0_COLLAPSE_CAPS_MS[1],
-      floor0: this.createFloor0Metadata(code, now + FLOOR0_COLLAPSE_CAPS_MS[1]),
-      floor0WorldState: this.createFloor0WorldState(),
+      floor0: null,
+      worldState: this.createFloorWorldState(),
+      floorWorldStates: new Map(),
+      floor0WorldState: null,
       floor0CollapseTimer: null,
       crawlerSnapshotTimer: null,
       enemySnapshotTimer: null,
       lastCrawlerSnapshotAt: 0,
       lastEnemySnapshotAt: 0
     };
+    lobby.floor0 = this.createFloor0Metadata(lobby, lobby.floor0CollapseAt);
+    lobby.floorWorldStates.set(0, lobby.worldState);
+    lobby.floor0WorldState = lobby.worldState;
     this.lobbies.set(code, lobby);
     return lobby;
   }
@@ -198,20 +246,26 @@ class LobbyManager {
       floor0Status: FLOOR0_ADVANCE_STATUSES.EXPLORING,
       floor0ReachedStairsAt: null
     });
+    this.applyFloor0LateJoinTimer(lobby);
     safeSend(client.ws, SERVER_MESSAGES.FLOOR0_WORLD_STATE, {
       lobbyCode: lobby.code,
-      currentFloor: 0,
-      worldState: this.floor0WorldStatePayload(lobby)
+      runId: lobby.runId,
+      currentFloor: lobby.floor,
+      floorSeed: lobby.floorSeed,
+      floor0: this.floor0Payload(lobby),
+      worldState: this.floorWorldStatePayload(lobby)
     });
-    this.applyFloor0CollapseCap(lobby);
+    this.syncFloor0CollapseMetadata(lobby);
     this.scheduleFloor0Collapse(lobby);
   }
 
-  applyFloor0CollapseCap(lobby) {
-    if (lobby.status !== LOBBY_STATUS.STAGING) return;
-    const count = Math.max(1, Math.min(TARGET_PLAYERS, lobby.players.length));
-    const cap = FLOOR0_COLLAPSE_CAPS_MS[count] || FLOOR0_COLLAPSE_CAPS_MS[TARGET_PLAYERS];
-    lobby.floor0CollapseAt = Math.min(lobby.floor0CollapseAt, Date.now() + cap);
+  applyFloor0LateJoinTimer(lobby) {
+    if (lobby.floor !== 0 || lobby.joinState !== "open") return;
+    const now = Date.now();
+    if (now - (lobby.collapseStartedAt || now) >= FLOOR0_LATE_JOIN_GRACE_MS) {
+      lobby.collapseAt = now + FLOOR0_LATE_JOIN_GRACE_MS;
+      lobby.floor0CollapseAt = lobby.collapseAt;
+    }
     this.syncFloor0CollapseMetadata(lobby);
   }
 
@@ -228,6 +282,7 @@ class LobbyManager {
     if (!lobby || lobby.status !== LOBBY_STATUS.STAGING) return;
     lobby.status = LOBBY_STATUS.START_PENDING;
     lobby.floor0CollapseAt = Date.now();
+    lobby.collapseAt = lobby.floor0CollapseAt;
 
     const advancingPlayers = [];
     const failedPlayers = [];
@@ -253,17 +308,9 @@ class LobbyManager {
       players: lobby.players.map(player => this.playerStatusPayload(player))
     });
 
-    for (const player of advancingPlayers) {
-      const client = this.clients.get(player.id);
-      if (client) {
-        safeSend(client.ws, SERVER_MESSAGES.FLOOR_START, {
-          lobbyCode: lobby.code,
-          floor: 1,
-          placeholder: true,
-          message: "Floor 1 placeholder start. Movement sync will arrive in a later slice."
-        });
-      }
-    }
+    if (!advancingPlayers.length) return;
+
+    this.startNextFloor(lobby, advancingPlayers, 1);
   }
 
 
@@ -295,7 +342,7 @@ class LobbyManager {
     if (!player) return false;
 
     const sanitized = this.sanitizeCrawlerState(state);
-    if (!sanitized || sanitized.currentFloor !== 0) {
+    if (!sanitized || sanitized.currentFloor !== lobby.floor) {
       player.crawlerState = null;
       this.broadcastCrawlerSnapshot(lobby, { force: true });
       return false;
@@ -375,9 +422,9 @@ class LobbyManager {
     lobby.lastCrawlerSnapshotAt = now;
     this.broadcast(lobby, SERVER_MESSAGES.CRAWLER_SNAPSHOT, {
       lobbyCode: lobby.code,
-      currentFloor: 0,
+      currentFloor: lobby.floor,
       players: lobby.players
-        .filter(player => player.crawlerState?.currentFloor === 0)
+        .filter(player => player.crawlerState?.currentFloor === lobby.floor)
         .map(player => ({
           ...player.crawlerState,
           floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING
@@ -396,14 +443,15 @@ class LobbyManager {
 
     this.broadcast(lobby, SERVER_MESSAGES.FLOOR0_WORLD_EVENT, {
       lobbyCode: lobby.code,
-      currentFloor: 0,
+      runId: lobby.runId,
+      currentFloor: lobby.floor,
       event: normalized
     });
     return true;
   }
 
   applyFloor0WorldEvent(lobby, event) {
-    const world = lobby.floor0WorldState || (lobby.floor0WorldState = this.createFloor0WorldState());
+    const world = this.currentWorldState(lobby);
     const type = String(event.type || "");
     const id = typeof event.id === "string" ? event.id.slice(0, 80) : null;
     if (!id) return null;
@@ -452,7 +500,7 @@ class LobbyManager {
     // The sender never needs its own snapshot echoed back, which prevents solo-lobby rubber-banding.
     if (ownerPlayerId && ownerPlayerId !== playerId) return false;
 
-    const world = lobby.floor0WorldState || (lobby.floor0WorldState = this.createFloor0WorldState());
+    const world = this.currentWorldState(lobby);
     for (const raw of message.enemies || []) {
       const state = this.sanitizeEnemyState(raw);
       if (!state?.enemyId) continue;
@@ -494,7 +542,7 @@ class LobbyManager {
   occupiedFloor0RoomIds(lobby) {
     const rooms = new Set();
     for (const player of lobby.players) {
-      if (player.crawlerState?.currentFloor !== 0) continue;
+      if (player.crawlerState?.currentFloor !== lobby.floor) continue;
       const roomId = Number(player.crawlerState.currentRoomId);
       if (Number.isFinite(roomId)) rooms.add(Math.trunc(roomId));
     }
@@ -504,7 +552,7 @@ class LobbyManager {
   floor0EnemySnapshotOwnerId(lobby, roomId) {
     const normalizedRoomId = Math.trunc(Number(roomId));
     const occupants = lobby.players
-      .filter(player => player.crawlerState?.currentFloor === 0 && Math.trunc(Number(player.crawlerState.currentRoomId)) === normalizedRoomId)
+      .filter(player => player.crawlerState?.currentFloor === lobby.floor && Math.trunc(Number(player.crawlerState.currentRoomId)) === normalizedRoomId)
       .sort((a, b) => a.joinedAt - b.joinedAt);
     return occupants[0]?.id || null;
   }
@@ -529,13 +577,13 @@ class LobbyManager {
     lobby.lastEnemySnapshotAt = now;
     const occupiedRooms = this.occupiedFloor0RoomIds(lobby);
     if (!occupiedRooms.size) return;
-    const enemies = Array.from((lobby.floor0WorldState?.enemyStates || new Map()).values())
+    const enemies = Array.from((this.currentWorldState(lobby).enemyStates || new Map()).values())
       .filter(enemy => enemy.alive !== false && Number.isFinite(Number(enemy.roomId)) && occupiedRooms.has(Math.trunc(Number(enemy.roomId))))
       .map(enemy => ({ ...enemy, ownerPlayerId: enemy.ownerPlayerId || ownerPlayerId || null }));
     if (!enemies.length) return;
     const payload = {
       lobbyCode: lobby.code,
-      currentFloor: 0,
+      currentFloor: lobby.floor,
       activeRoomIds: Array.from(occupiedRooms),
       ownerPlayerId,
       sourcePlayerId: ownerPlayerId,
@@ -547,7 +595,7 @@ class LobbyManager {
     }
   }
 
-  createFloor0WorldState() {
+  createFloorWorldState() {
     return {
       openedDoorIds: new Set(),
       openedChestIds: new Set(),
@@ -556,8 +604,8 @@ class LobbyManager {
     };
   }
 
-  floor0WorldStatePayload(lobby) {
-    const world = lobby.floor0WorldState || (lobby.floor0WorldState = this.createFloor0WorldState());
+  floorWorldStatePayload(lobby, floor = lobby.floor) {
+    const world = lobby.floorWorldStates?.get(floor) || this.currentWorldState(lobby);
     return {
       openedDoorIds: Array.from(world.openedDoorIds),
       openedChestIds: Array.from(world.openedChestIds),
@@ -592,7 +640,14 @@ class LobbyManager {
       stagingEndsAt: new Date(lobby.floor0CollapseAt).toISOString(),
       floor0CollapseAt: new Date(lobby.floor0CollapseAt).toISOString(),
       floor0: this.floor0Payload(lobby),
-      floor0WorldState: this.floor0WorldStatePayload(lobby)
+      runId: lobby.runId,
+      floor: lobby.floor,
+      floorSeed: lobby.floorSeed,
+      joinState: lobby.joinState,
+      collapseStartedAt: new Date(lobby.collapseStartedAt).toISOString(),
+      collapseAt: new Date(lobby.collapseAt).toISOString(),
+      floor0WorldState: this.floorWorldStatePayload(lobby),
+      worldState: this.floorWorldStatePayload(lobby)
     };
 
     return payload;
@@ -612,11 +667,15 @@ class LobbyManager {
     };
   }
 
-  createFloor0Metadata(code, collapseAt) {
-    const seed = this.makeFloor0Seed(code);
+  createFloor0Metadata(lobbyOrCode, collapseAt) {
+    const lobby = typeof lobbyOrCode === "object" ? lobbyOrCode : null;
+    const code = lobby?.code || lobbyOrCode;
+    const seed = lobby?.floorSeed || this.makeFloorSeed(0);
     return {
+      runId: lobby?.runId || null,
       floor: 0,
       seed,
+      floorSeed: seed,
       safeRoomId: 0,
       spawnRoom: { id: 0, type: "safe" },
       spawnPoints: FLOOR0_SPAWN_OFFSETS.map((offset, index) => ({
@@ -633,7 +692,11 @@ class LobbyManager {
   }
 
   syncFloor0CollapseMetadata(lobby) {
-    if (!lobby.floor0) lobby.floor0 = this.createFloor0Metadata(lobby.code, lobby.floor0CollapseAt);
+    lobby.collapseAt = lobby.floor0CollapseAt;
+    if (!lobby.floor0) lobby.floor0 = this.createFloor0Metadata(lobby, lobby.floor0CollapseAt);
+    lobby.floor0.seed = lobby.floorSeed;
+    lobby.floor0.floorSeed = lobby.floorSeed;
+    lobby.floor0.runId = lobby.runId;
     lobby.floor0.collapseAt = new Date(lobby.floor0CollapseAt).toISOString();
   }
 
@@ -647,13 +710,69 @@ class LobbyManager {
     };
   }
 
-  makeFloor0Seed(code) {
-    let hash = 2166136261;
-    for (const char of String(code || "FLOOR0")) {
-      hash ^= char.charCodeAt(0);
-      hash = Math.imul(hash, 16777619);
+  makeFloorSeed(floor = 0) {
+    return `floor${Math.max(0, Math.trunc(Number(floor) || 0))}-${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+  }
+
+  makeFloor0Seed() {
+    return this.makeFloorSeed(0);
+  }
+
+  currentWorldState(lobby) {
+    if (!lobby.floorWorldStates) lobby.floorWorldStates = new Map();
+    if (!lobby.floorWorldStates.has(lobby.floor)) lobby.floorWorldStates.set(lobby.floor, this.createFloorWorldState());
+    lobby.worldState = lobby.floorWorldStates.get(lobby.floor);
+    if (lobby.floor === 0) lobby.floor0WorldState = lobby.worldState;
+    return lobby.worldState;
+  }
+
+  startNextFloor(lobby, advancingPlayers, floor) {
+    lobby.floor = floor;
+    lobby.floorSeed = this.makeFloorSeed(floor);
+    lobby.joinState = "locked";
+    lobby.status = "active";
+    lobby.worldState = this.createFloorWorldState();
+    lobby.floorWorldStates.set(floor, lobby.worldState);
+    const spawnAssignments = this.assignSpawnPoints(lobby, advancingPlayers, floor);
+    const roster = lobby.players.map(player => this.playerStatusPayload(player));
+    for (const player of advancingPlayers) {
+      const client = this.clients.get(player.id);
+      if (client) safeSend(client.ws, SERVER_MESSAGES.FLOOR_START, {
+        lobbyCode: lobby.code,
+        runId: lobby.runId,
+        floor,
+        floorSeed: lobby.floorSeed,
+        spawnAssignments,
+        spawnAssignment: spawnAssignments[player.id] || null,
+        worldState: this.floorWorldStatePayload(lobby, floor),
+        players: roster
+      });
     }
-    return `floor0-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+    this.broadcastLobbyUpdate(lobby);
+  }
+
+  assignSpawnPoints(lobby, players, floor = lobby.floor) {
+    const assignments = {};
+    const baseX = floor === 0 ? 8 : 10;
+    const baseY = floor === 0 ? 8 : 10;
+    players.forEach((player, index) => {
+      const offset = FLOOR0_SPAWN_OFFSETS[index % FLOOR0_SPAWN_OFFSETS.length];
+      assignments[player.id] = {
+        playerId: player.id,
+        floor,
+        roomId: floor === 0 ? 1 : 2,
+        roomType: "normal",
+        x: baseX + offset.dx,
+        y: baseY + offset.dy,
+        tileBlocked: false,
+        safeRoom: false,
+        bossRoom: false,
+        lockedRoom: false,
+        stairwellRoom: false,
+        exitRoom: false
+      };
+    });
+    return assignments;
   }
 
   broadcast(lobby, type, payload = {}) {

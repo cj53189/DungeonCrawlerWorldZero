@@ -94,10 +94,9 @@ function joinQuickPartyByCode(manager, playerId, requestedCode) {
   const party = findPartyByCode(manager, requestedCode);
   if (!party) return null;
   const { lobby, code: partyCode, partyId } = party;
-  if (lobby.mode !== LOBBY_MODES.QUICK_MATCH || lobby.status !== LOBBY_STATUS.STAGING) {
-    throw new Error("That party code is no longer accepting crawlers.");
+  if (lobby.mode !== LOBBY_MODES.QUICK_MATCH || lobby.floor !== 0 || lobby.joinState !== "open") {
+    throw new Error("That run is locked after Floor 1. Find a new open Floor 0 run.");
   }
-  if (lobby.players.length >= TARGET_PLAYERS) throw new Error("That Quick Match room is full.");
 
   const client = manager.requireClient(playerId);
   manager.leaveLobby(playerId, { silent: true });
@@ -149,8 +148,8 @@ function applyQuickPartyExtension(LobbyManager) {
 
     let lobby = Array.from(this.lobbies.values()).find(candidate => (
       candidate.mode === LOBBY_MODES.QUICK_MATCH &&
-      candidate.status === LOBBY_STATUS.STAGING &&
-      candidate.players.length < TARGET_PLAYERS
+      candidate.floor === 0 &&
+      candidate.joinState === "open"
     ));
 
     if (!lobby) {
