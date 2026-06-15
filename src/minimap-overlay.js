@@ -140,7 +140,7 @@
       if (!seen[cy]?.[cx]) continue;
       const px = centerX + ((corpse.x / TILE) - playerTileX) * DESKTOP_MINIMAP_TILE_SCALE;
       const py = centerY + ((corpse.y / TILE) - playerTileY) * DESKTOP_MINIMAP_TILE_SCALE;
-      drawDesktopMinimapMarker(px, py, corpse.boss ? 3 : 2.2, corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)", centerX, centerY, innerRadius);
+      drawDesktopMinimapMarker(px, py, corpse.boss ? 3 : 2.2, corpse.playerCorpse ? "rgba(160,210,255,0.95)" : (corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)"), centerX, centerY, innerRadius);
     }
 
     if (multiplayer?.remotePlayers?.size) {

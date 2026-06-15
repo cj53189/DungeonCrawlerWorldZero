@@ -367,6 +367,9 @@ class LobbyManager {
       sprite: player.profile?.sprite || sanitized.sprite || "default",
       updatedAt: Date.now()
     };
+    if (player.crawlerState.status === "downed" || player.crawlerState.hp <= 0) {
+      this.createPlayerCorpse(lobby, player, state?.lootSnapshot);
+    }
     this.broadcastCrawlerSnapshot(lobby);
     return true;
   }
@@ -699,7 +702,8 @@ class LobbyManager {
       openedDoorIds: new Set(),
       openedChestIds: new Set(),
       takenLootIds: new Set(),
-      enemyStates: new Map()
+      enemyStates: new Map(),
+      playerCorpses: new Map()
     };
   }
 
@@ -709,7 +713,8 @@ class LobbyManager {
       openedDoorIds: Array.from(world.openedDoorIds),
       openedChestIds: Array.from(world.openedChestIds),
       takenLootIds: Array.from(world.takenLootIds),
-      enemyStates: Object.fromEntries(Array.from(world.enemyStates.entries()).map(([id, state]) => [id, { ...state }]))
+      enemyStates: Object.fromEntries(Array.from(world.enemyStates.entries()).map(([id, state]) => [id, { ...state }])),
+      playerCorpses: Array.from((world.playerCorpses || new Map()).values()).filter(c => !c.looted).map(c => ({ ...c, loot: (c.loot || []).map(item => ({ ...item })) }))
     };
   }
 
@@ -853,31 +858,110 @@ class LobbyManager {
   assignSpawnPoints(lobby, players, floor = lobby.floor) {
     const assignments = {};
     const roster = (players?.length ? players : lobby.players) || [];
+    if (floor === 0) {
+      roster.forEach((player, index) => {
+        const offset = FLOOR0_SPAWN_OFFSETS[index % FLOOR0_SPAWN_OFFSETS.length];
+        assignments[player.id] = { playerId: player.id, floor, slot: index, playerIndex: index, roomId: null, roomType: "safe", x: 8 + offset.dx, y: 8 + offset.dy, dx: offset.dx, dy: offset.dy, tileBlocked: false, safeRoom: true, bossRoom: false, lockedRoom: false, stairwellRoom: false, exitRoom: false };
+      });
+      return assignments;
+    }
+
+    const groups = [];
+    const partyGroups = new Map();
     roster.forEach((player, index) => {
-      const offset = FLOOR0_SPAWN_OFFSETS[index % FLOOR0_SPAWN_OFFSETS.length];
-      assignments[player.id] = {
-        playerId: player.id,
-        floor,
-        slot: index,
-        playerIndex: index,
-        roomId: null,
-        roomType: "normal",
-        // Server does not own exact client dungeon geometry for Floor 1+.
-        // These coordinates are stable hints only; clients validate and resolve
-        // the slot to a valid generated room tile from the shared floor seed.
-        x: floor === 0 ? 8 + offset.dx : null,
-        y: floor === 0 ? 8 + offset.dy : null,
-        dx: offset.dx,
-        dy: offset.dy,
-        tileBlocked: false,
-        safeRoom: false,
-        bossRoom: false,
-        lockedRoom: false,
-        stairwellRoom: false,
-        exitRoom: false
-      };
+      const partyId = player.partyId || null;
+      if (partyId) {
+        if (!partyGroups.has(partyId)) partyGroups.set(partyId, { id: partyId, partyId, players: [], firstIndex: index });
+        partyGroups.get(partyId).players.push(player);
+      } else {
+        groups.push({ id: `solo:${player.id}`, partyId: null, players: [player], firstIndex: index });
+      }
+    });
+    groups.unshift(...Array.from(partyGroups.values()).sort((a, b) => a.firstIndex - b.firstIndex));
+
+    groups.forEach((group, groupIndex) => {
+      const roomSlot = groupIndex;
+      group.players.forEach((player, memberIndex) => {
+        const offset = FLOOR0_SPAWN_OFFSETS[memberIndex % FLOOR0_SPAWN_OFFSETS.length];
+        assignments[player.id] = {
+          playerId: player.id,
+          floor,
+          slot: groupIndex,
+          playerIndex: group.firstIndex + memberIndex,
+          groupId: group.id,
+          partyId: group.partyId,
+          groupSlot: groupIndex,
+          groupMemberIndex: memberIndex,
+          roomSlot,
+          roomId: null,
+          roomType: "normal",
+          x: null,
+          y: null,
+          dx: offset.dx,
+          dy: offset.dy,
+          tileBlocked: false,
+          safeRoom: false,
+          bossRoom: false,
+          lockedRoom: false,
+          stairwellRoom: false,
+          exitRoom: false
+        };
+      });
     });
     return assignments;
+  }
+
+  sanitizeCorpseLootItem(item, sourcePlayer, originalSlot = null) {
+    if (!item || typeof item !== "object") return null;
+    const copy = JSON.parse(JSON.stringify(item));
+    if (!copy.id) copy.id = `loot_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+    copy.sourcePlayerId = sourcePlayer.id;
+    copy.sourcePlayerName = sourcePlayer.name;
+    if (originalSlot) copy.originalSlot = originalSlot;
+    return copy;
+  }
+
+  createPlayerCorpse(lobby, player, lootSnapshot = {}) {
+    if (!lobby || !player?.crawlerState || player.playerCorpseId) return null;
+    const world = this.currentWorldState(lobby);
+    if (!world.playerCorpses) world.playerCorpses = new Map();
+    const loot = [];
+    const coins = Math.max(0, Math.trunc(Number(lootSnapshot.coins) || 0));
+    if (coins > 0) loot.push({ id: `coins_${player.id}_${Date.now()}`, type: "coins", amount: coins, name: `${coins} Coins`, sourcePlayerId: player.id, sourcePlayerName: player.name, originalSlot: "coins" });
+    for (const item of lootSnapshot.inventory || []) { const clean = this.sanitizeCorpseLootItem(item, player, "inventory"); if (clean) loot.push(clean); }
+    for (const [slot, item] of Object.entries(lootSnapshot.equipment || {})) { const clean = this.sanitizeCorpseLootItem(item, player, slot); if (clean) loot.push(clean); }
+    const id = `player_corpse_${player.id}_${Date.now()}`;
+    const corpse = { id, kind: "player", playerCorpse: true, deadPlayerId: player.id, deadPlayerName: player.name, floor: lobby.floor, x: player.crawlerState.x, y: player.crawlerState.y, roomId: player.crawlerState.currentRoomId ?? null, r: 13, name: `${player.name}'s Corpse`, loot, looted: loot.length === 0, createdAt: Date.now() };
+    player.playerCorpseId = id;
+    world.playerCorpses.set(id, corpse);
+    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_DIED, { lobbyCode: lobby.code, playerId: player.id, corpse });
+    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_CREATED, { lobbyCode: lobby.code, corpse });
+    if (corpse.looted) world.playerCorpses.delete(id);
+    return corpse;
+  }
+
+  handlePlayerCorpseLootTake(playerId, message = {}) {
+    const client = this.requireClient(playerId);
+    const lobby = client.lobbyCode ? this.lobbies.get(client.lobbyCode) : null;
+    if (!lobby) return false;
+    const world = this.currentWorldState(lobby);
+    const corpse = world.playerCorpses?.get(String(message.corpseId || ""));
+    if (!corpse || corpse.looted) return false;
+    const takeAll = !!message.takeAll;
+    const taken = [];
+    if (takeAll) taken.push(...corpse.loot.splice(0));
+    else {
+      const index = Math.trunc(Number(message.lootIndex));
+      if (!Number.isFinite(index) || index < 0 || index >= corpse.loot.length) return false;
+      taken.push(corpse.loot.splice(index, 1)[0]);
+    }
+    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_LOOT_TAKEN, { lobbyCode: lobby.code, corpseId: corpse.id, looterPlayerId: playerId, loot: taken, lootIndex: takeAll ? null : message.lootIndex, remainingLoot: corpse.loot.map(item => ({ ...item })) });
+    if (!corpse.loot.length) {
+      corpse.looted = true;
+      world.playerCorpses.delete(corpse.id);
+      this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_LOOTED, { lobbyCode: lobby.code, corpseId: corpse.id });
+    }
+    return true;
   }
 
   broadcast(lobby, type, payload = {}) {

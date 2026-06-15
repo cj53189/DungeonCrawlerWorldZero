@@ -34,7 +34,7 @@ function updatePrompt() {
     if (corpse.looted) continue;
     const dist = Math.hypot(player.x - corpse.x, player.y - corpse.y);
     if (dist < player.r + corpse.r + 24) {
-      text = corpse.boss ? "Loot boss corpse" : "Loot corpse";
+      text = corpse.playerCorpse ? `Loot ${corpse.deadPlayerName || "Crawler"}'s corpse` : (corpse.boss ? "Loot boss corpse" : "Loot corpse");
       break;
     }
   }

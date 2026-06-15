@@ -1319,12 +1319,12 @@ function draw() {
     const tx = Math.floor(corpse.x / TILE), ty = Math.floor(corpse.y / TILE);
     if (!visible[ty]?.[tx]) continue;
 
-    ctx.fillStyle = corpse.boss ? "rgba(120,70,160,0.9)" : "rgba(105,88,72,0.9)";
+    ctx.fillStyle = corpse.playerCorpse ? "rgba(95,120,150,0.92)" : (corpse.boss ? "rgba(120,70,160,0.9)" : "rgba(105,88,72,0.9)");
     ctx.beginPath();
     ctx.ellipse(corpse.x, corpse.y + 2, corpse.r + 4, Math.max(6, corpse.r * 0.55), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = corpse.boss ? "rgba(255,216,107,0.85)" : "rgba(210,190,160,0.35)";
+    ctx.strokeStyle = corpse.playerCorpse ? "rgba(220,235,255,0.75)" : (corpse.boss ? "rgba(255,216,107,0.85)" : "rgba(210,190,160,0.35)");
     ctx.lineWidth = corpse.boss ? 2 : 1;
     ctx.stroke();
     ctx.lineWidth = 1;
@@ -1527,7 +1527,7 @@ function drawMinimap(){
     const cx = Math.floor(corpse.x / TILE);
     const cy = Math.floor(corpse.y / TILE);
     if (!seen[cy]?.[cx]) continue;
-    ctx.fillStyle = corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)";
+    ctx.fillStyle = corpse.playerCorpse ? "rgba(160,210,255,0.95)" : (corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)");
     ctx.beginPath();
     ctx.arc(x0 + (corpse.x / TILE) * scale, y0 + (corpse.y / TILE) * scale, corpse.boss ? 2.8 : 2.1, 0, Math.PI * 2);
     ctx.fill();
@@ -1620,7 +1620,7 @@ function drawMobileMinimap(){
     if (!seen[cy]?.[cx]) continue;
     const px = centerX + ((corpse.x / TILE) - playerTileX) * scale;
     const py = centerY + ((corpse.y / TILE) - playerTileY) * scale;
-    drawMobileMinimapMarker(px, py, corpse.boss ? 3 : 2.2, corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)", centerX, centerY, innerRadius);
+    drawMobileMinimapMarker(px, py, corpse.boss ? 3 : 2.2, corpse.playerCorpse ? "rgba(160,210,255,0.95)" : (corpse.boss ? "rgba(210,150,255,0.95)" : "rgba(160,120,85,0.85)"), centerX, centerY, innerRadius);
   }
 
   const safeWaypoint = safeRoomWaypoint();
