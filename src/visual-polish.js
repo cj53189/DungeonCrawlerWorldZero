@@ -130,3 +130,154 @@
   };
   drawEnvironmentalLightFixtures.__visualPolishFixes = true;
 })();
+
+(function installPrincessDonutPetSprite() {
+  if (typeof PET_DEFINITIONS === "undefined" || !PET_DEFINITIONS.fluffy_cat) return;
+
+  const donutDef = PET_DEFINITIONS.fluffy_cat;
+  donutDef.displayName = "Princess Donut";
+  donutDef.name = "Princess Donut";
+  donutDef.description = "A royal Persian show cat with deeply unreasonable magical confidence.";
+  donutDef.sprite = {
+    key: "princess_donut",
+    src: "./assets/sprites/pets/princess_donut.png",
+    frameWidth: 64,
+    frameHeight: 64,
+    columns: 3,
+    rows: 4,
+    idleFrame: 1,
+    sequence: [0, 1, 2, 1],
+    animationSpeed: 10,
+    renderWidth: 44,
+    renderHeight: 44,
+    directionRows: { down: 0, up: 1, left: 2, right: 3 }
+  };
+
+  const PET_SPRITE_CACHE = new Map();
+
+  function getPetSpriteSheet(sprite) {
+    if (!sprite?.src) return null;
+    const key = sprite.key || sprite.src;
+    let entry = PET_SPRITE_CACHE.get(key);
+    if (!entry) {
+      const image = new Image();
+      entry = { image, failed: false };
+      image.onload = () => { entry.failed = false; };
+      image.onerror = () => {
+        entry.failed = true;
+        console.warn(`Pet sprite missing: ${sprite.src}`);
+      };
+      image.src = sprite.src;
+      PET_SPRITE_CACHE.set(key, entry);
+    }
+    if (entry.failed) return null;
+    return entry.image;
+  }
+
+  function isPetSpriteReady(sprite, sheet) {
+    return !!sprite && !!sheet && sheet.complete &&
+      sheet.naturalWidth >= sprite.frameWidth * sprite.columns &&
+      sheet.naturalHeight >= sprite.frameHeight * sprite.rows;
+  }
+
+  function petDirectionRow(pet, sprite) {
+    const rows = sprite.directionRows || { down: 0, up: 1, left: 2, right: 3 };
+    const fx = Number(pet.facingX || 0);
+    const fy = Number(pet.facingY || 1);
+    if (Math.abs(fx) > Math.abs(fy)) return fx < 0 ? rows.left : rows.right;
+    return fy < 0 ? rows.up : rows.down;
+  }
+
+  function petAnimationFrame(pet, sprite) {
+    if (!pet.visualMoving) return Number.isFinite(Number(sprite.idleFrame)) ? Number(sprite.idleFrame) : 0;
+    const sequence = Array.isArray(sprite.sequence) && sprite.sequence.length ? sprite.sequence : [0, 1, 2, 1];
+    const speed = Math.max(1, Number(sprite.animationSpeed) || 10);
+    return sequence[Math.floor(frameCount / speed) % sequence.length];
+  }
+
+  function drawPetName(pet, def) {
+    ctx.fillStyle = "rgba(255,255,255,0.82)";
+    ctx.font = "10px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(`${def?.displayName || pet.displayName} Lv ${pet.level}`, pet.x, pet.y - 28);
+  }
+
+  function drawPetSprite(pet, def, sprite) {
+    const sheet = getPetSpriteSheet(sprite);
+    if (!isPetSpriteReady(sprite, sheet)) return false;
+
+    const frame = Math.max(0, Math.min(sprite.columns - 1, petAnimationFrame(pet, sprite)));
+    const row = Math.max(0, Math.min(sprite.rows - 1, petDirectionRow(pet, sprite)));
+    const drawW = Number(sprite.renderWidth) || sprite.frameWidth;
+    const drawH = Number(sprite.renderHeight) || sprite.frameHeight;
+    const dx = Math.round(pet.x - drawW / 2);
+    const dy = Math.round(pet.y + (pet.r || 8) - drawH);
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.28)";
+    ctx.beginPath();
+    ctx.ellipse(pet.x, pet.y + (pet.r || 8) * 0.76, (pet.r || 8) * 1.34, Math.max(3, (pet.r || 8) * 0.42), 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      sheet,
+      frame * sprite.frameWidth,
+      row * sprite.frameHeight,
+      sprite.frameWidth,
+      sprite.frameHeight,
+      dx,
+      dy,
+      drawW,
+      drawH
+    );
+    ctx.restore();
+    drawPetName(pet, def);
+    return true;
+  }
+
+  const baseDrawActivePet = typeof drawActivePet === "function" ? drawActivePet : null;
+  drawActivePet = function drawActivePetWithSprites() {
+    const pet = typeof getActivePet === "function" ? getActivePet() : null;
+    if (!pet) return;
+    const tx = Math.floor(pet.x / TILE), ty = Math.floor(pet.y / TILE);
+    if (!visible?.[ty]?.[tx]) return;
+    const def = typeof getPetDefinition === "function" ? getPetDefinition(pet) : null;
+    if (def?.sprite && drawPetSprite(pet, def, def.sprite)) return;
+    if (baseDrawActivePet) baseDrawActivePet();
+  };
+
+  const baseUpdatePet = typeof updatePet === "function" ? updatePet : null;
+  if (baseUpdatePet && !baseUpdatePet.__princessDonutMotionWrapped) {
+    updatePet = function updatePetWithSpriteMotion() {
+      const pet = typeof getActivePet === "function" ? getActivePet() : null;
+      const prevX = pet?.x;
+      const prevY = pet?.y;
+      if (pet) pet.visualMoving = false;
+
+      baseUpdatePet();
+
+      if (!pet) return;
+      const dx = pet.x - prevX;
+      const dy = pet.y - prevY;
+      const moved = Math.hypot(dx, dy) > 0.05;
+      if (moved) {
+        pet.visualMoving = true;
+        pet.facingX = dx;
+        pet.facingY = dy;
+      }
+
+      const target = pet.targetEnemyId && Array.isArray(enemies)
+        ? enemies.find(enemy => enemy?.id === pet.targetEnemyId || enemy?.enemyId === pet.targetEnemyId)
+        : null;
+      if (target) {
+        const faceX = target.x - pet.x;
+        const faceY = target.y - pet.y;
+        if (Math.hypot(faceX, faceY) > 0.1) {
+          pet.facingX = faceX;
+          pet.facingY = faceY;
+        }
+      }
+    };
+    updatePet.__princessDonutMotionWrapped = true;
+  }
+})();
