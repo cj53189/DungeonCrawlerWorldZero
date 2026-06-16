@@ -13,6 +13,7 @@
 
   let lastProgressSignature = "";
   let lastServerSubmitSignature = "";
+  let lastLocalPushPlayerId = null;
   let serverLeaderboardEntries = [];
 
   function safeNumber(value, fallback = 0) {
@@ -138,6 +139,10 @@
     return typeof isMultiplayerNetworkReady === "function" && isMultiplayerNetworkReady() && typeof sendMultiplayerMessage === "function";
   }
 
+  function getCurrentServerPlayerId() {
+    return String(multiplayerNetwork?.playerId || multiplayer?.playerId || "server");
+  }
+
   function submitLeaderboardScoreToServer(entry, reason = "progress") {
     if (!entry || !isServerLeaderboardReady()) return false;
     const normalized = normalizeEntry(entry);
@@ -163,14 +168,16 @@
 
   function pushLocalLeaderboardToServer(reason = "sync") {
     if (!isServerLeaderboardReady()) return false;
+    const serverPlayerId = getCurrentServerPlayerId();
+    if (lastLocalPushPlayerId === serverPlayerId && reason !== "open") return false;
     const entries = readLocalLeaderboard();
     for (const entry of entries) submitLeaderboardScoreToServer(entry, reason);
+    lastLocalPushPlayerId = serverPlayerId;
     return entries.length > 0;
   }
 
   function applyServerLeaderboardEntries(entries = []) {
     serverLeaderboardEntries = Array.isArray(entries) ? entries.map(normalizeEntry).filter(entry => entry.name) : [];
-    pushLocalLeaderboardToServer("server_sync");
     if (isLeaderboardPanelOpen()) renderLeaderboardEntries();
   }
 
