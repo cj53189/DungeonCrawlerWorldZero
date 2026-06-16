@@ -29,8 +29,9 @@
   }
 
   function getCurrentModeKey() {
-    if (typeof multiplayer !== "undefined" && multiplayer?.arena) return "arena";
-    const isMulti = (typeof isMultiplayerMode === "function" && isMultiplayerMode()) || !!multiplayer?.enabled;
+    const multiplayerActive = typeof multiplayer !== "undefined" && !!multiplayer?.enabled;
+    if (multiplayerActive && multiplayer?.arena) return "arena";
+    const isMulti = (typeof isMultiplayerMode === "function" && isMultiplayerMode()) || multiplayerActive;
     return isMulti ? "multiplayer" : "single";
   }
 
@@ -288,7 +289,8 @@
     if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
   }
 
-  function hideLeaderboardPanel() {
+  function hideLeaderboardPanel(options = {}) {
+    const shouldFocus = options?.focus !== false;
     const mainBox = getTitleMainBox();
     const panel = document.getElementById("leaderboardPanel");
     if (panel) {
@@ -296,8 +298,8 @@
       panel.setAttribute("aria-hidden", "true");
     }
     if (mainBox) mainBox.style.display = "";
-    document.getElementById("leaderboardBtn")?.focus({ preventScroll: true });
-    if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
+    if (shouldFocus) document.getElementById("leaderboardBtn")?.focus({ preventScroll: true });
+    if (shouldFocus && typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
   }
 
   function clearLeaderboardWithConfirm() {
@@ -333,7 +335,7 @@
     wrapFunction("winGame", "before", () => recordCurrentLeaderboardProgress("clear"));
     wrapFunction("requestMultiplayerStasis", "before", () => recordCurrentLeaderboardProgress("stasis"));
     wrapFunction("returnToTitle", "before", () => recordCurrentLeaderboardProgress("return"));
-    wrapFunction("showTitleScreen", "after", hideLeaderboardPanel);
+    wrapFunction("showTitleScreen", "after", () => hideLeaderboardPanel({ focus: false }));
   }
 
   function bootLeaderboard() {
