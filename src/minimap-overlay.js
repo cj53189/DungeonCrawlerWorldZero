@@ -1,3 +1,243 @@
+(function installEmbeddedDoorsAndLightingOverlay() {
+  const originalDrawEnvironmentalLightFixtures = typeof drawEnvironmentalLightFixtures === "function" ? drawEnvironmentalLightFixtures : null;
+  if (!originalDrawEnvironmentalLightFixtures || originalDrawEnvironmentalLightFixtures.__doorsLightingWrapped) return;
+
+  const originalDrawRadialLight = typeof drawRadialLight === "function" ? drawRadialLight : null;
+  if (originalDrawRadialLight && !originalDrawRadialLight.__wallLightBoostWrapped) {
+    drawRadialLight = function drawRadialLightWithWallBoost(light) {
+      if (light?.fixture?.wallMounted) {
+        return originalDrawRadialLight({
+          ...light,
+          radius: Math.round((light.radius || 96) * 1.12),
+          intensity: Math.min(0.62, (light.intensity || 0.25) * 1.16)
+        });
+      }
+      return originalDrawRadialLight(light);
+    };
+    drawRadialLight.__wallLightBoostWrapped = true;
+  }
+
+  function isDoorOrLockTile(tile) {
+    return tile === "D" || tile === "L";
+  }
+
+  function isDoorWalkableNeighbor(tile) {
+    return tile === "." || tile === "S" || tile === "C" || tile === "E" || tile === "D" || tile === "L";
+  }
+
+  function doorOrientation(x, y) {
+    const up = map?.[y - 1]?.[x];
+    const down = map?.[y + 1]?.[x];
+    const left = map?.[y]?.[x - 1];
+    const right = map?.[y]?.[x + 1];
+    if (up === "#" && down === "#" && isDoorWalkableNeighbor(left) && isDoorWalkableNeighbor(right)) return "eastWest";
+    if (left === "#" && right === "#" && isDoorWalkableNeighbor(up) && isDoorWalkableNeighbor(down)) return "northSouth";
+    return Math.abs((isDoorWalkableNeighbor(left) ? 1 : 0) + (isDoorWalkableNeighbor(right) ? 1 : 0)) >=
+      Math.abs((isDoorWalkableNeighbor(up) ? 1 : 0) + (isDoorWalkableNeighbor(down) ? 1 : 0)) ? "eastWest" : "northSouth";
+  }
+
+  function drawDoorGlow(px, py, locked) {
+    const color = locked
+      ? { inner: "rgba(255,80,80,0.32)", outer: "rgba(255,40,40,0)" }
+      : { inner: "rgba(255,176,76,0.14)", outer: "rgba(255,176,76,0)" };
+    const cx = px + TILE / 2;
+    const cy = py + TILE / 2;
+    const radius = locked ? TILE * 0.95 : TILE * 0.72;
+    const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    gradient.addColorStop(0, color.inner);
+    gradient.addColorStop(1, color.outer);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(px - TILE * 0.3, py - TILE * 0.3, TILE * 1.6, TILE * 1.6);
+  }
+
+  function drawEmbeddedDoorTile(x, y) {
+    const tile = map?.[y]?.[x];
+    if (!isDoorOrLockTile(tile) || !visible?.[y]?.[x]) return;
+
+    const px = x * TILE;
+    const py = y * TILE;
+    const locked = tile === "L";
+    const orientation = doorOrientation(x, y);
+    const stoneDark = locked ? "#38231f" : "#3a352d";
+    const stoneMid = locked ? "#512421" : "#595143";
+    const stoneLight = locked ? "rgba(255,108,92,0.30)" : "rgba(177,160,123,0.34)";
+    const panel = locked ? "#471316" : "#79502b";
+    const panelDark = locked ? "#240b0d" : "#3d2717";
+    const trim = locked ? "rgba(255,100,92,0.70)" : "rgba(226,169,83,0.55)";
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    drawDoorGlow(px, py, locked);
+
+    ctx.fillStyle = "rgba(0,0,0,0.36)";
+    ctx.fillRect(px + 2, py + 2, TILE - 4, TILE - 4);
+
+    ctx.fillStyle = stoneDark;
+    ctx.fillRect(px + 1, py + 1, TILE - 2, TILE - 2);
+
+    if (orientation === "eastWest") {
+      ctx.fillStyle = stoneMid;
+      ctx.fillRect(px + 2, py + 1, TILE - 4, 6);
+      ctx.fillRect(px + 2, py + TILE - 7, TILE - 4, 6);
+      ctx.fillStyle = stoneLight;
+      ctx.fillRect(px + 3, py + 1, TILE - 6, 1);
+      ctx.fillRect(px + 3, py + TILE - 7, TILE - 6, 1);
+
+      ctx.fillStyle = panel;
+      ctx.fillRect(px + 8, py + 5, TILE - 16, TILE - 10);
+      ctx.strokeStyle = panelDark;
+      ctx.strokeRect(px + 8.5, py + 5.5, TILE - 17, TILE - 11);
+      ctx.strokeStyle = locked ? "rgba(255,155,145,0.58)" : "rgba(35,20,12,0.48)";
+      ctx.beginPath();
+      ctx.moveTo(px + TILE / 2, py + 7);
+      ctx.lineTo(px + TILE / 2, py + TILE - 7);
+      ctx.moveTo(px + 11, py + 10);
+      ctx.lineTo(px + 11, py + TILE - 10);
+      ctx.moveTo(px + TILE - 11, py + 10);
+      ctx.lineTo(px + TILE - 11, py + TILE - 10);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = stoneMid;
+      ctx.fillRect(px + 1, py + 2, 6, TILE - 4);
+      ctx.fillRect(px + TILE - 7, py + 2, 6, TILE - 4);
+      ctx.fillStyle = stoneLight;
+      ctx.fillRect(px + 1, py + 3, 1, TILE - 6);
+      ctx.fillRect(px + TILE - 7, py + 3, 1, TILE - 6);
+
+      ctx.fillStyle = panel;
+      ctx.fillRect(px + 5, py + 8, TILE - 10, TILE - 16);
+      ctx.strokeStyle = panelDark;
+      ctx.strokeRect(px + 5.5, py + 8.5, TILE - 11, TILE - 17);
+      ctx.strokeStyle = locked ? "rgba(255,155,145,0.58)" : "rgba(35,20,12,0.48)";
+      ctx.beginPath();
+      ctx.moveTo(px + 7, py + TILE / 2);
+      ctx.lineTo(px + TILE - 7, py + TILE / 2);
+      ctx.moveTo(px + 10, py + 11);
+      ctx.lineTo(px + TILE - 10, py + 11);
+      ctx.moveTo(px + 10, py + TILE - 11);
+      ctx.lineTo(px + TILE - 10, py + TILE - 11);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = trim;
+    ctx.lineWidth = locked ? 2 : 1;
+    if (locked) {
+      ctx.beginPath();
+      ctx.moveTo(px + 9, py + 9);
+      ctx.lineTo(px + TILE - 9, py + TILE - 9);
+      ctx.moveTo(px + TILE - 9, py + 9);
+      ctx.lineTo(px + 9, py + TILE - 9);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(255,74,74,0.92)";
+      ctx.fillRect(px + TILE / 2 - 3, py + TILE / 2 - 3, 6, 6);
+    } else {
+      ctx.fillStyle = "rgba(238,178,83,0.82)";
+      ctx.fillRect(orientation === "eastWest" ? px + TILE - 13 : px + TILE - 12, orientation === "eastWest" ? py + TILE / 2 - 2 : py + TILE - 13, 4, 4);
+    }
+
+    ctx.restore();
+    ctx.lineWidth = 1;
+  }
+
+  function drawVisibleDoorOverlays() {
+    if (!map || !visible) return;
+    for (let y = 1; y < MAP_ROWS - 1; y++) {
+      for (let x = 1; x < MAP_COLS - 1; x++) {
+        if (isDoorOrLockTile(map[y]?.[x])) drawEmbeddedDoorTile(x, y);
+      }
+    }
+  }
+
+  function drawEnhancedLightFixture(light) {
+    if (!light || !visible?.[light.tileY]?.[light.tileX]) return;
+
+    ctx.save();
+    ctx.translate(light.x, light.y);
+    ctx.imageSmoothingEnabled = false;
+
+    if (light.type === "campfire") {
+      ctx.fillStyle = "rgba(255,160,55,0.34)";
+      ctx.beginPath();
+      ctx.ellipse(0, 6, 18, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,224,132,0.92)";
+      ctx.fillRect(-2, -3, 4, 9);
+      ctx.fillStyle = "rgba(255,92,32,0.82)";
+      ctx.fillRect(-6, 1, 4, 8);
+      ctx.fillRect(3, 0, 4, 9);
+      ctx.restore();
+      return;
+    }
+
+    const dir = light.fixture?.wallDir || { dx: 0, dy: -1 };
+    const anchorX = -dir.dx * 8;
+    const anchorY = -dir.dy * 8;
+
+    ctx.fillStyle = light.type === "crystal" ? "rgba(100,205,255,0.18)" : "rgba(255,160,72,0.16)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, light.type === "crystal" ? 15 : 13, light.type === "crystal" ? 11 : 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = "rgba(32,24,18,0.88)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(anchorX, anchorY);
+    ctx.lineTo(anchorX - dir.dx * 9, anchorY - dir.dy * 9);
+    ctx.stroke();
+
+    ctx.strokeStyle = light.type === "crystal" ? "rgba(190,238,255,0.72)" : "rgba(255,206,132,0.58)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(anchorX, anchorY);
+    ctx.lineTo(anchorX - dir.dx * 9, anchorY - dir.dy * 9);
+    ctx.stroke();
+
+    if (light.type === "crystal") {
+      ctx.fillStyle = "rgba(112,215,255,0.95)";
+      ctx.beginPath();
+      ctx.moveTo(0, -9);
+      ctx.lineTo(7, 0);
+      ctx.lineTo(0, 11);
+      ctx.lineTo(-7, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(230,250,255,0.86)";
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = "rgba(255,86,30,0.95)";
+      ctx.beginPath();
+      ctx.moveTo(-5, 5);
+      ctx.quadraticCurveTo(-2, -10, 2, 2);
+      ctx.quadraticCurveTo(8, -5, 5, 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = "rgba(255,232,126,0.95)";
+      ctx.beginPath();
+      ctx.moveTo(-1, 5);
+      ctx.quadraticCurveTo(2, -5, 4, 5);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
+    ctx.lineWidth = 1;
+  }
+
+  function drawEnhancedEnvironmentalLightFixtures() {
+    for (const light of environmentalLights || []) {
+      if (!light?.fixture?.wallMounted && light?.type !== "campfire") continue;
+      drawEnhancedLightFixture(light);
+    }
+  }
+
+  drawEnvironmentalLightFixtures = function drawEnvironmentalLightFixturesWithDoorsAndBetterLight() {
+    originalDrawEnvironmentalLightFixtures();
+    drawVisibleDoorOverlays();
+    drawEnhancedEnvironmentalLightFixtures();
+  };
+  drawEnvironmentalLightFixtures.__doorsLightingWrapped = true;
+})();
+
 (function installDungeonWallEdgeOverlay() {
   const originalDrawWallFloorShadow = typeof drawWallFloorShadow === "function" ? drawWallFloorShadow : null;
   if (!originalDrawWallFloorShadow || originalDrawWallFloorShadow.__wallEdgeOverlayWrapped) return;
