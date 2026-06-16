@@ -1,6 +1,6 @@
 const PET_DEFINITIONS = {
   fluffy_cat: {
-    id: "fluffy_cat", displayName: "Fluffy Cat", role: "Arcane Ranged", cost: 200,
+    id: "fluffy_cat", displayName: "Fluffy Cat", role: "Arcane Ranged", cost: 0,
     description: "A spoiled-looking cat whose eyes glow with deeply unreasonable magical confidence.",
     attackType: "magic_missile", primarySkill: "Magic Missile Eye Beams",
     baseStats: { hp: 53, damage: 14, speed: 2.35, range: 250, cooldown: 58, followDistance: 34, r: 8 },
@@ -8,7 +8,7 @@ const PET_DEFINITIONS = {
     skills: { melee: 1, magic: 4, guard: 1, tracking: 3 }
   },
   small_velociraptor: {
-    id: "small_velociraptor", displayName: "Small Velociraptor", role: "Fast Melee", cost: 200,
+    id: "small_velociraptor", displayName: "Small Velociraptor", role: "Fast Melee", cost: 0,
     description: "A tiny feathered problem with claws, teeth, and career goals.",
     attackType: "lunge_bite", primarySkill: "Lunge Bite",
     baseStats: { hp: 70, damage: 13, speed: 3.05, range: 30, cooldown: 38, followDistance: 38, r: 9 },
@@ -16,7 +16,7 @@ const PET_DEFINITIONS = {
     skills: { melee: 4, magic: 0, guard: 1, tracking: 3 }
   },
   small_dog: {
-    id: "small_dog", displayName: "Small Dog", role: "Loyal Guard", cost: 200,
+    id: "small_dog", displayName: "Small Dog", role: "Loyal Guard", cost: 0,
     description: "A brave little dog who has not read the dungeon waiver.",
     attackType: "guard_bite", primarySkill: "Guard Bite / Distract",
     baseStats: { hp: 94, damage: 10, speed: 2.55, range: 28, cooldown: 48, followDistance: 42, r: 9 },
