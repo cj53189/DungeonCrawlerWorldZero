@@ -131,28 +131,51 @@
   drawEnvironmentalLightFixtures.__visualPolishFixes = true;
 })();
 
-(function installPrincessDonutPetSprite() {
-  if (typeof PET_DEFINITIONS === "undefined" || !PET_DEFINITIONS.fluffy_cat) return;
+(function installPetSpriteSupportAndDefinitions() {
+  if (typeof PET_DEFINITIONS === "undefined") return;
 
-  const donutDef = PET_DEFINITIONS.fluffy_cat;
-  donutDef.displayName = "Princess Donut";
-  donutDef.name = "Princess Donut";
-  donutDef.description = "A royal Persian show cat with deeply unreasonable magical confidence.";
-  donutDef.sprite = {
-    key: "princess_donut",
-    src: "./assets/sprites/pets/princess_donut.png",
-    frameWidth: 64,
-    frameHeight: 64,
-    columns: 3,
-    rows: 4,
-    idleFrame: 1,
-    sequence: [0, 1, 2, 1],
-    animationSpeed: 10,
-    renderWidth: 44,
-    renderHeight: 44,
-    directionRows: { down: 0, up: 1, left: 2, right: 3 },
-    rowYOffset: { 2: 7, 3: 7 }
-  };
+  if (PET_DEFINITIONS.fluffy_cat) {
+    const donutDef = PET_DEFINITIONS.fluffy_cat;
+    donutDef.displayName = "Princess Donut";
+    donutDef.name = "Princess Donut";
+    donutDef.description = "A royal Persian show cat with deeply unreasonable magical confidence.";
+    donutDef.sprite = {
+      key: "princess_donut",
+      src: "./assets/sprites/pets/princess_donut.png",
+      frameWidth: 64,
+      frameHeight: 64,
+      columns: 3,
+      rows: 4,
+      idleFrame: 1,
+      sequence: [0, 1, 2, 1],
+      animationSpeed: 10,
+      renderWidth: 44,
+      renderHeight: 44,
+      directionRows: { down: 0, up: 1, left: 2, right: 3 },
+      rowYOffset: { 2: 7, 3: 7 }
+    };
+  }
+
+  if (PET_DEFINITIONS.small_velociraptor) {
+    const mongoDef = PET_DEFINITIONS.small_velociraptor;
+    mongoDef.displayName = "Mongo";
+    mongoDef.name = "Mongo";
+    mongoDef.description = "A small feathered velociraptor with blue and red plumage, big golden eyes, and murder-chicken confidence.";
+    mongoDef.sprite = {
+      key: "small_velociraptor",
+      src: "./assets/sprites/pets/small_velociraptor.png",
+      frameWidth: 64,
+      frameHeight: 64,
+      columns: 3,
+      rows: 4,
+      idleFrame: 1,
+      sequence: [0, 1, 2, 1],
+      animationSpeed: 8,
+      renderWidth: 48,
+      renderHeight: 48,
+      directionRows: { down: 0, up: 1, left: 2, right: 3 }
+    };
+  }
 
   const PET_SPRITE_CACHE = new Map();
 
@@ -249,7 +272,7 @@
   };
 
   const baseUpdatePet = typeof updatePet === "function" ? updatePet : null;
-  if (baseUpdatePet && !baseUpdatePet.__princessDonutMotionWrapped) {
+  if (baseUpdatePet && !baseUpdatePet.__petSpriteMotionWrapped) {
     updatePet = function updatePetWithSpriteMotion() {
       const pet = typeof getActivePet === "function" ? getActivePet() : null;
       const prevX = pet?.x;
@@ -280,7 +303,7 @@
         }
       }
     };
-    updatePet.__princessDonutMotionWrapped = true;
+    updatePet.__petSpriteMotionWrapped = true;
   }
 })();
 
