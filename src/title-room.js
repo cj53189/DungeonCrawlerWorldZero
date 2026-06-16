@@ -3,29 +3,61 @@
 
   const WORLD_W = 960;
   const WORLD_H = 640;
-  const ROOM = { x: 72, y: 72, w: 816, h: 488 };
-  const SPAWN = { x: WORLD_W / 2, y: 500 };
+  const ROOM = { x: 92, y: 78, w: 776, h: 500 };
+  const SPAWN = { x: WORLD_W / 2, y: 508 };
   const PLAYER_RADIUS = 14;
   const PLAYER_SPEED = 3.85;
-  const INITIAL_ZOOM = 2.65;
-  const HUB_ZOOM = 0.98;
+  const INITIAL_ZOOM = 2.6;
+  const HUB_ZOOM = 1.02;
   const LOW_TILT = 0.58;
   const GAME_TILT = 0.72;
-  const DOOR_COOLDOWN_MS = 700;
-  const STORAGE_SEEN_KEY = "dcw.titleRoom.seenIntro.v4";
+  const DOOR_COOLDOWN_MS = 750;
+  const STORAGE_SEEN_KEY = "dcw.titleRoom.seenIntro.v5";
 
   const titleSpriteCache = new Map();
   const keysDown = new Set();
 
   const zones = [
-    { id: "startSingleBtn", kind: "main", label: "ENTER", subtitle: "Single Player", x: 372, y: 86, w: 216, h: 176, trigger: { x: 394, y: 240, w: 172, h: 96 }, color: "#ffd86b" },
-    { id: "quickMatchBtn", kind: "door", label: "MULTIPLAYER", subtitle: "Quick Match", x: 138, y: 142, w: 168, h: 132, trigger: { x: 132, y: 258, w: 180, h: 80 }, color: "#9cffb1" },
-    { id: "characterCreatorBtn", kind: "door", label: "CHARACTER", subtitle: "Creator", x: 654, y: 142, w: 168, h: 132, trigger: { x: 648, y: 258, w: 180, h: 80 }, color: "#9db1ff" },
-    { id: "pvpArenaBtn", kind: "plaque", label: "PvP ARENA", subtitle: "Test combat", x: 118, y: 366, w: 148, h: 62, trigger: { x: 96, y: 336, w: 192, h: 114 }, color: "#ff8fb8" },
-    { id: "joinPartyBtn", kind: "plaque", label: "JOIN PARTY", subtitle: "Code", x: 316, y: 414, w: 146, h: 58, trigger: { x: 294, y: 384, w: 190, h: 108 }, color: "#9cffb1" },
-    { id: "leaderboardBtn", kind: "plaque", label: "LEADERBOARD", subtitle: "Records", x: 498, y: 414, w: 146, h: 58, trigger: { x: 476, y: 384, w: 190, h: 108 }, color: "#ffd86b", fallback: () => window.DCWZLeaderboard?.show?.() },
-    { id: "copyGameLinkBtn", kind: "plaque", label: "COPY LINK", subtitle: "Invite", x: 700, y: 358, w: 130, h: 54, trigger: { x: 678, y: 330, w: 174, h: 100 }, color: "#d7c0ff" },
-    { id: "localMultiTestBtn", kind: "plaque", label: "LOCAL TEST", subtitle: "4 Crawlers", x: 700, y: 468, w: 130, h: 54, trigger: { x: 678, y: 440, w: 174, h: 100 }, color: "#7cf7ff" }
+    {
+      id: "enterDungeon",
+      action: "modePrompt",
+      kind: "main",
+      label: "ENTER THE DUNGEON",
+      subtitle: "Choose single or multiplayer",
+      x: 342,
+      y: 108,
+      w: 276,
+      h: 184,
+      trigger: { x: 374, y: 266, w: 212, h: 94 },
+      color: "#ffd86b"
+    },
+    {
+      id: "characterCreatorBtn",
+      action: "button",
+      kind: "side",
+      label: "CHARACTER",
+      subtitle: "Creator",
+      x: 694,
+      y: 244,
+      w: 142,
+      h: 64,
+      trigger: { x: 664, y: 216, w: 198, h: 120 },
+      color: "#9db1ff"
+    },
+    {
+      id: "leaderboardBtn",
+      action: "button",
+      kind: "side",
+      label: "LEADERBOARD",
+      subtitle: "Records",
+      x: 694,
+      y: 336,
+      w: 142,
+      h: 64,
+      trigger: { x: 664, y: 308, w: 198, h: 120 },
+      color: "#ffd86b",
+      fallback: () => window.DCWZLeaderboard?.show?.()
+    }
   ];
 
   let titleScreen = null;
@@ -33,6 +65,7 @@
   let ctx = null;
   let hud = null;
   let ghost = null;
+  let modePrompt = null;
   let active = false;
   let started = false;
   let zoom = INITIAL_ZOOM;
@@ -113,12 +146,12 @@
         color: #ffd86b;
         font-weight: 1000;
         letter-spacing: 0.025em;
-        font-size: clamp(22px, 3.7vw, 42px);
+        font-size: clamp(22px, 3.5vw, 40px);
         line-height: 0.94;
       }
       .titleRoomSubtitle {
         color: #9cffb1;
-        font-size: clamp(10px, 1.45vw, 13px);
+        font-size: clamp(10px, 1.35vw, 13px);
         font-weight: 900;
         letter-spacing: 0.07em;
         text-transform: uppercase;
@@ -141,7 +174,10 @@
         pointer-events: none;
         text-align: center;
         text-shadow: 0 1px 4px #000;
+        opacity: 0;
+        transition: opacity 0.24s ease;
       }
+      .titleRoomHelp.visible { opacity: 1; }
       .titleRoomTouchGhost {
         position: absolute;
         inset: 0;
@@ -172,20 +208,64 @@
         background: rgba(255,255,255,0.34);
         box-shadow: 0 0 18px rgba(255,255,255,0.14);
       }
-      .titleRoomGhostButton {
+      .titleRoomModePrompt {
         position: absolute;
-        right: max(30px, env(safe-area-inset-right));
-        bottom: max(42px, env(safe-area-inset-bottom));
-        width: 72px;
-        height: 72px;
-        border-radius: 999px;
-        border: 2px solid rgba(255,216,107,0.36);
-        background: rgba(214,181,92,0.18);
+        inset: 0;
+        z-index: 6;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0,0,0,0.56);
+        backdrop-filter: blur(3px);
+        pointer-events: auto;
       }
-      #titleRoomFallback { display: none !important; }
+      .titleRoomModePrompt.open { display: flex; }
+      .titleRoomModeBox {
+        width: min(430px, calc(100vw - 36px));
+        border: 2px solid rgba(214,181,92,0.76);
+        border-radius: 18px;
+        background: rgba(18,18,20,0.96);
+        box-shadow: 0 0 38px rgba(214,181,92,0.22);
+        padding: 22px;
+        text-align: center;
+      }
+      .titleRoomModeBox h2 {
+        margin: 0 0 6px;
+        color: #ffd86b;
+        font-size: clamp(26px, 6vw, 38px);
+        line-height: 0.95;
+      }
+      .titleRoomModeBox p {
+        margin: 0 0 16px;
+        color: rgba(255,255,255,0.78);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+      .titleRoomModeActions {
+        display: grid;
+        gap: 10px;
+      }
+      .titleRoomModeActions button {
+        border: 1px solid rgba(255,216,107,0.45);
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: rgba(214,181,92,0.92);
+        color: #111;
+        font-weight: 900;
+        cursor: pointer;
+        font-size: 15px;
+      }
+      .titleRoomModeActions button.secondary {
+        background: rgba(255,255,255,0.09);
+        color: #fff;
+      }
+      .titleRoomModeActions button.cancel {
+        background: rgba(0,0,0,0.18);
+        color: rgba(255,255,255,0.74);
+      }
       #leaderboardPanel {
         position: relative;
-        z-index: 5;
+        z-index: 7;
         margin: auto;
       }
       #titleScreen.dcwTitleRoomReady #leaderboardPanel[style*="block"] {
@@ -237,8 +317,35 @@
     if (!ghost) {
       ghost = document.createElement("div");
       ghost.className = "titleRoomTouchGhost";
-      ghost.innerHTML = `<div class="titleRoomGhostStick"></div><div class="titleRoomGhostButton"></div>`;
+      ghost.innerHTML = `<div class="titleRoomGhostStick"></div>`;
       titleScreen.appendChild(ghost);
+    }
+
+    if (!modePrompt) {
+      modePrompt = document.createElement("div");
+      modePrompt.id = "titleRoomModePrompt";
+      modePrompt.className = "titleRoomModePrompt";
+      modePrompt.innerHTML = `
+        <div class="titleRoomModeBox" role="dialog" aria-modal="true" aria-labelledby="titleRoomModeTitle">
+          <h2 id="titleRoomModeTitle">Enter the Dungeon</h2>
+          <p>Choose how you want to crawl this floor.</p>
+          <div class="titleRoomModeActions">
+            <button type="button" data-title-choice="startSingleBtn">Single Player</button>
+            <button type="button" class="secondary" data-title-choice="quickMatchBtn">Multiplayer / Quick Match</button>
+            <button type="button" class="cancel" data-title-choice="cancel">Back</button>
+          </div>
+        </div>`;
+      modePrompt.addEventListener("click", event => {
+        const choice = event.target.closest("button[data-title-choice]")?.dataset.titleChoice;
+        if (!choice) {
+          if (event.target === modePrompt) hideModePrompt();
+          return;
+        }
+        if (choice === "cancel") { hideModePrompt(); return; }
+        hideModePrompt();
+        document.getElementById(choice)?.click();
+      });
+      titleScreen.appendChild(modePrompt);
     }
 
     return true;
@@ -262,14 +369,26 @@
     return !!titleScreen && titleScreen.style.display !== "none" && getComputedStyle(titleScreen).display !== "none";
   }
 
+  function isModePromptOpen() {
+    return !!modePrompt && modePrompt.classList.contains("open");
+  }
+
   function isBlockingTitlePanelOpen() {
     const leaderboard = document.getElementById("leaderboardPanel");
     const creator = document.getElementById("characterCreatorScreen");
-    return !!(leaderboard && leaderboard.style.display === "block") || !!(creator && getComputedStyle(creator).display !== "none");
+    return isModePromptOpen() || !!(leaderboard && leaderboard.style.display === "block") || !!(creator && getComputedStyle(creator).display !== "none");
+  }
+
+  function showModePrompt() {
+    modePrompt?.classList.add("open");
+  }
+
+  function hideModePrompt() {
+    modePrompt?.classList.remove("open");
   }
 
   function resetForTitleIfNeeded() {
-    const shouldBeActive = isTitleVisible() && !isBlockingTitlePanelOpen();
+    const shouldBeActive = isTitleVisible();
     if (shouldBeActive && !active) {
       active = true;
       const seenIntro = localStorage.getItem(STORAGE_SEEN_KEY) === "true";
@@ -288,6 +407,7 @@
       active = false;
       pointerId = null;
       pointerMove = { x: 0, y: 0 };
+      hideModePrompt();
     }
   }
 
@@ -323,6 +443,7 @@
   }
 
   function currentMoveVector() {
+    if (isBlockingTitlePanelOpen()) return { x: 0, y: 0, len: 0 };
     const keyboard = keyboardVector();
     const gamepad = gamepadVector();
     let x = keyboard.x + gamepad.x + pointerMove.x;
@@ -354,25 +475,23 @@
     }
 
     highlightedZone = null;
+    if (isBlockingTitlePanelOpen()) return;
     for (const zone of zones) {
       if (pointInRect(playerX, playerY, zone.trigger)) {
         highlightedZone = zone;
-        if (Date.now() - lastTriggeredAt > DOOR_COOLDOWN_MS && started && zoom < 1.20) triggerZone(zone.id, zone);
+        if (Date.now() - lastTriggeredAt > DOOR_COOLDOWN_MS && started && zoom < 1.22) triggerZone(zone);
         break;
       }
     }
   }
 
-  function triggerZone(id, zone = null) {
-    if (!id) return;
+  function triggerZone(zone) {
+    if (!zone) return;
     lastTriggeredAt = Date.now();
-    const target = zone || zones.find(candidate => candidate.id === id);
-    const button = document.getElementById(id);
-    if (button) {
-      button.click();
-      return;
-    }
-    if (target?.fallback) target.fallback();
+    if (zone.action === "modePrompt") { showModePrompt(); return; }
+    const button = document.getElementById(zone.id);
+    if (button) { button.click(); return; }
+    if (zone.fallback) zone.fallback();
   }
 
   function updateCamera() {
@@ -381,7 +500,6 @@
     const targetTilt = started ? (LOW_TILT + (GAME_TILT - LOW_TILT) * Math.max(0.20, approach)) : LOW_TILT;
     zoom += (targetZoom - zoom) * 0.06;
     tilt += (targetTilt - tilt) * 0.06;
-
     const targetX = started ? WORLD_W / 2 : playerX;
     const targetY = started ? (WORLD_H / 2 + 36 - approach * 72) : (playerY - 26);
     cameraX += (targetX - cameraX) * 0.065;
@@ -430,7 +548,7 @@
 
   function seededShade(x, y) {
     const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453;
-    return (n - Math.floor(n));
+    return n - Math.floor(n);
   }
 
   function drawStoneFloor() {
@@ -475,8 +593,8 @@
     ctx.lineWidth = 3;
     ctx.beginPath(); ctx.arc(WORLD_W / 2, 450, 72, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(WORLD_W / 2, 450, 42, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(WORLD_W / 2, 512); ctx.lineTo(WORLD_W / 2, 260); ctx.stroke();
-    const light = ctx.createRadialGradient(WORLD_W / 2, 245, 42, WORLD_W / 2, 310, 420);
+    ctx.beginPath(); ctx.moveTo(WORLD_W / 2, 512); ctx.lineTo(WORLD_W / 2, 292); ctx.stroke();
+    const light = ctx.createRadialGradient(WORLD_W / 2, 252, 38, WORLD_W / 2, 326, 420);
     light.addColorStop(0, "rgba(255,216,107,0.20)");
     light.addColorStop(0.48, "rgba(255,216,107,0.075)");
     light.addColorStop(1, "rgba(0,0,0,0)");
@@ -497,59 +615,55 @@
     ctx.restore();
   }
 
-  function drawDoor(zone) {
+  function drawMainDoor(zone) {
     const hot = highlightedZone?.id === zone.id;
     const { x, y, w, h } = zone;
     ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillStyle = "rgba(0,0,0,0.80)";
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = hot ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.045)";
-    ctx.fillRect(x + 12, y + 14, w - 24, h - 24);
+    ctx.fillRect(x + 14, y + 16, w - 28, h - 30);
     ctx.strokeStyle = zone.color;
-    ctx.globalAlpha = hot ? 0.80 + Math.sin(pulse * 0.12) * 0.10 : 0.36;
-    ctx.lineWidth = zone.kind === "main" ? 8 : 5;
-    ctx.strokeRect(x + 6, y + 6, w - 12, h - 12);
+    ctx.globalAlpha = hot ? 0.82 + Math.sin(pulse * 0.12) * 0.10 : 0.42;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(x + 7, y + 7, w - 14, h - 14);
     ctx.globalAlpha = 1;
-    if (zone.kind === "main") {
-      ctx.strokeStyle = "rgba(214,181,92,0.36)";
-      ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.arc(x + w / 2, y + 46, 56, Math.PI, 0); ctx.stroke();
-      drawTorch(x - 18, y + h - 26);
-      drawTorch(x + w + 18, y + h - 26);
-      const glow = ctx.createRadialGradient(x + w / 2, y + h, 18, x + w / 2, y + h, 140);
-      glow.addColorStop(0, "rgba(255,216,107,0.38)");
-      glow.addColorStop(1, "rgba(255,216,107,0)");
-      ctx.fillStyle = glow;
-      ctx.fillRect(x - 90, y + h - 56, w + 180, 170);
-    }
-    drawLabel(zone, x + w / 2, y + h / 2, zone.kind === "main" ? 25 : 16, hot);
+    ctx.strokeStyle = "rgba(214,181,92,0.36)";
+    ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(x + w / 2, y + 48, 58, Math.PI, 0); ctx.stroke();
+    drawTorch(x - 18, y + h - 26);
+    drawTorch(x + w + 18, y + h - 26);
+    const glow = ctx.createRadialGradient(x + w / 2, y + h, 18, x + w / 2, y + h, 150);
+    glow.addColorStop(0, "rgba(255,216,107,0.38)");
+    glow.addColorStop(1, "rgba(255,216,107,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(x - 110, y + h - 62, w + 220, 186);
+    drawLabel(zone, x + w / 2, y + h / 2, 22, hot);
     ctx.restore();
   }
 
-  function drawPlaque(zone) {
+  function drawSidePlaque(zone) {
     const hot = highlightedZone?.id === zone.id;
     ctx.save();
     ctx.translate(zone.x + zone.w / 2, zone.y + zone.h / 2);
-    ctx.rotate(zone.x < WORLD_W / 2 ? -0.05 : 0.05);
-    ctx.fillStyle = hot ? "rgba(48,42,30,0.96)" : "rgba(22,22,24,0.94)";
+    ctx.fillStyle = hot ? "rgba(48,42,30,0.96)" : "rgba(22,22,24,0.92)";
     ctx.strokeStyle = zone.color;
     ctx.lineWidth = hot ? 4 : 2;
     ctx.fillRect(-zone.w / 2, -zone.h / 2, zone.w, zone.h);
     ctx.strokeRect(-zone.w / 2, -zone.h / 2, zone.w, zone.h);
-    drawLabel(zone, 0, -2, 12, hot, true);
+    drawLabel(zone, 0, -1, 12, hot);
     ctx.restore();
   }
 
   function drawLabel(zone, x, y, size, hot) {
-    const label = zone.label;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.lineWidth = 5;
     ctx.strokeStyle = "rgba(0,0,0,0.86)";
     ctx.fillStyle = hot ? "#ffffff" : zone.color;
     ctx.font = `900 ${size}px Arial`;
-    ctx.strokeText(label, x, y - 6);
-    ctx.fillText(label, x, y - 6);
+    ctx.strokeText(zone.label, x, y - 8);
+    ctx.fillText(zone.label, x, y - 8);
     ctx.font = `900 ${Math.max(9, size - 7)}px Arial`;
     ctx.fillStyle = hot ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.70)";
     ctx.fillText(zone.subtitle || "", x, y + size * 0.72);
@@ -574,7 +688,6 @@
     const frame = lastMoveLen > 0.08 ? [0, 1, 2, 1][Math.floor(pulse / 12) % 4] : (Number.isFinite(Number(def?.idleFrame)) ? Number(def.idleFrame) : 0);
     const renderW = (Number(def?.renderWidth) || 34) * 1.45;
     const renderH = (Number(def?.renderHeight) || 42) * 1.45;
-
     ctx.save();
     ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.beginPath(); ctx.ellipse(playerX, playerY + 10, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
@@ -605,9 +718,6 @@
     ctx.fillStyle = "#ffd86b";
     ctx.strokeText(controlPromptText(), p.x, p.y);
     ctx.fillText(controlPromptText(), p.x, p.y);
-    ctx.font = "900 12px Arial";
-    ctx.fillStyle = "rgba(255,255,255,0.82)";
-    ctx.fillText("Approach a doorway to choose your path", p.x, p.y + 42);
     ctx.restore();
   }
 
@@ -615,10 +725,9 @@
     drawCeilingAndBackWall();
     drawStoneFloor();
     drawFloorDetails();
-    drawDoor(zones[1]);
-    drawDoor(zones[2]);
-    drawDoor(zones[0]);
-    for (const zone of zones.slice(3)) drawPlaque(zone);
+    drawMainDoor(zones[0]);
+    drawSidePlaque(zones[1]);
+    drawSidePlaque(zones[2]);
     drawSelectedCharacter();
   }
 
@@ -637,7 +746,10 @@
     const titleStatus = document.getElementById("titleConnectionStatus");
     if (status && titleStatus) status.textContent = titleStatus.textContent || "Connection: Connected";
     const help = document.getElementById("titleRoomHelp");
-    if (help) help.textContent = started ? (highlightedZone ? `Enter ${highlightedZone.label}` : "Walk into a doorway to choose") : controlPromptText();
+    if (help) {
+      help.textContent = highlightedZone ? `Enter ${highlightedZone.label}` : "";
+      help.classList.toggle("visible", !!highlightedZone && started && !isBlockingTitlePanelOpen());
+    }
   }
 
   function onPointerDown(event) {
@@ -672,15 +784,13 @@
     if (!start || pointerMoved) return;
     const world = screenToWorld(event.clientX, event.clientY);
     const clicked = zones.find(zone => pointInRect(world.x, world.y, { x: zone.x - 18, y: zone.y - 18, w: zone.w + 36, h: zone.h + 36 }));
-    if (clicked) {
-      markStarted();
-      triggerZone(clicked.id, clicked);
-    }
+    if (clicked) { markStarted(); triggerZone(clicked); }
   }
 
   window.addEventListener("keydown", event => {
     const key = event.key?.toLowerCase?.();
     if (!key) return;
+    if (["escape", "backspace"].includes(key) && isModePromptOpen()) { hideModePrompt(); return; }
     if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
       keysDown.add(key);
       if (isTitleVisible()) markStarted();
