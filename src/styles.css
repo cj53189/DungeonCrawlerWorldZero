@@ -1614,7 +1614,9 @@ body.progressionOpen { overflow: hidden; }
   background-color: rgba(0,0,0,0.35);
   background-image: var(--creator-sprite-image);
   background-repeat: no-repeat;
-  background-size: auto calc(64px * var(--creator-preview-scale, 2));
+  background-size:
+    calc(var(--creator-frame-width, 32px) * var(--creator-columns, 3) * var(--creator-preview-scale, 2))
+    calc(var(--creator-frame-height, 32px) * var(--creator-rows, 4) * var(--creator-preview-scale, 2));
   image-rendering: pixelated;
   box-shadow: 0 12px 0 -7px rgba(0,0,0,0.45), 0 0 18px rgba(120,183,255,0.34);
   animation: creatorWalkPreview 0.8s steps(1) infinite;

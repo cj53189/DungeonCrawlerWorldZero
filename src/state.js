@@ -61,6 +61,24 @@ const CHARACTER_DEFS = Object.freeze({
     supportsSkinColor: false,
     supportsHairColor: false,
     supportsHair: false
+  }),
+  armored_crawler: Object.freeze({
+    id: "armored_crawler",
+    label: "Armored Crawler",
+    mode: "baked",
+    image: "./assets/sprites/other_crawler_armored_52x52.png",
+    frameWidth: 52,
+    frameHeight: 52,
+    columns: 3,
+    rows: 5,
+    idleFrame: 1,
+    directionRows: Object.freeze({ down: 0, up: 1, left: 3, right: 4 }),
+    renderWidth: 38,
+    renderHeight: 38,
+    previewScale: 1.2,
+    supportsSkinColor: false,
+    supportsHairColor: false,
+    supportsHair: false
   })
 });
 const DEFAULT_PLAYER_PROFILE = Object.freeze({
