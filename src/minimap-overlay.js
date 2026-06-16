@@ -1,3 +1,115 @@
+(function installDungeonWallEdgeOverlay() {
+  const originalDrawWallFloorShadow = typeof drawWallFloorShadow === "function" ? drawWallFloorShadow : null;
+  if (!originalDrawWallFloorShadow || originalDrawWallFloorShadow.__wallEdgeOverlayWrapped) return;
+
+  // This file loads after rendering.js and before main.js. The hook belongs here so
+  // we can add wall visuals without touching collision, map generation, fog, or assets.
+  const FLOORLIKE_WALL_EDGE_TILES = new Set([".", "S", "C", "E", "D", "L"]);
+
+  function isFloorLikeVisualTile(tile) {
+    return FLOORLIKE_WALL_EDGE_TILES.has(tile);
+  }
+
+  function hasWallNeighbor(x, y, dx, dy) {
+    return map?.[y + dy]?.[x + dx] === "#";
+  }
+
+  function drawWallEdgeOverlay(x, y, px, py, isVisible) {
+    if (!isFloorLikeVisualTile(map?.[y]?.[x]) || !seen?.[y]?.[x]) return;
+
+    const north = hasWallNeighbor(x, y, 0, -1);
+    const south = hasWallNeighbor(x, y, 0, 1);
+    const west = hasWallNeighbor(x, y, -1, 0);
+    const east = hasWallNeighbor(x, y, 1, 0);
+    if (!north && !south && !west && !east) return;
+
+    const alpha = isVisible ? 0.88 : 0.38;
+    const backFace = isVisible ? "#37332d" : "#22201d";
+    const topCap = isVisible ? "#474238" : "#2c2924";
+    const sideFace = isVisible ? "#2e2b26" : "#1d1b18";
+    const lowLip = isVisible ? "#292721" : "#1b1916";
+    const edge = isVisible ? "rgba(150,140,116,0.42)" : "rgba(86,80,68,0.32)";
+    const seam = isVisible ? "rgba(0,0,0,0.20)" : "rgba(0,0,0,0.16)";
+    const shadow = isVisible ? "rgba(0,0,0,0.24)" : "rgba(0,0,0,0.14)";
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.imageSmoothingEnabled = false;
+
+    // Floor contact shadows. These sell the wall without turning every border into a bulky block.
+    ctx.fillStyle = shadow;
+    if (north) ctx.fillRect(px, py, TILE, 6);
+    if (south) ctx.fillRect(px, py + TILE - 6, TILE, 6);
+    if (west) ctx.fillRect(px, py, 5, TILE);
+    if (east) ctx.fillRect(px + TILE - 5, py, 5, TILE);
+
+    if (north) {
+      ctx.fillStyle = backFace;
+      ctx.fillRect(px, py - 10, TILE, 10);
+      ctx.fillStyle = topCap;
+      ctx.fillRect(px, py - 14, TILE, 5);
+      ctx.strokeStyle = edge;
+      ctx.beginPath();
+      ctx.moveTo(px, py - 9.5);
+      ctx.lineTo(px + TILE, py - 9.5);
+      ctx.moveTo(px, py - 0.5);
+      ctx.lineTo(px + TILE, py - 0.5);
+      ctx.stroke();
+      ctx.strokeStyle = seam;
+      ctx.beginPath();
+      ctx.moveTo(px + TILE * 0.5, py - 13);
+      ctx.lineTo(px + TILE * 0.5, py - 1);
+      ctx.stroke();
+    }
+
+    if (west) {
+      ctx.fillStyle = sideFace;
+      ctx.fillRect(px, py, 5, TILE);
+      ctx.strokeStyle = edge;
+      ctx.beginPath();
+      ctx.moveTo(px + 4.5, py);
+      ctx.lineTo(px + 4.5, py + TILE);
+      ctx.stroke();
+    }
+
+    if (east) {
+      ctx.fillStyle = sideFace;
+      ctx.fillRect(px + TILE - 5, py, 5, TILE);
+      ctx.strokeStyle = edge;
+      ctx.beginPath();
+      ctx.moveTo(px + TILE - 5.5, py);
+      ctx.lineTo(px + TILE - 5.5, py + TILE);
+      ctx.stroke();
+    }
+
+    if (south) {
+      ctx.fillStyle = lowLip;
+      ctx.fillRect(px, py + TILE - 6, TILE, 6);
+      ctx.strokeStyle = edge;
+      ctx.beginPath();
+      ctx.moveTo(px, py + TILE - 6.5);
+      ctx.lineTo(px + TILE, py + TILE - 6.5);
+      ctx.stroke();
+    }
+
+    // Darken seams where two edges meet so corners read as connected stone, not four loose strips.
+    ctx.fillStyle = isVisible ? "rgba(18,17,15,0.42)" : "rgba(8,8,8,0.26)";
+    if (north && west) ctx.fillRect(px, py - 10, 7, 16);
+    if (north && east) ctx.fillRect(px + TILE - 7, py - 10, 7, 16);
+    if (south && west) ctx.fillRect(px, py + TILE - 7, 7, 7);
+    if (south && east) ctx.fillRect(px + TILE - 7, py + TILE - 7, 7, 7);
+
+    ctx.restore();
+  }
+
+  drawWallFloorShadow = function drawWallFloorShadowWithWallEdgeOverlay(x, y, px, py, isVisible) {
+    originalDrawWallFloorShadow(x, y, px, py, isVisible);
+    drawWallEdgeOverlay(x, y, px, py, isVisible);
+  };
+  drawWallFloorShadow.__wallEdgeOverlayWrapped = true;
+  window.drawWallEdgeOverlay = drawWallEdgeOverlay;
+})();
+
 (function installPlayerCenteredDesktopMinimap() {
   const originalDrawMinimap = typeof drawMinimap === "function" ? drawMinimap : null;
   const DESKTOP_MINIMAP_SIZE = 150;
