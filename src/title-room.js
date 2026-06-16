@@ -1,25 +1,124 @@
 (function installPlayableTitleRoom() {
   "use strict";
 
-  const WORLD_W = 1080;
-  const WORLD_H = 760;
-  const ROOM = { x: 90, y: 90, w: 900, h: 560 };
-  const PLAYER_RADIUS = 15;
-  const PLAYER_SPEED = 4.1;
-  const INITIAL_ZOOM = 2.85;
-  const ROOM_ZOOM = 0.92;
-  const DOOR_COOLDOWN_MS = 650;
-  const STORAGE_SEEN_KEY = "dcw.titleRoom.seenIntro.v1";
+  const TILE = 32;
+  const WORLD_W = 1184;
+  const WORLD_H = 832;
+  const ROOM = { x: 96, y: 96, w: 992, h: 632 };
+  const SPAWN = { x: WORLD_W / 2, y: 646 };
+  const PLAYER_RADIUS = 14;
+  const PLAYER_SPEED = 4.05;
+  const INITIAL_ZOOM = 2.55;
+  const HUB_ZOOM = 0.88;
+  const DEFAULT_TILT = 0.72;
+  const LOW_TITLE_TILT = 0.54;
+  const DOOR_COOLDOWN_MS = 700;
+  const STORAGE_SEEN_KEY = "dcw.titleRoom.seenIntro.v2";
 
-  const doors = [
-    { id: "startSingleBtn", label: "Single Player", short: "Single", x: 445, y: 76, w: 190, h: 88, side: "north", color: "#ffd86b" },
-    { id: "quickMatchBtn", label: "Quick Match", short: "Quick", x: 205, y: 92, w: 170, h: 78, side: "north", color: "#9cffb1" },
-    { id: "pvpArenaBtn", label: "PvP Arena", short: "PvP", x: 705, y: 92, w: 170, h: 78, side: "north", color: "#ff8fb8" },
-    { id: "characterCreatorBtn", label: "Character Creator", short: "Creator", x: 72, y: 250, w: 92, h: 156, side: "west", color: "#9db1ff" },
-    { id: "leaderboardBtn", label: "Leaderboard", short: "Ranks", x: 72, y: 440, w: 92, h: 126, side: "west", color: "#ffd86b", fallback: () => window.DCWZLeaderboard?.show?.() },
-    { id: "joinPartyBtn", label: "Join Party Code", short: "Join", x: 916, y: 240, w: 92, h: 142, side: "east", color: "#9cffb1" },
-    { id: "localMultiTestBtn", label: "Local 4-Crawler Test", short: "Local Test", x: 916, y: 415, w: 92, h: 150, side: "east", color: "#7cf7ff" },
-    { id: "copyGameLinkBtn", label: "Copy Game Link", short: "Copy Link", x: 428, y: 632, w: 224, h: 76, side: "south", color: "#d7c0ff" }
+  const titleSpriteCache = new Map();
+  const keysDown = new Set();
+
+  const zones = [
+    {
+      id: "startSingleBtn",
+      kind: "door",
+      label: "Enter the Dungeon",
+      subtitle: "Single Player",
+      x: 468,
+      y: 82,
+      w: 248,
+      h: 178,
+      trigger: { x: 494, y: 232, w: 196, h: 92 },
+      color: "#ffd86b",
+      priority: "primary"
+    },
+    {
+      id: "quickMatchBtn",
+      kind: "door",
+      label: "Multiplayer",
+      subtitle: "Quick Match",
+      x: 214,
+      y: 152,
+      w: 168,
+      h: 132,
+      trigger: { x: 220, y: 264, w: 158, h: 72 },
+      color: "#9cffb1",
+      priority: "secondary"
+    },
+    {
+      id: "characterCreatorBtn",
+      kind: "door",
+      label: "Character",
+      subtitle: "Creator",
+      x: 802,
+      y: 152,
+      w: 168,
+      h: 132,
+      trigger: { x: 808, y: 264, w: 158, h: 72 },
+      color: "#9db1ff",
+      priority: "secondary"
+    },
+    {
+      id: "pvpArenaBtn",
+      kind: "alcove",
+      label: "PvP Arena",
+      subtitle: "Test combat",
+      x: 154,
+      y: 392,
+      w: 168,
+      h: 86,
+      trigger: { x: 138, y: 364, w: 200, h: 142 },
+      color: "#ff8fb8"
+    },
+    {
+      id: "joinPartyBtn",
+      kind: "sign",
+      label: "Join Party",
+      subtitle: "Code",
+      x: 346,
+      y: 484,
+      w: 160,
+      h: 76,
+      trigger: { x: 326, y: 462, w: 200, h: 114 },
+      color: "#9cffb1"
+    },
+    {
+      id: "leaderboardBtn",
+      kind: "sign",
+      label: "Leaderboard",
+      subtitle: "Records",
+      x: 680,
+      y: 484,
+      w: 160,
+      h: 76,
+      trigger: { x: 660, y: 462, w: 200, h: 114 },
+      color: "#ffd86b",
+      fallback: () => window.DCWZLeaderboard?.show?.()
+    },
+    {
+      id: "copyGameLinkBtn",
+      kind: "sign",
+      label: "Copy Link",
+      subtitle: "Invite",
+      x: 858,
+      y: 396,
+      w: 150,
+      h: 70,
+      trigger: { x: 838, y: 374, w: 190, h: 108 },
+      color: "#d7c0ff"
+    },
+    {
+      id: "localMultiTestBtn",
+      kind: "sign",
+      label: "Local Test",
+      subtitle: "4 Crawlers",
+      x: 858,
+      y: 556,
+      w: 150,
+      h: 70,
+      trigger: { x: 838, y: 534, w: 190, h: 108 },
+      color: "#7cf7ff"
+    }
   ];
 
   let titleScreen = null;
@@ -30,23 +129,23 @@
   let fallback = null;
   let active = false;
   let started = false;
-  let introSeen = false;
   let zoom = INITIAL_ZOOM;
   let targetZoom = INITIAL_ZOOM;
-  let cameraX = WORLD_W / 2;
-  let cameraY = WORLD_H - 170;
-  let playerX = WORLD_W / 2;
-  let playerY = WORLD_H - 128;
+  let tilt = LOW_TITLE_TILT;
+  let targetTilt = LOW_TITLE_TILT;
+  let cameraX = SPAWN.x;
+  let cameraY = SPAWN.y - 36;
+  let playerX = SPAWN.x;
+  let playerY = SPAWN.y;
   let aimX = 0;
   let aimY = -1;
   let pulse = 0;
-  let highlightedDoor = null;
+  let highlightedZone = null;
   let lastTriggeredAt = 0;
   let pointerId = null;
   let pointerStart = null;
   let pointerMove = { x: 0, y: 0 };
   let pointerMoved = false;
-  const keysDown = new Set();
 
   function isMobilePointer() {
     return window.matchMedia?.("(hover: none) and (pointer: coarse)")?.matches || window.innerWidth < 780;
@@ -56,7 +155,7 @@
     const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
     if (pads.some(pad => pad?.connected)) return "MOVE LEFT STICK";
     if (isMobilePointer()) return "DRAG TO MOVE";
-    return "PRESS W / ↑ / FORWARD";
+    return "PRESS FORWARD";
   }
 
   function injectStyles() {
@@ -95,27 +194,27 @@
       .titleRoomHud {
         position: absolute;
         left: 50%;
-        top: max(14px, env(safe-area-inset-top));
+        top: max(18px, env(safe-area-inset-top));
         transform: translateX(-50%);
         z-index: 2;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 3px;
+        gap: 4px;
         pointer-events: none;
         text-align: center;
-        text-shadow: 0 2px 8px #000, 0 0 18px rgba(0,0,0,0.9);
+        text-shadow: 0 2px 10px #000, 0 0 22px rgba(0,0,0,0.95);
       }
       .titleRoomGameTitle {
         color: #ffd86b;
         font-weight: 1000;
-        letter-spacing: 0.03em;
-        font-size: clamp(24px, 5.6vw, 64px);
-        line-height: 0.9;
+        letter-spacing: 0.02em;
+        font-size: clamp(28px, 5.6vw, 68px);
+        line-height: 0.90;
       }
       .titleRoomSubtitle {
         color: #9cffb1;
-        font-size: clamp(11px, 2.3vw, 15px);
+        font-size: clamp(11px, 2.1vw, 15px);
         font-weight: 900;
         letter-spacing: 0.06em;
         text-transform: uppercase;
@@ -123,14 +222,14 @@
       .titleRoomHelp {
         position: absolute;
         left: 50%;
-        bottom: max(14px, env(safe-area-inset-bottom));
+        bottom: max(16px, env(safe-area-inset-bottom));
         transform: translateX(-50%);
         z-index: 2;
-        color: rgba(255,255,255,0.78);
-        background: rgba(0,0,0,0.44);
-        border: 1px solid rgba(255,216,107,0.20);
+        color: rgba(255,255,255,0.82);
+        background: rgba(0,0,0,0.46);
+        border: 1px solid rgba(255,216,107,0.24);
         border-radius: 999px;
-        padding: 7px 12px;
+        padding: 8px 14px;
         font-size: 11px;
         font-weight: 900;
         letter-spacing: 0.06em;
@@ -147,14 +246,14 @@
         display: flex;
         gap: 6px;
         pointer-events: auto;
-        opacity: 0.38;
+        opacity: 0.34;
         transition: opacity 0.18s ease;
       }
       .titleRoomFallback:hover,
       .titleRoomFallback:focus-within { opacity: 1; }
       .titleRoomFallback button {
         border: 1px solid rgba(255,216,107,0.42);
-        background: rgba(10,10,12,0.72);
+        background: rgba(10,10,12,0.74);
         color: #ffd86b;
         border-radius: 999px;
         font-size: 10px;
@@ -169,7 +268,7 @@
         opacity: 0;
         transition: opacity 0.32s ease;
       }
-      .titleRoomTouchGhost.show { opacity: 0.74; }
+      .titleRoomTouchGhost.show { opacity: 0.70; }
       .titleRoomGhostStick {
         position: absolute;
         left: max(22px, env(safe-area-inset-left));
@@ -211,7 +310,7 @@
       }
       @media (max-width: 640px) {
         .titleRoomHud { top: max(48px, env(safe-area-inset-top)); }
-        .titleRoomGameTitle { font-size: clamp(25px, 8.5vw, 44px); }
+        .titleRoomGameTitle { font-size: clamp(26px, 8.5vw, 46px); }
         .titleRoomSubtitle { font-size: 11px; }
         .titleRoomFallback { display: none; }
         .titleRoomHelp { max-width: 84vw; white-space: normal; line-height: 1.2; }
@@ -249,7 +348,7 @@
       const help = document.createElement("div");
       help.id = "titleRoomHelp";
       help.className = "titleRoomHelp";
-      help.textContent = "Walk into a doorway to choose";
+      help.textContent = controlPromptText();
       titleScreen.appendChild(help);
     }
 
@@ -263,10 +362,10 @@
     if (!fallback) {
       fallback = document.createElement("div");
       fallback.className = "titleRoomFallback";
-      fallback.innerHTML = `<button type="button" data-title-action="startSingleBtn">Single</button><button type="button" data-title-action="quickMatchBtn">Quick</button><button type="button" data-title-action="characterCreatorBtn">Creator</button>`;
+      fallback.innerHTML = `<button type="button" data-title-action="startSingleBtn">Enter</button><button type="button" data-title-action="quickMatchBtn">Quick</button><button type="button" data-title-action="characterCreatorBtn">Character</button>`;
       fallback.addEventListener("click", event => {
         const button = event.target.closest("button[data-title-action]");
-        if (button) triggerDoor(button.dataset.titleAction);
+        if (button) triggerZone(button.dataset.titleAction);
       });
       titleScreen.appendChild(fallback);
     }
@@ -284,7 +383,7 @@
       canvas.height = Math.floor(h * dpr);
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.setTransform(dpr, 0, 0, dpr, 0);
     }
   }
 
@@ -302,16 +401,20 @@
     const shouldBeActive = isTitleVisible() && !isBlockingTitlePanelOpen();
     if (shouldBeActive && !active) {
       active = true;
-      introSeen = localStorage.getItem(STORAGE_SEEN_KEY) === "true";
-      started = introSeen;
-      zoom = started ? ROOM_ZOOM : INITIAL_ZOOM;
-      targetZoom = started ? ROOM_ZOOM : INITIAL_ZOOM;
-      playerX = WORLD_W / 2;
-      playerY = WORLD_H - 128;
+      const seenIntro = localStorage.getItem(STORAGE_SEEN_KEY) === "true";
+      started = seenIntro;
+      zoom = seenIntro ? HUB_ZOOM : INITIAL_ZOOM;
+      targetZoom = zoom;
+      tilt = seenIntro ? DEFAULT_TILT : LOW_TITLE_TILT;
+      targetTilt = tilt;
+      playerX = SPAWN.x;
+      playerY = SPAWN.y;
       cameraX = playerX;
-      cameraY = playerY - 30;
-      highlightedDoor = null;
-      if (isMobilePointer() && !introSeen) showTouchGhost();
+      cameraY = playerY - 34;
+      highlightedZone = null;
+      pointerId = null;
+      pointerMove = { x: 0, y: 0 };
+      if (isMobilePointer() && !seenIntro) showTouchGhost();
     } else if (!shouldBeActive && active) {
       active = false;
       pointerId = null;
@@ -322,17 +425,14 @@
   function showTouchGhost() {
     if (!ghost) return;
     ghost.classList.add("show");
-    setTimeout(() => ghost?.classList.remove("show"), 2400);
+    setTimeout(() => ghost?.classList.remove("show"), 2300);
   }
 
-  function markStarted(source = "input") {
+  function markStarted() {
     if (started) return;
     started = true;
-    targetZoom = ROOM_ZOOM;
     try { localStorage.setItem(STORAGE_SEEN_KEY, "true"); } catch {}
     ghost?.classList.remove("show");
-    const help = document.getElementById("titleRoomHelp");
-    if (help) help.textContent = "Walk into a doorway to choose · tap a label as backup";
   }
 
   function keyboardVector() {
@@ -347,9 +447,10 @@
     if (!navigator.getGamepads) return { x: 0, y: 0 };
     const pad = Array.from(navigator.getGamepads()).find(gp => gp && gp.connected !== false);
     if (!pad) return { x: 0, y: 0 };
-    const x = Math.abs(pad.axes[0] || 0) > 0.18 ? pad.axes[0] : 0;
-    const y = Math.abs(pad.axes[1] || 0) > 0.18 ? pad.axes[1] : 0;
-    return { x, y };
+    return {
+      x: Math.abs(pad.axes[0] || 0) > 0.18 ? pad.axes[0] : 0,
+      y: Math.abs(pad.axes[1] || 0) > 0.18 ? pad.axes[1] : 0
+    };
   }
 
   function currentMoveVector() {
@@ -359,26 +460,23 @@
     let y = keyboard.y + gamepad.y + pointerMove.y;
     const len = Math.hypot(x, y);
     if (len > 1) { x /= len; y /= len; }
-    if (len > 0.08) markStarted("movement");
+    if (len > 0.08) markStarted();
     return { x, y, len };
   }
 
   function clampPlayerToRoom() {
-    playerX = Math.max(ROOM.x + PLAYER_RADIUS, Math.min(ROOM.x + ROOM.w - PLAYER_RADIUS, playerX));
-    playerY = Math.max(ROOM.y + PLAYER_RADIUS, Math.min(ROOM.y + ROOM.h - PLAYER_RADIUS, playerY));
-  }
-
-  function doorTriggerZone(door) {
-    const pad = 26;
-    if (door.side === "north") return { x: door.x + 6, y: door.y + 54, w: door.w - 12, h: 58 };
-    if (door.side === "south") return { x: door.x + 8, y: door.y - 30, w: door.w - 16, h: 70 };
-    if (door.side === "west") return { x: door.x + door.w - 34, y: door.y + 8, w: 68, h: door.h - 16 };
-    if (door.side === "east") return { x: door.x - 34, y: door.y + 8, w: 68, h: door.h - 16 };
-    return { x: door.x - pad, y: door.y - pad, w: door.w + pad * 2, h: door.h + pad * 2 };
+    playerX = Math.max(ROOM.x + PLAYER_RADIUS + 14, Math.min(ROOM.x + ROOM.w - PLAYER_RADIUS - 14, playerX));
+    playerY = Math.max(ROOM.y + PLAYER_RADIUS + 18, Math.min(ROOM.y + ROOM.h - PLAYER_RADIUS - 12, playerY));
   }
 
   function pointInRect(x, y, rect) {
     return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+  }
+
+  function distanceToZone(zone) {
+    const cx = zone.trigger.x + zone.trigger.w / 2;
+    const cy = zone.trigger.y + zone.trigger.h / 2;
+    return Math.hypot(playerX - cx, playerY - cy);
   }
 
   function updatePlayer() {
@@ -391,36 +489,36 @@
       clampPlayerToRoom();
     }
 
-    highlightedDoor = null;
-    for (const door of doors) {
-      if (pointInRect(playerX, playerY, doorTriggerZone(door))) {
-        highlightedDoor = door;
-        if (Date.now() - lastTriggeredAt > DOOR_COOLDOWN_MS && started && zoom < 1.35) {
-          triggerDoor(door.id, door);
-        }
+    highlightedZone = null;
+    for (const zone of zones) {
+      if (pointInRect(playerX, playerY, zone.trigger)) {
+        highlightedZone = zone;
+        if (Date.now() - lastTriggeredAt > DOOR_COOLDOWN_MS && started && zoom < 1.22) triggerZone(zone.id, zone);
         break;
       }
     }
   }
 
-  function triggerDoor(id, door = null) {
+  function triggerZone(id, zone = null) {
     if (!id) return;
     lastTriggeredAt = Date.now();
-    const targetDoor = door || doors.find(candidate => candidate.id === id);
+    const target = zone || zones.find(candidate => candidate.id === id);
     const button = document.getElementById(id);
     if (button) {
       button.click();
       return;
     }
-    if (targetDoor?.fallback) targetDoor.fallback();
+    if (target?.fallback) target.fallback();
   }
 
   function updateCamera() {
-    const desiredZoom = started ? ROOM_ZOOM : INITIAL_ZOOM;
-    targetZoom = desiredZoom;
+    const approach = highlightedZone ? 1 : Math.max(0, Math.min(1, (SPAWN.y - playerY) / 360));
+    targetZoom = started ? (HUB_ZOOM - approach * 0.05) : INITIAL_ZOOM;
+    targetTilt = started ? (LOW_TITLE_TILT + (DEFAULT_TILT - LOW_TITLE_TILT) * Math.max(0.25, approach)) : LOW_TITLE_TILT;
     zoom += (targetZoom - zoom) * 0.055;
+    tilt += (targetTilt - tilt) * 0.055;
     const targetX = started ? WORLD_W / 2 : playerX;
-    const targetY = started ? WORLD_H / 2 - 12 : playerY - 40;
+    const targetY = started ? (WORLD_H / 2 + 16 - approach * 60) : (playerY - 38);
     cameraX += (targetX - cameraX) * 0.06;
     cameraY += (targetY - cameraY) * 0.06;
   }
@@ -430,7 +528,7 @@
     const height = canvas.clientHeight || window.innerHeight;
     return {
       x: (x - cameraX) * zoom + width / 2,
-      y: (y - cameraY) * zoom + height / 2
+      y: (y - cameraY) * zoom * tilt + height / 2
     };
   }
 
@@ -439,7 +537,7 @@
     const height = canvas.clientHeight || window.innerHeight;
     return {
       x: (x - width / 2) / zoom + cameraX,
-      y: (y - height / 2) / zoom + cameraY
+      y: (y - height / 2) / (zoom * tilt) + cameraY
     };
   }
 
@@ -448,7 +546,7 @@
     const height = canvas.clientHeight || window.innerHeight;
     ctx.save();
     ctx.translate(width / 2, height / 2);
-    ctx.scale(zoom, zoom);
+    ctx.scale(zoom, zoom * tilt);
     ctx.translate(-cameraX, -cameraY);
     fn();
     ctx.restore();
@@ -457,136 +555,232 @@
   function drawBackground() {
     const width = canvas.clientWidth || window.innerWidth;
     const height = canvas.clientHeight || window.innerHeight;
-    const gradient = ctx.createRadialGradient(width * 0.5, height * 0.32, 0, width * 0.5, height * 0.45, Math.max(width, height) * 0.8);
-    gradient.addColorStop(0, "rgba(68,52,22,0.68)");
-    gradient.addColorStop(0.35, "rgba(14,14,16,0.96)");
-    gradient.addColorStop(1, "#030305");
+    const gradient = ctx.createRadialGradient(width * 0.5, height * 0.28, 0, width * 0.5, height * 0.44, Math.max(width, height) * 0.9);
+    gradient.addColorStop(0, "rgba(72,52,20,0.72)");
+    gradient.addColorStop(0.42, "rgba(13,13,16,0.96)");
+    gradient.addColorStop(1, "#020204");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
   }
 
+  function drawStoneRect(x, y, w, h, fill, stroke = null) {
+    ctx.fillStyle = fill;
+    ctx.fillRect(x, y, w, h);
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    }
+  }
+
+  function drawCeilingAndBackWall() {
+    drawStoneRect(ROOM.x - 20, ROOM.y - 154, ROOM.w + 40, 160, "#0b0b0e", "rgba(214,181,92,0.26)");
+    ctx.fillStyle = "rgba(255,216,107,0.05)";
+    for (let x = ROOM.x + 42; x < ROOM.x + ROOM.w; x += 86) {
+      ctx.beginPath();
+      ctx.moveTo(x, ROOM.y - 154);
+      ctx.lineTo(x + 28, ROOM.y + 2);
+      ctx.lineTo(x - 8, ROOM.y + 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = "rgba(0,0,0,0.42)";
+    ctx.fillRect(ROOM.x - 20, ROOM.y - 154, ROOM.w + 40, 36);
+    ctx.strokeStyle = "rgba(255,216,107,0.18)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(ROOM.x + 28, ROOM.y - 28);
+    ctx.lineTo(ROOM.x + ROOM.w - 28, ROOM.y - 28);
+    ctx.stroke();
+  }
+
   function drawRoomFloor() {
-    ctx.fillStyle = "#0a0a0c";
-    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
-
-    ctx.fillStyle = "#141416";
-    ctx.fillRect(ROOM.x, ROOM.y, ROOM.w, ROOM.h);
-
-    ctx.strokeStyle = "rgba(214,181,92,0.42)";
-    ctx.lineWidth = 8;
-    ctx.strokeRect(ROOM.x, ROOM.y, ROOM.w, ROOM.h);
+    drawStoneRect(0, 0, WORLD_W, WORLD_H, "#050506");
+    drawCeilingAndBackWall();
+    drawStoneRect(ROOM.x, ROOM.y, ROOM.w, ROOM.h, "#151517", "rgba(214,181,92,0.40)");
 
     ctx.strokeStyle = "rgba(255,255,255,0.045)";
     ctx.lineWidth = 1;
-    for (let x = ROOM.x + 32; x < ROOM.x + ROOM.w; x += 32) {
+    for (let x = ROOM.x + TILE; x < ROOM.x + ROOM.w; x += TILE) {
       ctx.beginPath(); ctx.moveTo(x, ROOM.y); ctx.lineTo(x, ROOM.y + ROOM.h); ctx.stroke();
     }
-    for (let y = ROOM.y + 32; y < ROOM.y + ROOM.h; y += 32) {
+    for (let y = ROOM.y + TILE; y < ROOM.y + ROOM.h; y += TILE) {
       ctx.beginPath(); ctx.moveTo(ROOM.x, y); ctx.lineTo(ROOM.x + ROOM.w, y); ctx.stroke();
     }
 
-    const glow = ctx.createRadialGradient(WORLD_W / 2, WORLD_H / 2, 60, WORLD_W / 2, WORLD_H / 2, 520);
-    glow.addColorStop(0, "rgba(255,216,107,0.10)");
-    glow.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = glow;
+    ctx.strokeStyle = "rgba(255,216,107,0.18)";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(WORLD_W / 2, 560, 92, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(WORLD_W / 2, 560, 54, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(255,216,107,0.22)";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(WORLD_W / 2, 650);
+    ctx.lineTo(WORLD_W / 2, 260);
+    ctx.stroke();
+
+    const light = ctx.createRadialGradient(WORLD_W / 2, 300, 50, WORLD_W / 2, 360, 500);
+    light.addColorStop(0, "rgba(255,216,107,0.22)");
+    light.addColorStop(0.45, "rgba(255,216,107,0.08)");
+    light.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = light;
     ctx.fillRect(ROOM.x, ROOM.y, ROOM.w, ROOM.h);
   }
 
-  function drawDoor(door) {
-    const isHot = highlightedDoor?.id === door.id;
-    const t = pulse;
-    const glowAlpha = isHot ? 0.62 + Math.sin(t * 0.12) * 0.14 : 0.28;
-    const rect = { x: door.x, y: door.y, w: door.w, h: door.h };
-
+  function drawTorch(x, y) {
     ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.72)";
-    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-
-    ctx.strokeStyle = door.color;
-    ctx.globalAlpha = glowAlpha;
-    ctx.lineWidth = isHot ? 7 : 4;
-    ctx.strokeRect(rect.x + 4, rect.y + 4, rect.w - 8, rect.h - 8);
-    ctx.globalAlpha = 1;
-
-    const inner = ctx.createLinearGradient(rect.x, rect.y, rect.x, rect.y + rect.h);
-    inner.addColorStop(0, isHot ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.08)");
-    inner.addColorStop(1, "rgba(0,0,0,0.30)");
-    ctx.fillStyle = inner;
-    ctx.fillRect(rect.x + 11, rect.y + 11, rect.w - 22, rect.h - 22);
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.font = isHot ? "900 23px Arial" : "900 20px Arial";
+    ctx.translate(x, y);
+    ctx.strokeStyle = "rgba(50,28,14,0.9)";
     ctx.lineWidth = 5;
-    ctx.strokeStyle = "rgba(0,0,0,0.82)";
-    ctx.fillStyle = isHot ? "#ffffff" : door.color;
-
-    const label = rect.w < 120 ? door.short : door.label;
-    const lines = label.split(/\s+/);
-    const textLines = rect.w < 150 && lines.length > 1 ? [lines.slice(0, Math.ceil(lines.length / 2)).join(" "), lines.slice(Math.ceil(lines.length / 2)).join(" ")] : [label];
-    textLines.forEach((line, index) => {
-      const y = rect.y + rect.h / 2 + (index - (textLines.length - 1) / 2) * 24;
-      ctx.strokeText(line, rect.x + rect.w / 2, y);
-      ctx.fillText(line, rect.x + rect.w / 2, y);
-    });
-
-    if (isHot) {
-      ctx.font = "900 12px Arial";
-      ctx.fillStyle = "rgba(255,255,255,0.86)";
-      ctx.fillText("ENTER", rect.x + rect.w / 2, rect.y + rect.h + 18);
-    }
-
+    ctx.beginPath(); ctx.moveTo(0, 18); ctx.lineTo(0, -8); ctx.stroke();
+    ctx.fillStyle = "rgba(255,91,28,0.88)";
+    ctx.beginPath();
+    ctx.moveTo(-7, -6); ctx.quadraticCurveTo(-2, -28, 5, -7); ctx.quadraticCurveTo(13, -19, 7, 5); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = "rgba(255,230,110,0.96)";
+    ctx.beginPath(); ctx.moveTo(-1, -5); ctx.quadraticCurveTo(3, -17, 5, -3); ctx.closePath(); ctx.fill();
     ctx.restore();
   }
 
-  function drawPlayer() {
-    const bob = started ? Math.sin(pulse * 0.16) * 1.2 : 0;
+  function drawDoor(zone) {
+    const isHot = highlightedZone?.id === zone.id;
+    const pulseGlow = isHot ? 0.72 + Math.sin(pulse * 0.12) * 0.12 : 0.32;
+    const { x, y, w, h } = zone;
     ctx.save();
-    ctx.translate(playerX, playerY + bob);
-    ctx.fillStyle = "rgba(0,0,0,0.36)";
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = "rgba(255,255,255,0.045)";
+    ctx.fillRect(x + 10, y + 12, w - 20, h - 20);
+    ctx.strokeStyle = zone.color;
+    ctx.globalAlpha = pulseGlow;
+    ctx.lineWidth = zone.priority === "primary" ? 8 : 5;
+    ctx.strokeRect(x + 6, y + 6, w - 12, h - 12);
+    ctx.globalAlpha = 1;
+
+    if (zone.priority === "primary") {
+      ctx.strokeStyle = "rgba(214,181,92,0.38)";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(x + w / 2, y + 44, 62, Math.PI, 0);
+      ctx.stroke();
+      drawTorch(x - 16, y + h - 28);
+      drawTorch(x + w + 16, y + h - 28);
+    }
+
+    drawLabel(zone, x + w / 2, y + h / 2, zone.priority === "primary" ? 23 : 17, isHot);
+    ctx.restore();
+  }
+
+  function drawSign(zone) {
+    const isHot = highlightedZone?.id === zone.id;
+    ctx.save();
+    ctx.translate(zone.x + zone.w / 2, zone.y + zone.h / 2);
+    if (zone.kind === "sign") ctx.rotate(zone.x < WORLD_W / 2 ? -0.08 : 0.08);
+    ctx.fillStyle = isHot ? "rgba(47,41,28,0.96)" : "rgba(26,26,29,0.94)";
+    ctx.strokeStyle = zone.color;
+    ctx.lineWidth = isHot ? 4 : 2;
+    ctx.fillRect(-zone.w / 2, -zone.h / 2, zone.w, zone.h);
+    ctx.strokeRect(-zone.w / 2, -zone.h / 2, zone.w, zone.h);
+    drawLabel(zone, 0, -2, 15, isHot, true);
+    ctx.restore();
+  }
+
+  function drawLabel(zone, x, y, size, isHot, local = false) {
+    const lines = zone.label.split(/\s+/);
+    const labelLines = zone.label.length > 13 ? [lines.slice(0, Math.ceil(lines.length / 2)).join(" "), lines.slice(Math.ceil(lines.length / 2)).join(" ")] : [zone.label];
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "rgba(0,0,0,0.86)";
+    ctx.fillStyle = isHot ? "#ffffff" : zone.color;
+    ctx.font = `900 ${size}px Arial`;
+    labelLines.forEach((line, index) => {
+      const yy = y + (index - (labelLines.length - 1) / 2) * (size + 2);
+      ctx.strokeText(line, x, yy);
+      ctx.fillText(line, x, yy);
+    });
+    ctx.font = `900 ${Math.max(10, size - 7)}px Arial`;
+    ctx.fillStyle = isHot ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.74)";
+    ctx.fillText(zone.subtitle || "", x, y + labelLines.length * (size * 0.58) + 18);
+  }
+
+  function getCharacterSheet(def) {
+    if (!def?.image) return null;
+    let sheet = titleSpriteCache.get(def.id);
+    if (!sheet) {
+      sheet = new Image();
+      sheet.src = def.image;
+      titleSpriteCache.set(def.id, sheet);
+    }
+    return sheet;
+  }
+
+  function drawSelectedCharacter() {
+    const def = typeof getCharacterDef === "function" ? getCharacterDef(playerProfile?.characterId) : null;
+    const sheet = getCharacterSheet(def);
+    const rows = def?.directionRows || { down: 0, up: 1, left: 2, right: 3 };
+    const row = Math.abs(aimX) > Math.abs(aimY) ? (aimX < 0 ? rows.left : rows.right) : (aimY < 0 ? rows.up : rows.down);
+    const moving = currentMoveVector().len > 0.08;
+    const frame = moving ? [0, 1, 2, 1][Math.floor(pulse / 12) % 4] : (Number.isFinite(Number(def?.idleFrame)) ? Number(def.idleFrame) : 0);
+    const renderW = Number(def?.renderWidth) || 34;
+    const renderH = Number(def?.renderHeight) || 42;
+
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.35)";
     ctx.beginPath();
-    ctx.ellipse(0, 12, 17, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(playerX, playerY + 10, 18, 7, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    const angle = Math.atan2(aimY || -1, aimX || 0);
-    ctx.rotate(angle + Math.PI / 2);
-    ctx.fillStyle = "#f1f1f1";
-    ctx.strokeStyle = "rgba(255,216,107,0.82)";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, -19);
-    ctx.lineTo(12, 12);
-    ctx.lineTo(0, 7);
-    ctx.lineTo(-12, 12);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#ffd86b";
-    ctx.beginPath();
-    ctx.arc(0, -8, 4, 0, Math.PI * 2);
-    ctx.fill();
+    if (sheet && sheet.complete && sheet.naturalWidth >= def.frameWidth * def.columns && sheet.naturalHeight >= def.frameHeight * def.rows) {
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sheet, frame * def.frameWidth, row * def.frameHeight, def.frameWidth, def.frameHeight, playerX - renderW / 2, playerY + PLAYER_RADIUS - renderH, renderW, renderH);
+    } else {
+      ctx.fillStyle = "#f1f1f1";
+      ctx.strokeStyle = "rgba(255,216,107,0.82)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(playerX, playerY - 10, 12, 20, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.fillStyle = "#ffd86b";
+      ctx.beginPath(); ctx.arc(playerX, playerY - 31, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
     ctx.restore();
   }
 
   function drawIntroText() {
-    if (started && zoom < 2.1) return;
+    if (started && zoom < 1.85) return;
     const p = worldToScreen(playerX, playerY - 96);
-    const alpha = Math.max(0, Math.min(1, (zoom - 1.35) / 1.1));
+    const alpha = Math.max(0, Math.min(1, (zoom - 1.22) / 1.05));
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = `900 ${Math.max(34, Math.min(72, (canvas.clientWidth || 900) * 0.08))}px Arial`;
+    ctx.font = `900 ${Math.max(34, Math.min(68, (canvas.clientWidth || 900) * 0.078))}px Arial`;
     ctx.lineWidth = 8;
-    ctx.strokeStyle = "rgba(0,0,0,0.86)";
+    ctx.strokeStyle = "rgba(0,0,0,0.88)";
     ctx.fillStyle = "#ffd86b";
-    const text = controlPromptText();
-    ctx.strokeText(text, p.x, p.y);
-    ctx.fillText(text, p.x, p.y);
+    ctx.strokeText(controlPromptText(), p.x, p.y);
+    ctx.fillText(controlPromptText(), p.x, p.y);
     ctx.font = "900 13px Arial";
     ctx.fillStyle = "rgba(255,255,255,0.82)";
-    ctx.fillText("The dungeon is not subtle. Move forward.", p.x, p.y + 46);
+    ctx.fillText("Approach a doorway to choose your path", p.x, p.y + 46);
     ctx.restore();
+  }
+
+  function drawTitleHub() {
+    drawRoomFloor();
+    drawDoor(zones[1]);
+    drawDoor(zones[2]);
+    drawDoor(zones[0]);
+    drawSign(zones[3]);
+    drawSign(zones[4]);
+    drawSign(zones[5]);
+    drawSign(zones[6]);
+    drawSign(zones[7]);
+    drawSelectedCharacter();
   }
 
   function draw() {
@@ -600,11 +794,7 @@
     pulse++;
 
     drawBackground();
-    withWorldTransform(() => {
-      drawRoomFloor();
-      for (const door of doors) drawDoor(door);
-      drawPlayer();
-    });
+    withWorldTransform(drawTitleHub);
     drawIntroText();
 
     const status = document.getElementById("titleRoomConnection");
@@ -612,7 +802,7 @@
     if (status && titleStatus) status.textContent = titleStatus.textContent || "Connection: Connected";
     const help = document.getElementById("titleRoomHelp");
     if (help) help.textContent = started
-      ? (highlightedDoor ? `Enter ${highlightedDoor.label}` : "Walk into a doorway to choose")
+      ? (highlightedZone ? `Enter ${highlightedZone.label}` : "Walk into a doorway to choose")
       : controlPromptText();
   }
 
@@ -633,11 +823,9 @@
     const len = Math.hypot(dx, dy);
     pointerMoved = pointerMoved || len > 8;
     if (len > 10) {
-      pointerMove = { x: dx / Math.max(52, len), y: dy / Math.max(52, len) };
-      const mag = Math.min(1, len / 52);
-      pointerMove.x *= mag;
-      pointerMove.y *= mag;
-      markStarted("touch");
+      const mag = Math.min(1, len / 56);
+      pointerMove = { x: (dx / len) * mag, y: (dy / len) * mag };
+      markStarted();
     }
   }
 
@@ -649,10 +837,10 @@
     pointerMove = { x: 0, y: 0 };
     if (!start || pointerMoved) return;
     const world = screenToWorld(event.clientX, event.clientY);
-    const clicked = doors.find(door => pointInRect(world.x, world.y, { x: door.x - 18, y: door.y - 18, w: door.w + 36, h: door.h + 36 }));
+    const clicked = zones.find(zone => pointInRect(world.x, world.y, { x: zone.x - 18, y: zone.y - 18, w: zone.w + 36, h: zone.h + 36 }));
     if (clicked) {
-      markStarted("tap");
-      triggerDoor(clicked.id, clicked);
+      markStarted();
+      triggerZone(clicked.id, clicked);
     }
   }
 
@@ -661,11 +849,11 @@
     if (!key) return;
     if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(key)) {
       keysDown.add(key);
-      if (isTitleVisible()) markStarted("keyboard");
+      if (isTitleVisible()) markStarted();
     }
   });
   window.addEventListener("keyup", event => keysDown.delete(event.key?.toLowerCase?.()));
-  window.addEventListener("gamepadconnected", () => { if (isTitleVisible()) markStarted("gamepad"); });
+  window.addEventListener("gamepadconnected", () => { if (isTitleVisible()) markStarted(); });
   window.addEventListener("resize", () => { if (canvas) resizeCanvas(); });
 
   function boot() {
