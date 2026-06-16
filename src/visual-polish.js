@@ -150,7 +150,8 @@
     animationSpeed: 10,
     renderWidth: 44,
     renderHeight: 44,
-    directionRows: { down: 0, up: 1, left: 2, right: 3 }
+    directionRows: { down: 0, up: 1, left: 2, right: 3 },
+    rowYOffset: { 2: 7, 3: 7 }
   };
 
   const PET_SPRITE_CACHE = new Map();
@@ -208,10 +209,11 @@
 
     const frame = Math.max(0, Math.min(sprite.columns - 1, petAnimationFrame(pet, sprite)));
     const row = Math.max(0, Math.min(sprite.rows - 1, petDirectionRow(pet, sprite)));
+    const rowYOffset = Number(sprite.rowYOffset?.[row]) || 0;
     const drawW = Number(sprite.renderWidth) || sprite.frameWidth;
     const drawH = Number(sprite.renderHeight) || sprite.frameHeight;
     const dx = Math.round(pet.x - drawW / 2);
-    const dy = Math.round(pet.y + (pet.r || 8) - drawH);
+    const dy = Math.round(pet.y + (pet.r || 8) - drawH + rowYOffset);
 
     ctx.save();
     ctx.fillStyle = "rgba(0,0,0,0.28)";
