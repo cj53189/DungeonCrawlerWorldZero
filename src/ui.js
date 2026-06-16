@@ -741,7 +741,10 @@ function updateCharacterCreatorPreview() {
   if (preview && characterDef.mode === "baked") {
     preview.style.setProperty("--creator-sprite-image", `url(${characterDef.image})`);
     preview.style.setProperty("--creator-frame-width", `${characterDef.frameWidth}px`);
-    preview.style.setProperty("--creator-preview-scale", "2");
+    preview.style.setProperty("--creator-frame-height", `${characterDef.frameHeight}px`);
+    preview.style.setProperty("--creator-columns", characterDef.columns);
+    preview.style.setProperty("--creator-rows", characterDef.rows);
+    preview.style.setProperty("--creator-preview-scale", characterDef.previewScale || 2);
   }
 }
 

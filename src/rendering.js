@@ -309,12 +309,32 @@ function isPlayerTryingToMove() {
   return Math.hypot(movementX, movementY) > PLAYER_SPRITE_MOVEMENT_THRESHOLD;
 }
 
-function playerSpriteRowForAim() {
+function getCharacterDirectionRows(def) {
+  return def?.directionRows || { down: 0, up: 1, left: 2, right: 3 };
+}
+
+function getSpriteRowForAim(aimX, aimY, rows) {
+  if (Math.abs(aimX) > Math.abs(aimY)) return aimX < 0 ? rows.left : rows.right;
+  return aimY < 0 ? rows.up : rows.down;
+}
+
+function getCharacterIdleFrame(def) {
+  return Number.isFinite(Number(def?.idleFrame)) ? Number(def.idleFrame) : 0;
+}
+
+function getCharacterRenderWidth(def) {
+  return Number.isFinite(Number(def?.renderWidth)) ? Number(def.renderWidth) : PLAYER_SPRITE_RENDER_WIDTH;
+}
+
+function getCharacterRenderHeight(def) {
+  return Number.isFinite(Number(def?.renderHeight)) ? Number(def.renderHeight) : PLAYER_SPRITE_RENDER_HEIGHT;
+}
+
+function playerSpriteRowForAim(characterDef) {
   const aimX = Number.isFinite(player.aimX) ? player.aimX : 0;
   const aimY = Number.isFinite(player.aimY) ? player.aimY : 1;
 
-  if (Math.abs(aimX) > Math.abs(aimY)) return aimX < 0 ? 2 : 3;
-  return aimY < 0 ? 1 : 0;
+  return getSpriteRowForAim(aimX, aimY, getCharacterDirectionRows(characterDef));
 }
 
 function getCharacterSpriteSheet(characterId) {
@@ -345,11 +365,10 @@ function isOtherCrawlerSpriteLoaded() {
     OTHER_CRAWLER_SPRITE_SHEET.naturalHeight >= SPRITE_FRAME_H * OTHER_CRAWLER_SPRITE_ROWS;
 }
 
-function getEntitySpriteRowForAim(entity) {
+function getEntitySpriteRowForAim(entity, characterDef) {
   const aimX = Number.isFinite(entity?.aimX) ? entity.aimX : 0;
   const aimY = Number.isFinite(entity?.aimY) ? entity.aimY : 1;
-  if (Math.abs(aimX) > Math.abs(aimY)) return aimX < 0 ? 2 : 3;
-  return aimY < 0 ? 1 : 0;
+  return getSpriteRowForAim(aimX, aimY, getCharacterDirectionRows(characterDef));
 }
 
 function normalizeNetworkDirection(direction) {
@@ -404,12 +423,14 @@ function drawPlayerSprite() {
     ? Math.floor((player.dodgeVisualFrame || 0) / 4) % 3
     : moving || dodging
       ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor((dodging ? (player.dodgeVisualFrame || frameCount) : frameCount) / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
-      : 0;
-  const row = playerSpriteRowForAim();
+      : getCharacterIdleFrame(characterDef);
+  const row = playerSpriteRowForAim(characterDef);
+  const renderWidth = getCharacterRenderWidth(characterDef);
+  const renderHeight = getCharacterRenderHeight(characterDef);
   const sx = frame * characterDef.frameWidth;
   const sy = row * characterDef.frameHeight;
-  const dx = player.x - PLAYER_SPRITE_RENDER_WIDTH / 2;
-  const dy = player.y + player.r - PLAYER_SPRITE_RENDER_HEIGHT;
+  const dx = player.x - renderWidth / 2;
+  const dy = player.y + player.r - renderHeight;
 
   ctx.save();
   ctx.fillStyle = "rgba(0,0,0,0.32)";
@@ -437,17 +458,17 @@ function drawPlayerSprite() {
     characterDef.frameHeight,
     dx,
     dy,
-    PLAYER_SPRITE_RENDER_WIDTH,
-    PLAYER_SPRITE_RENDER_HEIGHT
+    renderWidth,
+    renderHeight
   );
   if (player.dodgeFlashFrames > 0) {
     ctx.globalCompositeOperation = "source-atop";
     ctx.fillStyle = `rgba(255,255,255,${Math.min(0.62, player.dodgeFlashFrames / 9)})`;
-    ctx.fillRect(dx - 2, dy - 2, PLAYER_SPRITE_RENDER_WIDTH + 4, PLAYER_SPRITE_RENDER_HEIGHT + 4);
+    ctx.fillRect(dx - 2, dy - 2, renderWidth + 4, renderHeight + 4);
     ctx.globalCompositeOperation = "source-over";
     ctx.strokeStyle = "rgba(255,255,255,0.86)";
     ctx.lineWidth = 2;
-    ctx.strokeRect(dx - 1, dy - 1, PLAYER_SPRITE_RENDER_WIDTH + 2, PLAYER_SPRITE_RENDER_HEIGHT + 2);
+    ctx.strokeRect(dx - 1, dy - 1, renderWidth + 2, renderHeight + 2);
   }
   ctx.restore();
 }
@@ -486,10 +507,17 @@ function drawPvpKillMarker(crawler, yOffset = 55) {
 }
 
 function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
-  const characterDef = getCharacterDef(crawler?.characterId);
-  const characterSheet = getCharacterSpriteSheet(characterDef.id);
-  if (characterDef.mode === "baked" && isCharacterSpriteLoaded(characterDef, characterSheet)) {
-    drawPlayerSpriteAt({ ...crawler, characterId: characterDef.id, frame: crawler.moving ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length] : 0 }, alpha, tint);
+  const hasValidCharacterId = !!crawler?.characterId && Object.prototype.hasOwnProperty.call(CHARACTER_DEFS, String(crawler.characterId));
+  const characterDef = hasValidCharacterId ? getCharacterDef(crawler.characterId) : null;
+  const characterSheet = characterDef ? getCharacterSpriteSheet(characterDef.id) : null;
+  if (characterDef?.mode === "baked" && isCharacterSpriteLoaded(characterDef, characterSheet)) {
+    drawPlayerSpriteAt({
+      ...crawler,
+      characterId: characterDef.id,
+      frame: crawler.moving
+        ? PLAYER_SPRITE_ANIMATION_SEQUENCE[Math.floor(frameCount / PLAYER_SPRITE_WALK_FRAME_DELAY) % PLAYER_SPRITE_ANIMATION_SEQUENCE.length]
+        : getCharacterIdleFrame(characterDef)
+    }, alpha, tint);
     drawRemoteCrawlerBadge(crawler);
     return;
   }
@@ -543,18 +571,20 @@ function drawPlayerSpriteAt(entity, alpha = 1, tint = null) {
     ctx.restore();
     return;
   }
-  const frame = entity.frame ?? 0;
-  const row = getEntitySpriteRowForAim(entity);
-  const dx = entity.x - PLAYER_SPRITE_RENDER_WIDTH / 2;
-  const dy = entity.y + (entity.r || player.r) - PLAYER_SPRITE_RENDER_HEIGHT;
+  const frame = entity.frame ?? getCharacterIdleFrame(characterDef);
+  const row = getEntitySpriteRowForAim(entity, characterDef);
+  const renderWidth = getCharacterRenderWidth(characterDef);
+  const renderHeight = getCharacterRenderHeight(characterDef);
+  const dx = entity.x - renderWidth / 2;
+  const dy = entity.y + (entity.r || player.r) - renderHeight;
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(sheet, frame * characterDef.frameWidth, row * characterDef.frameHeight, characterDef.frameWidth, characterDef.frameHeight, dx, dy, PLAYER_SPRITE_RENDER_WIDTH, PLAYER_SPRITE_RENDER_HEIGHT);
+  ctx.drawImage(sheet, frame * characterDef.frameWidth, row * characterDef.frameHeight, characterDef.frameWidth, characterDef.frameHeight, dx, dy, renderWidth, renderHeight);
   if (tint) {
     ctx.globalCompositeOperation = "source-atop";
     ctx.fillStyle = tint;
-    ctx.fillRect(dx, dy, PLAYER_SPRITE_RENDER_WIDTH, PLAYER_SPRITE_RENDER_HEIGHT);
+    ctx.fillRect(dx, dy, renderWidth, renderHeight);
   }
   ctx.restore();
 }
