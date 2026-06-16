@@ -1,5 +1,5 @@
-// Local title-screen leaderboard for single-player and multiplayer runs.
-// Stores best floor and best gold per player name on this device, with a future-friendly event hook for server sync.
+// Local + server-backed title-screen leaderboard for single-player and multiplayer runs.
+// LocalStorage keeps offline records; the WebSocket server stores shared records when connected.
 (function installDungeonCrawlerLeaderboard() {
   "use strict";
 
@@ -12,6 +12,8 @@
   };
 
   let lastProgressSignature = "";
+  let lastServerSubmitSignature = "";
+  let serverLeaderboardEntries = [];
 
   function safeNumber(value, fallback = 0) {
     const number = Number(value);
@@ -28,6 +30,19 @@
     return String(name || "Crawler").trim().toLowerCase() || "crawler";
   }
 
+  function normalizeMode(mode) {
+    const value = String(mode || "").trim().toLowerCase();
+    if (value === "pvp" || value === "pvp_arena") return "arena";
+    if (value === "quick_match" || value === "local_multiplayer") return "multiplayer";
+    return MODE_LABELS[value] ? value : "single";
+  }
+
+  function normalizeModes(modes, fallbackMode = "single") {
+    const source = Array.isArray(modes) ? modes : [fallbackMode];
+    const normalized = source.map(normalizeMode).filter(mode => MODE_LABELS[mode]);
+    return Array.from(new Set(normalized.length ? normalized : [normalizeMode(fallbackMode)]));
+  }
+
   function getCurrentModeKey() {
     const multiplayerActive = typeof multiplayer !== "undefined" && !!multiplayer?.enabled;
     if (multiplayerActive && multiplayer?.arena) return "arena";
@@ -35,19 +50,22 @@
     return isMulti ? "multiplayer" : "single";
   }
 
-  function readLeaderboard() {
+  function normalizeEntry(entry = {}) {
+    const modeKey = normalizeMode(entry.modeKey || entry.mode || (Array.isArray(entry.modes) ? entry.modes[0] : "single"));
+    return {
+      name: typeof sanitizePlayerName === "function" ? sanitizePlayerName(entry?.name) : String(entry?.name || "Crawler").trim().slice(0, 16) || "Crawler",
+      highestFloor: Math.max(0, Math.floor(safeNumber(entry?.highestFloor ?? entry?.floor))),
+      highestGold: Math.max(0, Math.floor(safeNumber(entry?.highestGold ?? entry?.gold ?? entry?.coins))),
+      modes: normalizeModes(entry?.modes, modeKey),
+      updatedAt: Number.isFinite(Number(entry?.updatedAt)) ? Number(entry.updatedAt) : Date.now()
+    };
+  }
+
+  function readLocalLeaderboard() {
     try {
       const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
       const entries = Array.isArray(raw) ? raw : (Array.isArray(raw?.entries) ? raw.entries : []);
-      return entries
-        .map(entry => ({
-          name: typeof sanitizePlayerName === "function" ? sanitizePlayerName(entry?.name) : String(entry?.name || "Crawler").trim().slice(0, 16) || "Crawler",
-          highestFloor: Math.max(0, Math.floor(safeNumber(entry?.highestFloor))),
-          highestGold: Math.max(0, Math.floor(safeNumber(entry?.highestGold))),
-          modes: Array.isArray(entry?.modes) ? entry.modes.filter(mode => MODE_LABELS[mode]) : [],
-          updatedAt: Number.isFinite(Number(entry?.updatedAt)) ? Number(entry.updatedAt) : Date.now()
-        }))
-        .filter(entry => entry.name);
+      return entries.map(normalizeEntry).filter(entry => entry.name);
     } catch {
       return [];
     }
@@ -60,6 +78,30 @@
       b.updatedAt - a.updatedAt ||
       a.name.localeCompare(b.name)
     );
+  }
+
+  function mergeLeaderboardEntries(...entryGroups) {
+    const merged = new Map();
+    for (const group of entryGroups) {
+      for (const rawEntry of group || []) {
+        const entry = normalizeEntry(rawEntry);
+        const nameKey = normalizeNameKey(entry.name);
+        const existing = merged.get(nameKey);
+        if (!existing) {
+          merged.set(nameKey, entry);
+          continue;
+        }
+        existing.highestFloor = Math.max(existing.highestFloor, entry.highestFloor);
+        existing.highestGold = Math.max(existing.highestGold, entry.highestGold);
+        existing.modes = normalizeModes([...(existing.modes || []), ...(entry.modes || [])], entry.modes?.[0]);
+        existing.updatedAt = Math.max(existing.updatedAt, entry.updatedAt);
+      }
+    }
+    return sortLeaderboard(Array.from(merged.values())).slice(0, MAX_ENTRIES);
+  }
+
+  function readLeaderboard() {
+    return mergeLeaderboardEntries(readLocalLeaderboard(), serverLeaderboardEntries);
   }
 
   function writeLeaderboard(entries) {
@@ -85,10 +127,51 @@
       name: getSanitizedName(),
       highestFloor: Math.max(0, Math.floor(safeNumber(currentFloor))),
       highestGold: Math.max(0, Math.floor(safeNumber(player?.coins))),
+      modes: [modeKey],
       modeKey,
       reason,
       updatedAt: Date.now()
     };
+  }
+
+  function isServerLeaderboardReady() {
+    return typeof isMultiplayerNetworkReady === "function" && isMultiplayerNetworkReady() && typeof sendMultiplayerMessage === "function";
+  }
+
+  function submitLeaderboardScoreToServer(entry, reason = "progress") {
+    if (!entry || !isServerLeaderboardReady()) return false;
+    const normalized = normalizeEntry(entry);
+    const signature = `${normalized.name}|${normalized.highestFloor}|${normalized.highestGold}|${(normalized.modes || []).join("+")}`;
+    if (signature === lastServerSubmitSignature && reason === "hud") return false;
+    lastServerSubmitSignature = signature;
+    return sendMultiplayerMessage("leaderboard_submit", {
+      score: {
+        name: normalized.name,
+        highestFloor: normalized.highestFloor,
+        highestGold: normalized.highestGold,
+        modes: normalized.modes,
+        modeKey: normalized.modes?.[0] || "single",
+        updatedAt: normalized.updatedAt
+      }
+    });
+  }
+
+  function requestServerLeaderboard() {
+    if (!isServerLeaderboardReady()) return false;
+    return sendMultiplayerMessage("leaderboard_request");
+  }
+
+  function pushLocalLeaderboardToServer(reason = "sync") {
+    if (!isServerLeaderboardReady()) return false;
+    const entries = readLocalLeaderboard();
+    for (const entry of entries) submitLeaderboardScoreToServer(entry, reason);
+    return entries.length > 0;
+  }
+
+  function applyServerLeaderboardEntries(entries = []) {
+    serverLeaderboardEntries = Array.isArray(entries) ? entries.map(normalizeEntry).filter(entry => entry.name) : [];
+    pushLocalLeaderboardToServer("server_sync");
+    if (isLeaderboardPanelOpen()) renderLeaderboardEntries();
   }
 
   function recordCurrentLeaderboardProgress(reason = "progress") {
@@ -99,7 +182,7 @@
     if (signature === lastProgressSignature && reason === "hud") return null;
     lastProgressSignature = signature;
 
-    const entries = readLeaderboard();
+    const entries = readLocalLeaderboard();
     const nameKey = normalizeNameKey(snapshot.name);
     let entry = entries.find(candidate => normalizeNameKey(candidate.name) === nameKey);
     let changed = false;
@@ -109,23 +192,24 @@
         name: snapshot.name,
         highestFloor: snapshot.highestFloor,
         highestGold: snapshot.highestGold,
-        modes: [snapshot.modeKey],
+        modes: snapshot.modes,
         updatedAt: snapshot.updatedAt
       };
       entries.push(entry);
       changed = true;
     } else {
-      const nextModes = Array.from(new Set([...(entry.modes || []), snapshot.modeKey])).filter(mode => MODE_LABELS[mode]);
+      const nextModes = normalizeModes([...(entry.modes || []), snapshot.modeKey], snapshot.modeKey);
       if (entry.name !== snapshot.name) { entry.name = snapshot.name; changed = true; }
       if (snapshot.highestFloor > entry.highestFloor) { entry.highestFloor = snapshot.highestFloor; changed = true; }
       if (snapshot.highestGold > entry.highestGold) { entry.highestGold = snapshot.highestGold; changed = true; }
-      if (nextModes.length !== (entry.modes || []).length) { entry.modes = nextModes; changed = true; }
+      if (nextModes.join("|") !== (entry.modes || []).join("|")) { entry.modes = nextModes; changed = true; }
       if (changed) entry.updatedAt = snapshot.updatedAt;
     }
 
     if (!changed) return entry;
     const saved = writeLeaderboard(entries);
     const updatedEntry = saved.find(candidate => normalizeNameKey(candidate.name) === nameKey) || entry;
+    submitLeaderboardScoreToServer(updatedEntry, reason);
 
     try {
       window.dispatchEvent(new CustomEvent("dcwz:leaderboard-progress", { detail: { ...updatedEntry, reason } }));
@@ -154,6 +238,7 @@
       .leaderboardEmpty { padding: 18px; border: 1px dashed rgba(255,255,255,0.18); border-radius: 12px; color: #ddd; text-align: center; line-height: 1.4; }
       .leaderboardActions { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
       .leaderboardDanger { border-color: rgba(255,100,100,0.42) !important; color: #ffd1d1 !important; }
+      .leaderboardSync { margin-top: 10px; text-align: center; color: #cbd3ff; font-size: 11px; font-weight: 800; }
       @media (max-width: 640px) {
         #leaderboardPanel { width: min(94vw, 760px); padding: 20px; }
         .leaderboardRow { grid-template-columns: 34px minmax(0, 1fr) 74px 74px; gap: 7px; padding: 9px 8px; font-size: 12px; }
@@ -192,11 +277,12 @@
         <button id="closeLeaderboardBtn" class="panelClose" type="button" aria-label="Close leaderboard">×</button>
         <div class="titleEyebrow">Crawler Records</div>
         <h1 id="leaderboardTitle">Leaderboard</h1>
-        <p>Best floor and best gold are tracked together across single player, quick match, local multiplayer, and arena runs on this device.</p>
+        <p>Best floor and best gold are tracked locally while offline and shared through the server when connected.</p>
+        <div id="leaderboardSyncStatus" class="leaderboardSync">Server leaderboard: checking...</div>
         <div id="leaderboardEntries" class="leaderboardList" aria-live="polite"></div>
         <div class="titleActions leaderboardActions">
           <button id="backFromLeaderboardBtn" type="button">Back to Title</button>
-          <button id="clearLeaderboardBtn" class="leaderboardDanger" type="button">Clear Leaderboard</button>
+          <button id="clearLeaderboardBtn" class="leaderboardDanger" type="button">Clear Local Records</button>
         </div>
       `;
       titleScreen.appendChild(panel);
@@ -219,7 +305,7 @@
   }
 
   function formatModes(modes = []) {
-    const labels = Array.from(new Set(modes)).map(mode => MODE_LABELS[mode]).filter(Boolean);
+    const labels = Array.from(new Set(normalizeModes(modes))).map(mode => MODE_LABELS[mode]).filter(Boolean);
     if (!labels.length) return "Single + Multiplayer";
     if (labels.length === 1) return labels[0];
     return labels.join(" + ").replace("Single Player + Multiplayer", "Single + Multiplayer");
@@ -228,8 +314,15 @@
   function renderLeaderboardEntries() {
     const container = document.getElementById("leaderboardEntries");
     if (!container) return;
-    const entries = sortLeaderboard(readLeaderboard()).slice(0, MAX_ENTRIES);
+    const entries = readLeaderboard();
     container.innerHTML = "";
+
+    const syncStatus = document.getElementById("leaderboardSyncStatus");
+    if (syncStatus) {
+      syncStatus.textContent = isServerLeaderboardReady()
+        ? `Server leaderboard: connected · ${serverLeaderboardEntries.length} shared record${serverLeaderboardEntries.length === 1 ? "" : "s"}`
+        : "Server leaderboard: offline · showing local records";
+    }
 
     const header = document.createElement("div");
     header.className = "leaderboardRow header";
@@ -277,6 +370,8 @@
   function showLeaderboardPanel() {
     if (!ensureLeaderboardUi()) return;
     recordCurrentLeaderboardProgress("open");
+    requestServerLeaderboard();
+    pushLocalLeaderboardToServer("open");
     renderLeaderboardEntries();
     const mainBox = getTitleMainBox();
     const panel = document.getElementById("leaderboardPanel");
@@ -303,7 +398,7 @@
   }
 
   function clearLeaderboardWithConfirm() {
-    const ok = window.confirm("Clear all local leaderboard records? The dungeon will not issue a refund.");
+    const ok = window.confirm("Clear local leaderboard records on this device? Shared server records will remain online.");
     if (!ok) return;
     try { localStorage.removeItem(STORAGE_KEY); } catch {}
     lastProgressSignature = "";
@@ -338,16 +433,40 @@
     wrapFunction("showTitleScreen", "after", () => hideLeaderboardPanel({ focus: false }));
   }
 
+  function installServerMessageHook() {
+    const original = window.handleMultiplayerServerMessage;
+    if (typeof original !== "function" || original.__leaderboardServerWrapped) return;
+    const wrapped = function handleMultiplayerServerMessageWithLeaderboard(message) {
+      if (message?.type === "leaderboard_update") {
+        applyServerLeaderboardEntries(message.entries || []);
+        return;
+      }
+      const result = original.apply(this, arguments);
+      if (message?.type === "welcome") {
+        requestServerLeaderboard();
+        pushLocalLeaderboardToServer("welcome");
+      }
+      return result;
+    };
+    wrapped.__leaderboardServerWrapped = true;
+    window.handleMultiplayerServerMessage = wrapped;
+  }
+
   function bootLeaderboard() {
     injectLeaderboardStyles();
     ensureLeaderboardUi();
     installLeaderboardHooks();
+    installServerMessageHook();
     window.DCWZLeaderboard = Object.freeze({
       read: readLeaderboard,
+      readLocal: readLocalLeaderboard,
+      readServer: () => serverLeaderboardEntries.slice(),
       record: recordCurrentLeaderboardProgress,
       render: renderLeaderboardEntries,
       show: showLeaderboardPanel,
-      hide: hideLeaderboardPanel
+      hide: hideLeaderboardPanel,
+      requestServer: requestServerLeaderboard,
+      applyServerEntries: applyServerLeaderboardEntries
     });
   }
 
