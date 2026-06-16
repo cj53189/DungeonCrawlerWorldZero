@@ -980,7 +980,11 @@ function drawCombatVisuals() {
 }
 
 
-const FLOORLIKE_VISUAL_TILES = new Set([".", "S", "C", "E"]);
+const FLOORLIKE_VISUAL_TILES = new Set([".", "S", "C", "E", "D", "L"]);
+
+function isFloorLikeVisualTile(t) {
+  return FLOORLIKE_VISUAL_TILES.has(t);
+}
 
 function drawFloorDetail(detail, px, py, isVisible) {
   if (!detail) return;
@@ -1043,13 +1047,89 @@ function drawWallAmbientShadow(px, py, isVisible) {
 }
 
 function drawWallFloorShadow(x, y, px, py, isVisible) {
-  if (!FLOORLIKE_VISUAL_TILES.has(map[y]?.[x])) return;
+  if (!isFloorLikeVisualTile(map[y]?.[x])) return;
   const alpha = isVisible ? 0.17 : 0.08;
   ctx.fillStyle = `rgba(0,0,0,${alpha})`;
   if (map[y - 1]?.[x] === "#") ctx.fillRect(px, py, TILE, 5);
   if (map[y + 1]?.[x] === "#") ctx.fillRect(px, py + TILE - 5, TILE, 5);
   if (map[y]?.[x - 1] === "#") ctx.fillRect(px, py, 5, TILE);
   if (map[y]?.[x + 1] === "#") ctx.fillRect(px + TILE - 5, py, 5, TILE);
+}
+
+
+function hasWallNeighbor(x, y, dx, dy) {
+  return map[y + dy]?.[x + dx] === "#";
+}
+
+function drawWallEdgeOverlay(x, y, px, py, isVisible) {
+  if (!seen[y]?.[x] || !isFloorLikeVisualTile(map[y]?.[x])) return;
+
+  const north = hasWallNeighbor(x, y, 0, -1);
+  const south = hasWallNeighbor(x, y, 0, 1);
+  const west = hasWallNeighbor(x, y, -1, 0);
+  const east = hasWallNeighbor(x, y, 1, 0);
+  if (!north && !south && !west && !east) return;
+
+  const alpha = isVisible ? 1 : 0.42;
+  const topLip = Math.max(5, Math.round(TILE * 0.19));
+  const bottomLip = Math.max(3, Math.round(TILE * 0.10));
+  const sideLip = Math.max(3, Math.round(TILE * 0.12));
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  if (north) {
+    ctx.fillStyle = "rgba(76,70,61,0.56)";
+    ctx.fillRect(px, py, TILE, topLip);
+    ctx.fillStyle = "rgba(122,113,96,0.22)";
+    ctx.fillRect(px, py, TILE, 1);
+    ctx.fillStyle = "rgba(30,25,21,0.32)";
+    ctx.fillRect(px, py + topLip - 2, TILE, 2);
+  }
+
+  if (south) {
+    ctx.fillStyle = "rgba(52,45,37,0.44)";
+    ctx.fillRect(px, py + TILE - bottomLip, TILE, bottomLip);
+    ctx.fillStyle = "rgba(116,103,83,0.18)";
+    ctx.fillRect(px, py + TILE - bottomLip, TILE, 1);
+  }
+
+  if (west) {
+    const capTop = north ? topLip - 1 : 0;
+    const capBottom = south ? bottomLip - 1 : 0;
+    ctx.fillStyle = "rgba(65,58,49,0.42)";
+    ctx.fillRect(px, py + capTop, sideLip, TILE - capTop - capBottom);
+    ctx.fillStyle = "rgba(24,21,18,0.24)";
+    ctx.fillRect(px + sideLip - 1, py + capTop, 1, TILE - capTop - capBottom);
+  }
+
+  if (east) {
+    const capTop = north ? topLip - 1 : 0;
+    const capBottom = south ? bottomLip - 1 : 0;
+    ctx.fillStyle = "rgba(58,51,43,0.40)";
+    ctx.fillRect(px + TILE - sideLip, py + capTop, sideLip, TILE - capTop - capBottom);
+    ctx.fillStyle = "rgba(129,118,96,0.13)";
+    ctx.fillRect(px + TILE - sideLip, py + capTop, 1, TILE - capTop - capBottom);
+  }
+
+  if (north && west) {
+    ctx.fillStyle = "rgba(38,32,27,0.24)";
+    ctx.fillRect(px, py, sideLip, topLip);
+  }
+  if (north && east) {
+    ctx.fillStyle = "rgba(38,32,27,0.22)";
+    ctx.fillRect(px + TILE - sideLip, py, sideLip, topLip);
+  }
+  if (south && west) {
+    ctx.fillStyle = "rgba(28,23,19,0.18)";
+    ctx.fillRect(px, py + TILE - bottomLip, sideLip, bottomLip);
+  }
+  if (south && east) {
+    ctx.fillStyle = "rgba(28,23,19,0.16)";
+    ctx.fillRect(px + TILE - sideLip, py + TILE - bottomLip, sideLip, bottomLip);
+  }
+
+  ctx.restore();
 }
 
 function drawVisualDecal(decal, isVisible) {
@@ -1313,8 +1393,9 @@ function draw() {
           : (collapseStarted ? (isVisible ? "#2b1c1c" : "#1d1515") : (isVisible ? "#202020" : "#161616"));
         drawDungeonTileBase(px, py, fallbackColor);
         const atlasDrawn = drawFloorAtlasTile(floorVisual, px, py, isVisible);
-        drawWallFloorShadow(x, y, px, py, isVisible);
         if (!atlasDrawn) drawFloorDetail(floorVisual, px, py, isVisible);
+        drawWallFloorShadow(x, y, px, py, isVisible);
+        drawWallEdgeOverlay(x, y, px, py, isVisible);
       }
 
       if (t === "D") {
