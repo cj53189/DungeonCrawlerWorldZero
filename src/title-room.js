@@ -32,6 +32,19 @@
       color: "#ffd86b"
     },
     {
+      id: "pvpArenaBtn",
+      action: "button",
+      kind: "side",
+      label: "PvP ARENA",
+      subtitle: "Test combat",
+      x: 124,
+      y: 336,
+      w: 142,
+      h: 64,
+      trigger: { x: 94, y: 308, w: 198, h: 120 },
+      color: "#ff8fb8"
+    },
+    {
       id: "characterCreatorBtn",
       action: "button",
       kind: "side",
@@ -726,8 +739,7 @@
     drawStoneFloor();
     drawFloorDetails();
     drawMainDoor(zones[0]);
-    drawSidePlaque(zones[1]);
-    drawSidePlaque(zones[2]);
+    for (const zone of zones.slice(1)) drawSidePlaque(zone);
     drawSelectedCharacter();
   }
 
