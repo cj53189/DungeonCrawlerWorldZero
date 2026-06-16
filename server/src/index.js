@@ -4,6 +4,7 @@ const fs = require("fs");
 const { WebSocketServer } = require("ws");
 const { randomUUID } = require("crypto");
 const { LobbyManager } = require("./rooms");
+const { LeaderboardStore } = require("./leaderboard-store");
 const { applyQuickPartyExtension } = require("./quick-party-extension");
 const { CLIENT_MESSAGES, SERVER_MESSAGES, parseClientMessage, safeSend } = require("./protocol");
 
@@ -11,7 +12,9 @@ applyQuickPartyExtension(LobbyManager);
 
 const PORT = Number(process.env.PORT || 8080);
 const CLIENT_ROOT = path.resolve(__dirname, "../..");
+const LEADERBOARD_FILE = process.env.LEADERBOARD_FILE || path.resolve(__dirname, "../data/leaderboard.json");
 const rooms = new LobbyManager();
+const leaderboard = new LeaderboardStore({ filePath: LEADERBOARD_FILE, maxEntries: 50 });
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -33,6 +36,43 @@ const MIME_TYPES = {
 function sendResponse(res, statusCode, body, headers = {}) {
   res.writeHead(statusCode, headers);
   res.end(body);
+}
+
+function sendJson(res, statusCode, payload) {
+  sendResponse(res, statusCode, JSON.stringify(payload), { "Content-Type": "application/json; charset=utf-8" });
+}
+
+function leaderboardPayload() {
+  return { entries: leaderboard.list(), updatedAt: Date.now() };
+}
+
+function sendLeaderboard(ws) {
+  return safeSend(ws, SERVER_MESSAGES.LEADERBOARD_UPDATE, leaderboardPayload());
+}
+
+function broadcastLeaderboard() {
+  for (const client of wss.clients) sendLeaderboard(client);
+}
+
+function handleApiRequest(req, res) {
+  let requestUrl;
+  try {
+    requestUrl = new URL(req.url || "/", "http://localhost");
+  } catch {
+    sendResponse(res, 400, "Bad Request");
+    return true;
+  }
+
+  if (requestUrl.pathname !== "/api/leaderboard") return false;
+
+  if (req.method === "GET" || req.method === "HEAD") {
+    const body = req.method === "HEAD" ? "" : JSON.stringify(leaderboardPayload());
+    sendResponse(res, 200, body, { "Content-Type": "application/json; charset=utf-8" });
+    return true;
+  }
+
+  sendResponse(res, 405, "Method Not Allowed", { Allow: "GET, HEAD" });
+  return true;
 }
 
 function getStaticFilePath(urlPath) {
@@ -88,7 +128,10 @@ function serveStaticFile(req, res) {
   });
 }
 
-const server = http.createServer(serveStaticFile);
+const server = http.createServer((req, res) => {
+  if (handleApiRequest(req, res)) return;
+  serveStaticFile(req, res);
+});
 const wss = new WebSocketServer({ server });
 
 rooms.startCleanup();
@@ -101,6 +144,7 @@ wss.on("connection", (ws) => {
   const playerId = makePlayerId();
   rooms.registerClient(ws, playerId);
   safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4 });
+  sendLeaderboard(ws);
 
   ws.on("message", (raw) => {
     const { message, error } = parseClientMessage(raw);
@@ -114,6 +158,7 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.HELLO:
           rooms.updateClientProfile(playerId, message.profile || message);
           safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4 });
+          sendLeaderboard(ws);
           break;
         case CLIENT_MESSAGES.PARTY_CREATE:
         case CLIENT_MESSAGES.CREATE_LOBBY:
@@ -164,6 +209,16 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.PLAYER_CORPSE_LOOT_TAKE:
           rooms.handlePlayerCorpseLootTake(playerId, message);
           break;
+        case CLIENT_MESSAGES.LEADERBOARD_REQUEST:
+          sendLeaderboard(ws);
+          break;
+        case CLIENT_MESSAGES.LEADERBOARD_SUBMIT: {
+          const client = rooms.clients.get(playerId);
+          const result = leaderboard.submitScore(playerId, message.score || message, client?.profile || { name: client?.name });
+          if (result.changed) broadcastLeaderboard();
+          else sendLeaderboard(ws);
+          break;
+        }
         default:
           safeSend(ws, SERVER_MESSAGES.ERROR, { message: `Unsupported message type: ${message.type}` });
       }
@@ -178,6 +233,7 @@ wss.on("connection", (ws) => {
 
 server.listen(PORT, () => {
   console.log(`Dungeon Crawler World client and Floor 0 collapse WebSocket server listening on http://localhost:${PORT}`);
+  console.log(`Leaderboard storage: ${LEADERBOARD_FILE}`);
 });
 
 function shutdown() {
