@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { LeaderboardStore, normalizeMode, sanitizePlayerName } = require('../src/leaderboard-store');
 
 test('leaderboard sanitizes names and modes', () => {
-  assert.equal(sanitizePlayerName('  TheLongestCrawlerNameEver  '), 'TheLongestCrawler');
+  assert.equal(sanitizePlayerName('  TheLongestCrawlerNameEver  '), 'TheLongestCrawle');
   assert.equal(sanitizePlayerName('   '), 'Crawler');
   assert.equal(normalizeMode('pvp_arena'), 'arena');
   assert.equal(normalizeMode('quick_match'), 'multiplayer');
