@@ -1,4 +1,6 @@
 node_modules/
 server/node_modules/
+server/data/leaderboard.json
+server/data/leaderboard.json.tmp
 npm-debug.log*
 .DS_Store
