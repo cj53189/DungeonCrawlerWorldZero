@@ -1,0 +1,14 @@
+{
+  "name": "Princess Donut",
+  "image": "princess_donut.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "columns": 3,
+  "rows": 4,
+  "animations": {
+    "front": { "row": 0, "frames": [0, 1, 2] },
+    "back": { "row": 1, "frames": [0, 1, 2] },
+    "left": { "row": 2, "frames": [0, 1, 2] },
+    "right": { "row": 3, "frames": [0, 1, 2] }
+  }
+}
