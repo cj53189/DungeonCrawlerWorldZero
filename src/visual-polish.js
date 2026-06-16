@@ -281,3 +281,38 @@
     updatePet.__princessDonutMotionWrapped = true;
   }
 })();
+
+(function installPetMerchantTestMode() {
+  if (typeof PET_DEFINITIONS !== "undefined") {
+    for (const def of Object.values(PET_DEFINITIONS)) def.cost = 0;
+  }
+
+  if (typeof placePetMerchantInSafeRoom === "function" && !placePetMerchantInSafeRoom.__everyFloorTestMode) {
+    placePetMerchantInSafeRoom = function placePetMerchantEveryFloorForTesting(room) {
+      petMerchant = null;
+      if (!room) return;
+      const candidates = roomTileList(room, 1)
+        .filter(tile => map[tile.y]?.[tile.x] === "S")
+        .filter(tile => Math.hypot(tile.x + 0.5 - player.x / TILE, tile.y + 0.5 - player.y / TILE) > 1.4)
+        .sort((a, b) => Math.hypot(a.x - room.cx, a.y - room.cy) - Math.hypot(b.x - room.cx, b.y - room.cy));
+      const tile = candidates[0] || { x: room.cx, y: room.cy };
+      petMerchant = {
+        id: `floor${currentFloor}_pet_merchant`,
+        type: "pet_merchant",
+        x: tile.x * TILE + TILE / 2,
+        y: tile.y * TILE + TILE / 2,
+        r: 13,
+        floor: currentFloor,
+        options: [...PET_MERCHANT_OPTIONS]
+      };
+    };
+    placePetMerchantInSafeRoom.__everyFloorTestMode = true;
+  }
+
+  if (typeof petMerchantInReach === "function" && !petMerchantInReach.__everyFloorTestMode) {
+    petMerchantInReach = function petMerchantInReachEveryFloorForTesting() {
+      return !!petMerchant && Math.hypot(player.x - petMerchant.x, player.y - petMerchant.y) < player.r + petMerchant.r + 36;
+    };
+    petMerchantInReach.__everyFloorTestMode = true;
+  }
+})();
