@@ -63,3 +63,11 @@
     }
   }, true);
 })();
+
+(function loadCleanUiEditorV2() {
+  if (document.querySelector('script[src="./src/ui-editor-v2.js"]')) return;
+  const script = document.createElement("script");
+  script.src = "./src/ui-editor-v2.js";
+  script.defer = true;
+  document.head.appendChild(script);
+})();
