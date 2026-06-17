@@ -71,3 +71,15 @@
   script.defer = true;
   document.head.appendChild(script);
 })();
+
+(function loadPetVisionRevealFixAfterGameScripts() {
+  function loadFix() {
+    if (document.querySelector('script[src="./src/pet-vision-reveal-fix.js"]')) return;
+    const script = document.createElement("script");
+    script.src = "./src/pet-vision-reveal-fix.js";
+    document.head.appendChild(script);
+  }
+
+  if (document.readyState === "complete") loadFix();
+  else window.addEventListener("load", loadFix, { once: true });
+})();
