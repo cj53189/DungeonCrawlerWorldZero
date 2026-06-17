@@ -23,11 +23,25 @@
     window[name] = wrapped;
   }
 
+  function bindStartButtonFallback(id) {
+    const button = document.getElementById(id);
+    if (!button || button.__autoClosesLobbyPanel) return;
+    button.__autoClosesLobbyPanel = true;
+    button.addEventListener("click", () => {
+      setTimeout(closeLobbyPanelForGameplay, 0);
+      setTimeout(closeLobbyPanelForGameplay, 250);
+    });
+  }
+
   function install() {
     wrapGlobalFunction("startMultiplayerFloor0");
     wrapGlobalFunction("prepareServerLobbyState");
     wrapGlobalFunction("startMockFloorOne");
     wrapGlobalFunction("handleServerFloorStart");
+    bindStartButtonFallback("quickMatchBtn");
+    bindStartButtonFallback("pvpArenaBtn");
+    bindStartButtonFallback("localMultiTestBtn");
+    bindStartButtonFallback("joinPartyBtn");
   }
 
   if (document.readyState === "loading") {
