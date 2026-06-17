@@ -1,0 +1,127 @@
+/* Character Creator mobile landscape hotfix */
+@media (orientation: landscape) and (max-height: 520px), (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  #characterCreatorScreen {
+    align-items: stretch;
+    justify-content: stretch;
+    min-height: 100dvh;
+    padding: 8px 12px;
+    overflow: hidden;
+  }
+
+  #characterCreatorScreen .characterCreatorBox {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    height: calc(100dvh - 16px);
+    display: grid;
+    grid-template-columns: minmax(148px, 36vw) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "header field"
+      "preview name"
+      "preview options"
+      "preview actions";
+    gap: 6px 12px;
+    padding: 10px;
+    overflow: hidden;
+  }
+
+  #characterCreatorScreen .titleEyebrow {
+    grid-area: header;
+    align-self: end;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-align: left;
+  }
+
+  #characterCreatorScreen h1 {
+    grid-area: header;
+    align-self: start;
+    margin: 12px 0 0;
+    font-size: clamp(19px, 5.2vh, 28px);
+    line-height: 0.95;
+    text-align: left;
+  }
+
+  #characterCreatorScreen p {
+    display: none;
+  }
+
+  #characterCreatorScreen .creatorField {
+    grid-area: field;
+    margin: 0;
+    align-self: end;
+    font-size: 9px;
+  }
+
+  #characterCreatorScreen .creatorNameInput {
+    grid-area: name;
+    min-height: 44px;
+    padding: 8px 10px;
+    font-size: 15px;
+  }
+
+  #characterCreatorScreen .creatorOptions {
+    grid-area: options;
+    min-height: 0;
+    overflow-y: auto;
+    gap: 6px;
+    margin: 0;
+    padding-right: 4px;
+  }
+
+  #characterCreatorScreen .creatorCharacterOption {
+    min-height: 44px;
+    padding: 8px 10px;
+    gap: 8px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+
+  #characterCreatorScreen .creatorPreview {
+    grid-area: preview;
+    min-height: 0;
+    height: 100%;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0;
+    padding: 10px;
+    overflow: hidden;
+  }
+
+  #characterCreatorScreen .creatorSpritePreview {
+    width: clamp(58px, 17vh, 72px);
+    height: clamp(58px, 17vh, 72px);
+    flex: 0 0 auto;
+  }
+
+  #characterCreatorScreen .creatorPreviewName,
+  #characterCreatorScreen .creatorPreviewMeta {
+    text-align: center;
+  }
+
+  #characterCreatorScreen .creatorPreviewName {
+    font-size: clamp(14px, 4.2vh, 18px);
+  }
+
+  #characterCreatorScreen .creatorPreviewMeta {
+    font-size: 10px;
+    line-height: 1.2;
+  }
+
+  #characterCreatorScreen .creatorActions {
+    grid-area: actions;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 0;
+    align-self: end;
+  }
+
+  #characterCreatorScreen .creatorActions button {
+    min-height: 44px;
+    padding: 9px 10px;
+  }
+}
