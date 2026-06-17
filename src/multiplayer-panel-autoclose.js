@@ -66,9 +66,19 @@
       }
 
       #multiplayerPanel .panelTitle {
-        gap: 8px;
+        display: block;
         margin-top: 4px;
-        font-size: 12px;
+        color: #ffd86b;
+        font-size: 16px;
+        line-height: 1.15;
+      }
+
+      #multiplayerPanel #mpStatus {
+        display: block;
+      }
+
+      #multiplayerPanel #mpCount {
+        display: none !important;
       }
 
       #multiplayerPanel .partyCode,
@@ -84,39 +94,44 @@
       }
 
       #multiplayerPanel .mpRuleText {
-        max-height: 3.75em;
-        overflow: hidden;
+        display: none !important;
+      }
+
+      #multiplayerPanel .mpConnectionStatus:empty,
+      #multiplayerPanel .partyCode:empty {
+        display: none !important;
       }
 
       #multiplayerPanel .mpMemberList {
-        margin-top: 6px;
+        margin-top: 8px;
         gap: 4px;
       }
 
       #multiplayerPanel .mpMember {
-        padding: 5px 6px;
-        font-size: 10px;
+        padding: 7px 8px;
+        font-size: 11px;
         gap: 6px;
       }
 
       #multiplayerPanel .mpMember span:last-child {
-        font-size: 9px;
+        font-size: 10px;
       }
 
       #multiplayerPanel .mpActions {
         grid-template-columns: 1fr;
-        gap: 6px;
-        margin-top: 8px;
+        gap: 7px;
+        margin-top: 10px;
       }
 
       #multiplayerPanel .mpActions button {
-        min-height: 38px;
-        padding: 8px 10px;
-        font-size: 10px;
+        min-height: 40px;
+        padding: 9px 10px;
+        font-size: 11px;
       }
 
+      #multiplayerPanel .mpActions button[hidden],
       #multiplayerPanel .mpNearbyEmpty {
-        display: none;
+        display: none !important;
       }
 
       @media (orientation: landscape) and (max-height: 520px) {
@@ -153,8 +168,79 @@
     updateArenaBodyClass();
   }
 
+  function compactLobbyTimerText() {
+    if (multiplayer?.stagingEndsAt && typeof formatFloor0CollapseCountdown === "function") {
+      return formatFloor0CollapseCountdown(multiplayer.stagingEndsAt);
+    }
+    if (currentFloor === 0 && typeof formatTimer === "function") return formatTimer(floorTimeLeft || 0);
+    if (multiplayer?.collapseAt && typeof formatTimer === "function") {
+      return formatTimer(Math.max(0, Math.ceil((multiplayer.collapseAt - Date.now()) / 1000)));
+    }
+    return "";
+  }
+
+  function compactLobbyStatusText() {
+    const timer = compactLobbyTimerText();
+    if (isArenaModeActive()) return timer ? `Arena · ${timer}` : "Arena";
+    if (currentFloor === 0) return timer ? `Floor 0 · ${timer}` : "Floor 0";
+    return timer ? `Floor ${currentFloor} · ${timer}` : `Floor ${currentFloor}`;
+  }
+
+  function connectedStatusIsOk() {
+    const network = typeof multiplayerNetwork !== "undefined" ? multiplayerNetwork : null;
+    const raw = multiplayer?.networkStatus || (network?.connected ? "connected" : "offline");
+    return raw === "connected" || !!network?.connected;
+  }
+
+  function shouldShowDevLobbyButtons() {
+    return window.DCW_SHOW_DEV_LOBBY === true || localStorage.getItem("dcw.showDevLobby") === "true";
+  }
+
+  function simplifyLobbyPanel() {
+    const status = document.getElementById("mpStatus");
+    const count = document.getElementById("mpCount");
+    const partyCode = document.getElementById("mpPartyCode");
+    const connection = document.getElementById("mpConnectionStatus");
+    const rule = document.getElementById("mpRuleText");
+    const copy = document.getElementById("mpCopyInviteBtn");
+    const cancel = document.getElementById("mpCancelBtn");
+
+    if (status) status.textContent = compactLobbyStatusText();
+    if (count) {
+      count.textContent = "";
+      count.hidden = true;
+    }
+
+    if (partyCode) {
+      const code = multiplayer?.lobbyCode || multiplayer?.partyCode || "";
+      partyCode.textContent = code ? `Code: ${code}` : "";
+      partyCode.hidden = !code;
+    }
+
+    if (connection) {
+      connection.textContent = connectedStatusIsOk() ? "" : connection.textContent;
+      connection.hidden = connectedStatusIsOk();
+    }
+
+    if (rule) {
+      rule.textContent = "";
+      rule.hidden = true;
+    }
+
+    for (const id of ["mpAddMockBtn", "mpFillMockBtn", "mpForceStartBtn"]) {
+      const button = document.getElementById(id);
+      if (button) button.hidden = !shouldShowDevLobbyButtons();
+    }
+
+    if (copy && !copy.classList.contains("copyStatusOk") && !copy.classList.contains("copyStatusWarn")) {
+      copy.textContent = (multiplayer?.lobbyCode || multiplayer?.partyCode) ? "Copy Invite" : "Copy Link";
+    }
+    if (cancel) cancel.textContent = "Leave";
+  }
+
   function pruneLobbyPanel() {
     updateArenaBodyClass();
+    simplifyLobbyPanel();
     const nearbyList = document.getElementById("mpNearbyCrawlerList");
     if (nearbyList) {
       const hasNearbyRows = Array.from(nearbyList.children).some(child => !child.classList.contains("mpNearbyEmpty"));
@@ -180,6 +266,45 @@
 
   function closeLobbyPanelForGameplay() {
     setLobbyPanelOpenClean(false);
+  }
+
+  function getRemainingCrawlerCount() {
+    if (!multiplayer?.enabled) return null;
+    const remainingIds = new Set();
+    const localId = multiplayer.playerId || "local_crawler";
+    if (player.hp > 0 && multiplayer.localStatus !== "downed" && multiplayer.localFloor0Status !== "failed") remainingIds.add(localId);
+
+    for (const member of multiplayer.lobbyMembers || []) {
+      if (!member?.id || member.id === localId) continue;
+      if (member.floor0Status === "failed") continue;
+      remainingIds.add(member.id);
+    }
+
+    if (multiplayer.remotePlayers instanceof Map) {
+      for (const [id, crawler] of multiplayer.remotePlayers.entries()) {
+        if (!id || id === localId) continue;
+        if (crawler?.status === "downed" || crawler?.status === "failed") continue;
+        if (Number(crawler?.hp ?? 1) <= 0) continue;
+        remainingIds.add(id);
+      }
+    }
+
+    return remainingIds.size || (player.hp > 0 ? 1 : 0);
+  }
+
+  function patchRecapRemainingCrawlers() {
+    const original = window.showSafeRoomRecap;
+    if (typeof original !== "function" || original.__multiplayerUiCleanupWrapped) return;
+    window.showSafeRoomRecap = function showSafeRoomRecapWithRemainingCrawlers(...args) {
+      const result = original.apply(this, args);
+      const remaining = getRemainingCrawlerCount();
+      const statsBox = document.getElementById("recapStats");
+      if (statsBox && remaining !== null) {
+        statsBox.insertAdjacentHTML("beforeend", `<div class="recapLine"><span>Crawlers Remaining</span><span>${remaining}</span></div>`);
+      }
+      return result;
+    };
+    window.showSafeRoomRecap.__multiplayerUiCleanupWrapped = true;
   }
 
   function wrapGlobalFunction(name, after) {
@@ -310,6 +435,7 @@
     patchReturnToTitle();
     patchServerMessageHandling();
     patchPanelUpdates();
+    patchRecapRemainingCrawlers();
     patchArenaFloorEngraving();
     patchArenaCanvasOverlay();
 
