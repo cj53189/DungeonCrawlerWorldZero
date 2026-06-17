@@ -18,6 +18,11 @@
     return !!prompt && prompt.classList.contains("open");
   }
 
+  function leaderboardIsOpen() {
+    const panel = document.getElementById("leaderboardPanel");
+    return !!panel && panel.style.display === "block";
+  }
+
   function resetTitleRoomToSpawn() {
     const screen = document.getElementById("titleScreen");
     if (!screen) return;
@@ -39,9 +44,22 @@
     if (choice === "cancel" || clickedBackdrop) setTimeout(resetTitleRoomToSpawn, 0);
   }, true);
 
+  document.addEventListener("click", event => {
+    if (!leaderboardIsOpen()) return;
+    const closeControl = event.target.closest?.("#closeLeaderboardBtn, #backFromLeaderboardBtn");
+    if (closeControl) setTimeout(resetTitleRoomToSpawn, 0);
+  }, true);
+
   document.addEventListener("keydown", event => {
-    if (!modePromptIsOpen()) return;
     const key = event.key?.toLowerCase?.();
-    if (key === "escape" || key === "backspace") setTimeout(resetTitleRoomToSpawn, 0);
+    if ((key === "escape" || key === "backspace") && modePromptIsOpen()) {
+      setTimeout(resetTitleRoomToSpawn, 0);
+      return;
+    }
+    if ((key === "escape" || key === "backspace") && leaderboardIsOpen()) {
+      const hide = window.DCWZLeaderboard?.hide;
+      if (typeof hide === "function") hide();
+      setTimeout(resetTitleRoomToSpawn, 0);
+    }
   }, true);
 })();
