@@ -20,9 +20,7 @@
     style.id = "multiplayerUiCleanupStyles";
     style.textContent = `
       body:not(.multiplayerActive) #mpOpenPanelBtn,
-      body.titleActive #mpOpenPanelBtn,
-      body.pvpArenaActive #mpOpenPanelBtn,
-      body.pvpArenaActive #multiplayerPanel {
+      body.titleActive #mpOpenPanelBtn {
         display: none !important;
       }
 
@@ -172,7 +170,7 @@
     updateArenaBodyClass();
     const panel = document.getElementById("multiplayerPanel");
     const openButton = document.getElementById("mpOpenPanelBtn");
-    const canShowLobbyUi = !!(multiplayer?.enabled && !isArenaModeActive() && !isTitleModeActive());
+    const canShowLobbyUi = !!(multiplayer?.enabled && !isTitleModeActive());
     const shouldOpenPanel = !!(isOpen && canShowLobbyUi);
 
     if (panel) panel.style.display = shouldOpenPanel ? "block" : "none";
@@ -256,10 +254,19 @@
     window.updateMultiplayerPanel = function updateMultiplayerPanelWithUiCleanup(...args) {
       const result = original.apply(this, args);
       pruneLobbyPanel();
-      if (isArenaModeActive()) setLobbyPanelOpenClean(false);
       return result;
     };
     window.updateMultiplayerPanel.__multiplayerUiCleanupWrapped = true;
+  }
+
+  function patchArenaFloorEngraving() {
+    const original = window.drawEngravedRoomNames;
+    if (typeof original !== "function" || original.__multiplayerUiCleanupWrapped) return;
+    window.drawEngravedRoomNames = function drawEngravedRoomNamesWithoutArenaTitle(...args) {
+      if (isArenaModeActive()) return;
+      return original.apply(this, args);
+    };
+    window.drawEngravedRoomNames.__multiplayerUiCleanupWrapped = true;
   }
 
   function bindStartButtonFallback(id, { arena = false } = {}) {
@@ -280,6 +287,7 @@
     patchReturnToTitle();
     patchServerMessageHandling();
     patchPanelUpdates();
+    patchArenaFloorEngraving();
 
     wrapGlobalFunction("startMultiplayerFloor0", () => closeLobbyPanelForGameplay());
     wrapGlobalFunction("prepareServerLobbyState", () => closeLobbyPanelForGameplay());
