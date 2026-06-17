@@ -13,6 +13,7 @@ applyQuickPartyExtension(LobbyManager);
 const PORT = Number(process.env.PORT || 8080);
 const CLIENT_ROOT = path.resolve(__dirname, "../..");
 const LEADERBOARD_FILE = process.env.LEADERBOARD_FILE || path.resolve(__dirname, "../data/leaderboard.json");
+const API_CORS_ORIGIN = process.env.API_CORS_ORIGIN || "*";
 const rooms = new LobbyManager();
 const leaderboard = new LeaderboardStore({ filePath: LEADERBOARD_FILE, maxEntries: 50 });
 
@@ -33,13 +34,24 @@ const MIME_TYPES = {
   ".ogg": "audio/ogg"
 };
 
+const API_HEADERS = {
+  "Access-Control-Allow-Origin": API_CORS_ORIGIN,
+  "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Accept",
+  "Cache-Control": "no-store"
+};
+
 function sendResponse(res, statusCode, body, headers = {}) {
   res.writeHead(statusCode, headers);
   res.end(body);
 }
 
-function sendJson(res, statusCode, payload) {
-  sendResponse(res, statusCode, JSON.stringify(payload), { "Content-Type": "application/json; charset=utf-8" });
+function sendJson(res, statusCode, payload, headers = {}) {
+  sendResponse(res, statusCode, JSON.stringify(payload), {
+    "Content-Type": "application/json; charset=utf-8",
+    ...API_HEADERS,
+    ...headers
+  });
 }
 
 function leaderboardPayload() {
@@ -54,24 +66,75 @@ function broadcastLeaderboard() {
   for (const client of wss.clients) sendLeaderboard(client);
 }
 
+function readJsonBody(req, maxBytes = 16 * 1024) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.setEncoding("utf8");
+    req.on("data", chunk => {
+      body += chunk;
+      if (body.length > maxBytes) {
+        reject(Object.assign(new Error("Request body too large."), { statusCode: 413 }));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      if (!body.trim()) {
+        resolve({});
+        return;
+      }
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(Object.assign(new Error("Invalid JSON body."), { statusCode: 400 }));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+async function handleLeaderboardPost(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const score = body.score || body;
+    const profile = body.profile || {};
+    const playerId = body.playerId || `http_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+    const result = leaderboard.submitScore(playerId, score, profile);
+    if (result.changed) broadcastLeaderboard();
+    sendJson(res, 200, { ...leaderboardPayload(), changed: result.changed, entry: result.entry });
+  } catch (err) {
+    const statusCode = err.statusCode || 500;
+    sendJson(res, statusCode, { error: err.message || "Leaderboard submit failed." });
+  }
+}
+
 function handleApiRequest(req, res) {
   let requestUrl;
   try {
     requestUrl = new URL(req.url || "/", "http://localhost");
   } catch {
-    sendResponse(res, 400, "Bad Request");
+    sendResponse(res, 400, "Bad Request", API_HEADERS);
     return true;
   }
 
   if (requestUrl.pathname !== "/api/leaderboard") return false;
 
-  if (req.method === "GET" || req.method === "HEAD") {
-    const body = req.method === "HEAD" ? "" : JSON.stringify(leaderboardPayload());
-    sendResponse(res, 200, body, { "Content-Type": "application/json; charset=utf-8" });
+  if (req.method === "OPTIONS") {
+    sendResponse(res, 204, "", API_HEADERS);
     return true;
   }
 
-  sendResponse(res, 405, "Method Not Allowed", { Allow: "GET, HEAD" });
+  if (req.method === "GET" || req.method === "HEAD") {
+    const body = req.method === "HEAD" ? "" : JSON.stringify(leaderboardPayload());
+    sendResponse(res, 200, body, { "Content-Type": "application/json; charset=utf-8", ...API_HEADERS });
+    return true;
+  }
+
+  if (req.method === "POST") {
+    handleLeaderboardPost(req, res);
+    return true;
+  }
+
+  sendResponse(res, 405, "Method Not Allowed", { Allow: "GET, HEAD, POST, OPTIONS", ...API_HEADERS });
   return true;
 }
 
