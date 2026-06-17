@@ -269,6 +269,29 @@
     window.drawEngravedRoomNames.__multiplayerUiCleanupWrapped = true;
   }
 
+  function patchArenaCanvasOverlay() {
+    if (CanvasRenderingContext2D.prototype.__multiplayerArenaOverlayPatched) return;
+    const originalFillRect = CanvasRenderingContext2D.prototype.fillRect;
+    const originalFillText = CanvasRenderingContext2D.prototype.fillText;
+
+    CanvasRenderingContext2D.prototype.fillRect = function fillRectWithoutArenaInfoCard(x, y, width, height, ...rest) {
+      if (this.canvas?.id === "game" && isArenaModeActive() && Math.round(x) === 14 && Math.round(y) === 72 && Math.round(width) === 245 && Math.round(height) === 62) {
+        return;
+      }
+      return originalFillRect.call(this, x, y, width, height, ...rest);
+    };
+
+    CanvasRenderingContext2D.prototype.fillText = function fillTextWithoutArenaInfoCard(text, x, y, ...rest) {
+      const value = String(text || "");
+      if (this.canvas?.id === "game" && isArenaModeActive() && (value === "PvP Arena Test" || value === "PvP Enabled · No escape")) {
+        return;
+      }
+      return originalFillText.call(this, text, x, y, ...rest);
+    };
+
+    CanvasRenderingContext2D.prototype.__multiplayerArenaOverlayPatched = true;
+  }
+
   function bindStartButtonFallback(id, { arena = false } = {}) {
     const button = document.getElementById(id);
     if (!button || button.__multiplayerUiCleanupBound) return;
@@ -288,6 +311,7 @@
     patchServerMessageHandling();
     patchPanelUpdates();
     patchArenaFloorEngraving();
+    patchArenaCanvasOverlay();
 
     wrapGlobalFunction("startMultiplayerFloor0", () => closeLobbyPanelForGameplay());
     wrapGlobalFunction("prepareServerLobbyState", () => closeLobbyPanelForGameplay());
