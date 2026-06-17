@@ -1,10 +1,11 @@
 // Local + server-backed title-screen leaderboard for single-player and multiplayer runs.
-// LocalStorage keeps offline records; the WebSocket server stores shared records when connected.
+// LocalStorage keeps offline records; HTTP/WebSocket sync keeps shared records global when the server is available.
 (function installDungeonCrawlerLeaderboard() {
   "use strict";
 
   const STORAGE_KEY = "dcwz.leaderboard.v1";
   const MAX_ENTRIES = 25;
+  const LEADERBOARD_API_URL = window.DCW_LEADERBOARD_API_URL || "/api/leaderboard";
   const MODE_LABELS = {
     single: "Single Player",
     multiplayer: "Multiplayer",
@@ -13,8 +14,12 @@
 
   let lastProgressSignature = "";
   let lastServerSubmitSignature = "";
+  let lastHttpSubmitSignature = "";
   let lastLocalPushPlayerId = null;
   let serverLeaderboardEntries = [];
+  let serverLeaderboardStatus = "checking";
+  let serverLeaderboardStatusMessage = "Server leaderboard: checking...";
+  let httpLoadInFlight = null;
 
   function safeNumber(value, fallback = 0) {
     const number = Number(value);
@@ -102,7 +107,7 @@
   }
 
   function readLeaderboard() {
-    return mergeLeaderboardEntries(readLocalLeaderboard(), serverLeaderboardEntries);
+    return mergeLeaderboardEntries(serverLeaderboardEntries, readLocalLeaderboard());
   }
 
   function writeLeaderboard(entries) {
@@ -113,6 +118,23 @@
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(payload)); } catch {}
     return payload.entries;
+  }
+
+  function setLeaderboardServerStatus(status, message) {
+    serverLeaderboardStatus = status;
+    serverLeaderboardStatusMessage = message || "";
+    const syncStatus = document.getElementById("leaderboardSyncStatus");
+    if (syncStatus) syncStatus.textContent = getLeaderboardServerStatusText();
+  }
+
+  function getLeaderboardServerStatusText() {
+    if (serverLeaderboardStatusMessage) return serverLeaderboardStatusMessage;
+    if (serverLeaderboardStatus === "online") {
+      return `Server leaderboard: online · ${serverLeaderboardEntries.length} shared record${serverLeaderboardEntries.length === 1 ? "" : "s"}`;
+    }
+    if (serverLeaderboardStatus === "saving") return "Server leaderboard: saving score...";
+    if (serverLeaderboardStatus === "checking") return "Server leaderboard: checking...";
+    return "Server leaderboard: unavailable · showing local records";
   }
 
   function canRecordLeaderboardProgress() {
@@ -143,42 +165,117 @@
     return String(multiplayerNetwork?.playerId || multiplayer?.playerId || "server");
   }
 
+  function applyServerLeaderboardEntries(entries = []) {
+    serverLeaderboardEntries = Array.isArray(entries) ? entries.map(normalizeEntry).filter(entry => entry.name) : [];
+    setLeaderboardServerStatus("online", `Server leaderboard: online · ${serverLeaderboardEntries.length} shared record${serverLeaderboardEntries.length === 1 ? "" : "s"}`);
+    if (isLeaderboardPanelOpen()) renderLeaderboardEntries();
+  }
+
+  async function loadLeaderboardFromHttp(reason = "load") {
+    if (typeof fetch !== "function") {
+      setLeaderboardServerStatus("offline", "Server leaderboard: unavailable · fetch not supported");
+      return false;
+    }
+    if (httpLoadInFlight) return httpLoadInFlight;
+    setLeaderboardServerStatus("checking", "Server leaderboard: checking...");
+    httpLoadInFlight = fetch(LEADERBOARD_API_URL, {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      cache: "no-store"
+    })
+      .then(async response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        applyServerLeaderboardEntries(payload.entries || []);
+        return true;
+      })
+      .catch(err => {
+        console.warn(`Leaderboard HTTP load failed (${reason}):`, err);
+        setLeaderboardServerStatus("offline", "Server leaderboard: unavailable · showing local records");
+        return false;
+      })
+      .finally(() => {
+        httpLoadInFlight = null;
+      });
+    return httpLoadInFlight;
+  }
+
+  async function submitLeaderboardScoreOverHttp(entry, reason = "progress") {
+    if (!entry || typeof fetch !== "function") return false;
+    const normalized = normalizeEntry(entry);
+    const signature = `${normalized.name}|${normalized.highestFloor}|${normalized.highestGold}|${(normalized.modes || []).join("+")}`;
+    if (signature === lastHttpSubmitSignature && reason === "hud") return false;
+    lastHttpSubmitSignature = signature;
+    setLeaderboardServerStatus("saving", "Server leaderboard: saving score...");
+    try {
+      const response = await fetch(LEADERBOARD_API_URL, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          score: {
+            name: normalized.name,
+            highestFloor: normalized.highestFloor,
+            highestGold: normalized.highestGold,
+            modes: normalized.modes,
+            modeKey: normalized.modes?.[0] || "single",
+            updatedAt: normalized.updatedAt
+          }
+        })
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      applyServerLeaderboardEntries(payload.entries || []);
+      return true;
+    } catch (err) {
+      console.warn(`Leaderboard HTTP submit failed (${reason}):`, err);
+      setLeaderboardServerStatus("offline", "Server leaderboard: save failed · showing local records");
+      return false;
+    }
+  }
+
   function submitLeaderboardScoreToServer(entry, reason = "progress") {
-    if (!entry || !isServerLeaderboardReady()) return false;
+    if (!entry) return false;
     const normalized = normalizeEntry(entry);
     const signature = `${normalized.name}|${normalized.highestFloor}|${normalized.highestGold}|${(normalized.modes || []).join("+")}`;
     if (signature === lastServerSubmitSignature && reason === "hud") return false;
     lastServerSubmitSignature = signature;
-    return sendMultiplayerMessage("leaderboard_submit", {
-      score: {
-        name: normalized.name,
-        highestFloor: normalized.highestFloor,
-        highestGold: normalized.highestGold,
-        modes: normalized.modes,
-        modeKey: normalized.modes?.[0] || "single",
-        updatedAt: normalized.updatedAt
-      }
-    });
+
+    let sentOverWebSocket = false;
+    if (isServerLeaderboardReady()) {
+      sentOverWebSocket = sendMultiplayerMessage("leaderboard_submit", {
+        score: {
+          name: normalized.name,
+          highestFloor: normalized.highestFloor,
+          highestGold: normalized.highestGold,
+          modes: normalized.modes,
+          modeKey: normalized.modes?.[0] || "single",
+          updatedAt: normalized.updatedAt
+        }
+      });
+    }
+
+    submitLeaderboardScoreOverHttp(normalized, reason);
+    return sentOverWebSocket;
   }
 
   function requestServerLeaderboard() {
-    if (!isServerLeaderboardReady()) return false;
-    return sendMultiplayerMessage("leaderboard_request");
+    const sentOverWebSocket = isServerLeaderboardReady() ? sendMultiplayerMessage("leaderboard_request") : false;
+    loadLeaderboardFromHttp("request");
+    return sentOverWebSocket;
   }
 
   function pushLocalLeaderboardToServer(reason = "sync") {
-    if (!isServerLeaderboardReady()) return false;
+    const entries = readLocalLeaderboard();
+    if (!entries.length) return false;
+
     const serverPlayerId = getCurrentServerPlayerId();
     if (lastLocalPushPlayerId === serverPlayerId && reason !== "open") return false;
-    const entries = readLocalLeaderboard();
     for (const entry of entries) submitLeaderboardScoreToServer(entry, reason);
     lastLocalPushPlayerId = serverPlayerId;
-    return entries.length > 0;
-  }
-
-  function applyServerLeaderboardEntries(entries = []) {
-    serverLeaderboardEntries = Array.isArray(entries) ? entries.map(normalizeEntry).filter(entry => entry.name) : [];
-    if (isLeaderboardPanelOpen()) renderLeaderboardEntries();
+    return true;
   }
 
   function recordCurrentLeaderboardProgress(reason = "progress") {
@@ -284,7 +381,7 @@
         <button id="closeLeaderboardBtn" class="panelClose" type="button" aria-label="Close leaderboard">×</button>
         <div class="titleEyebrow">Crawler Records</div>
         <h1 id="leaderboardTitle">Leaderboard</h1>
-        <p>Best floor and best gold are tracked locally while offline and shared through the server when connected.</p>
+        <p>Best floor and best gold are cached locally for offline play and synced to the global server leaderboard when available.</p>
         <div id="leaderboardSyncStatus" class="leaderboardSync">Server leaderboard: checking...</div>
         <div id="leaderboardEntries" class="leaderboardList" aria-live="polite"></div>
         <div class="titleActions leaderboardActions">
@@ -325,11 +422,7 @@
     container.innerHTML = "";
 
     const syncStatus = document.getElementById("leaderboardSyncStatus");
-    if (syncStatus) {
-      syncStatus.textContent = isServerLeaderboardReady()
-        ? `Server leaderboard: connected · ${serverLeaderboardEntries.length} shared record${serverLeaderboardEntries.length === 1 ? "" : "s"}`
-        : "Server leaderboard: offline · showing local records";
-    }
+    if (syncStatus) syncStatus.textContent = getLeaderboardServerStatusText();
 
     const header = document.createElement("div");
     header.className = "leaderboardRow header";
@@ -464,6 +557,7 @@
     ensureLeaderboardUi();
     installLeaderboardHooks();
     installServerMessageHook();
+    loadLeaderboardFromHttp("boot");
     window.DCWZLeaderboard = Object.freeze({
       read: readLeaderboard,
       readLocal: readLocalLeaderboard,
@@ -473,6 +567,8 @@
       show: showLeaderboardPanel,
       hide: hideLeaderboardPanel,
       requestServer: requestServerLeaderboard,
+      requestHttp: loadLeaderboardFromHttp,
+      submitHttp: submitLeaderboardScoreOverHttp,
       applyServerEntries: applyServerLeaderboardEntries
     });
   }
