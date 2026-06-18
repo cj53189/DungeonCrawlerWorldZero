@@ -22,7 +22,11 @@ const CLIENT_MESSAGES = Object.freeze({
   PVP_DAMAGE: "pvp_damage",
   PLAYER_CORPSE_LOOT_TAKE: "player_corpse_loot_take",
   LEADERBOARD_SUBMIT: "leaderboard_submit",
-  LEADERBOARD_REQUEST: "leaderboard_request"
+  LEADERBOARD_REQUEST: "leaderboard_request",
+  VOICE_OFFER: "voice_offer",
+  VOICE_ANSWER: "voice_answer",
+  VOICE_ICE_CANDIDATE: "voice_ice_candidate",
+  VOICE_DISCONNECT: "voice_disconnect"
 });
 
 const SERVER_MESSAGES = Object.freeze({
@@ -52,6 +56,10 @@ const SERVER_MESSAGES = Object.freeze({
   PLAYER_CORPSE_LOOT_TAKEN: "player_corpse_loot_taken",
   PLAYER_CORPSE_LOOTED: "player_corpse_looted",
   LEADERBOARD_UPDATE: "leaderboard_update",
+  VOICE_OFFER: "voice_offer",
+  VOICE_ANSWER: "voice_answer",
+  VOICE_ICE_CANDIDATE: "voice_ice_candidate",
+  VOICE_DISCONNECT: "voice_disconnect",
   ERROR: "error"
 });
 
