@@ -38,6 +38,10 @@ function initVoiceChat() {
     if (event.code !== voiceChat.pushToTalkKey) return;
     setVoicePushToTalkActive(false);
   });
+  window.addEventListener("blur", () => setVoicePushToTalkActive(false));
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") setVoicePushToTalkActive(false);
+  });
 
   startVoiceProximityTimer();
   startVoiceLifecycleTimer();
@@ -276,6 +280,7 @@ function isVoiceTypingTarget(target) {
 function setVoiceChatMode(mode) {
   initVoiceChat();
   const nextMode = mode === "push_to_talk" ? "push_to_talk" : "off";
+  if (nextMode !== "push_to_talk") setVoicePushToTalkActive(false);
   voiceChat.mode = nextMode;
   voiceChat.enabled = nextMode !== "off";
   if (!voiceChat.enabled) voiceChat.selfMuted = true;
@@ -330,6 +335,7 @@ function startVoiceForLobby() {
 }
 
 function stopVoiceChat(reason = "stopped") {
+  setVoicePushToTalkActive(false);
   const knownPeerIds = Array.from(new Set([
     ...voiceChat.peers.keys(),
     ...voiceChat.remoteAudio.keys(),

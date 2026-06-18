@@ -112,6 +112,7 @@ function setupTouchControls() {
   const btnAttack = document.getElementById("btnAttack");
   const attackBase = document.getElementById("attackStickBase");
   const btnInteract = document.getElementById("btnInteract");
+  const btnVoiceTalk = document.getElementById("btnVoiceTalk");
   const btnDodge = document.getElementById("btnDodge");
   const btnLog = document.getElementById("btnLog");
   const btnRecap = document.getElementById("btnRecap");
@@ -275,8 +276,37 @@ function setupTouchControls() {
     el.addEventListener("click", fire);
   };
 
+  const bindVoiceTalkButton = (el) => {
+    if (!el || el.dataset.voiceTalkBound === "true") return;
+    el.dataset.voiceTalkBound = "true";
+
+    const isVoicePushToTalkEnabled = () => typeof voiceChat !== "undefined" && voiceChat.mode === "push_to_talk";
+    const handlePress = (e) => {
+      prevent(e);
+      if (!isVoicePushToTalkEnabled()) {
+        if (typeof updateVoiceTouchButton === "function") updateVoiceTouchButton();
+        if (typeof announcer === "function") announcer("Enable Voice Chat in Settings first.");
+        return;
+      }
+      if (typeof setVoicePushToTalkActive === "function") setVoicePushToTalkActive(true);
+    };
+    const handleRelease = (e) => {
+      prevent(e);
+      if (typeof setVoicePushToTalkActive === "function") setVoicePushToTalkActive(false);
+    };
+
+    el.addEventListener("pointerdown", handlePress, { passive: false });
+    el.addEventListener("pointerup", handleRelease, { passive: false });
+    el.addEventListener("pointercancel", handleRelease, { passive: false });
+    el.addEventListener("pointerleave", handleRelease, { passive: false });
+    el.addEventListener("touchstart", handlePress, { passive: false });
+    el.addEventListener("touchend", handleRelease, { passive: false });
+    el.addEventListener("touchcancel", handleRelease, { passive: false });
+  };
+
   bindAttackStick();
   bindButton(btnInteract, interact);
+  bindVoiceTalkButton(btnVoiceTalk);
   bindButton(btnDodge, triggerDodge);
   bindButton(btnLog, toggleLogPanelMobile);
   bindButton(btnRecap, toggleRecapPanelMobile);

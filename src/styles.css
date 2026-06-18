@@ -290,6 +290,34 @@
       transition: box-shadow 0.08s ease-out, background 0.08s ease-out;
     }
     #btnInteract { right: 116px; bottom: 100px; width: 64px; height: 64px; }
+    .voiceTalkButton {
+      right: 184px;
+      bottom: 100px;
+      width: 82px;
+      height: 64px;
+      border-radius: 22px;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      background: rgba(124,247,255,0.20);
+      border-color: rgba(124,247,255,0.56);
+      box-shadow: 0 0 18px rgba(124,247,255,0.14);
+    }
+    .voiceTalkButton.talking {
+      width: 96px;
+      background: rgba(87,205,112,0.38);
+      border-color: rgba(126,255,157,0.82);
+      box-shadow: 0 0 24px rgba(87,205,112,0.34);
+      transform: scale(1.04);
+    }
+    .voiceTalkButton.disabled {
+      display: flex;
+      opacity: 0.72;
+      color: rgba(255,255,255,0.84);
+      background: rgba(120,120,120,0.24);
+      border-color: rgba(255,255,255,0.34);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
     #btnDodge {
       right: 146px;
       bottom: 26px;
@@ -630,6 +658,7 @@
   
 .hudToggle.locked, .hudToggle:disabled { opacity: 0.62; cursor: not-allowed; }
 .touchButton.disabled { display: none; }
+.touchButton.voiceTalkButton.disabled { display: flex; }
 
 #titleScreen {
   position: fixed;

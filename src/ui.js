@@ -342,11 +342,26 @@ function updateVoiceChatSettingsUI() {
   }
 }
 
+function updateVoiceTouchButton() {
+  const button = document.getElementById("btnVoiceTalk");
+  if (!button) return;
+
+  const enabled = typeof voiceChat !== "undefined" && voiceChat.mode === "push_to_talk";
+  const talking = enabled && typeof isLocalVoiceTransmitting === "function" && isLocalVoiceTransmitting();
+
+  button.disabled = !enabled;
+  button.textContent = !enabled ? "MIC OFF" : talking ? "TALKING" : "TALK";
+  button.classList.toggle("talking", talking);
+  button.classList.toggle("disabled", !enabled);
+}
+
 function updateVoiceChatUi() {
   updateVoiceChatSettingsUI();
+  updateVoiceTouchButton();
 }
 
 window.updateVoiceChatUi = updateVoiceChatUi;
+window.updateVoiceTouchButton = updateVoiceTouchButton;
 
 async function toggleVoiceChatFromSettings() {
   const active = typeof voiceChat !== "undefined" && voiceChat.mode === "push_to_talk";
@@ -358,7 +373,7 @@ async function toggleVoiceChatFromSettings() {
     if (typeof requestVoiceMicrophone === "function") await requestVoiceMicrophone();
     if (typeof startVoiceForLobby === "function") startVoiceForLobby();
   }
-  updateVoiceChatSettingsUI();
+  updateVoiceChatUi();
 }
 function setupUiLayoutEditor() {
   if (document.body.dataset.settingsBound !== "true") {
