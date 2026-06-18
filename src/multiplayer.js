@@ -35,6 +35,7 @@ function isGameplayUpdatePaused() {
 }
 
 function resetMultiplayerState() {
+  if (typeof stopVoiceChat === "function") stopVoiceChat("left_lobby");
   multiplayer.enabled = false;
   multiplayer.lobbyCode = null;
   multiplayer.partyCode = null;
@@ -362,6 +363,7 @@ function returnToTitle() {
   pendingFloorAdvance = false;
   if (typeof resetTransientInputState === "function") resetTransientInputState();
   if (typeof resetPlayerDodgeState === "function") resetPlayerDodgeState();
+  if (typeof stopVoiceChat === "function") stopVoiceChat("left_lobby");
   if (typeof requestServerLeaveLobby === "function") requestServerLeaveLobby();
   resetMultiplayerState();
   setGameMode(GAME_MODES.TITLE);

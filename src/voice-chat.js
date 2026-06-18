@@ -10,6 +10,9 @@ var voiceChat = {
   localSpeaking: false,
   remoteSpeaking: new Map(),
   proximityTimer: null,
+  lifecycleTimer: null,
+  pendingConnections: new Set(),
+  remoteLastSeen: new Map(),
   selfMuted: true,
   initialized: false,
   lastError: null
@@ -19,6 +22,8 @@ const VOICE_ICE_CONFIG = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }
 const VOICE_FULL_VOLUME_TILES = 2;
 const VOICE_MAX_RANGE_TILES = 8;
 const VOICE_PROXIMITY_UPDATE_MS = 200;
+const VOICE_LIFECYCLE_SYNC_MS = 1000;
+const VOICE_REMOTE_STALE_MS = 5000;
 const VOICE_FALLBACK_TILE_SIZE = 32;
 
 function initVoiceChat() {
@@ -35,6 +40,7 @@ function initVoiceChat() {
   });
 
   startVoiceProximityTimer();
+  startVoiceLifecycleTimer();
   updateLocalVoiceTrackState();
 }
 
@@ -47,6 +53,17 @@ function stopVoiceProximityTimer() {
   if (!voiceChat.proximityTimer) return;
   clearInterval(voiceChat.proximityTimer);
   voiceChat.proximityTimer = null;
+}
+
+function startVoiceLifecycleTimer() {
+  if (voiceChat.lifecycleTimer) return;
+  voiceChat.lifecycleTimer = setInterval(syncVoicePeersToMultiplayerState, VOICE_LIFECYCLE_SYNC_MS);
+}
+
+function stopVoiceLifecycleTimer() {
+  if (!voiceChat.lifecycleTimer) return;
+  clearInterval(voiceChat.lifecycleTimer);
+  voiceChat.lifecycleTimer = null;
 }
 
 function getVoiceTileSize() {
@@ -95,6 +112,61 @@ function updateVoiceProximityVolumes() {
   if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
 }
 
+
+function shouldHaveVoicePeer(playerId) {
+  const multiplayerState = typeof multiplayer !== "undefined" ? multiplayer : null;
+  if (!isVoiceChatEnabled()) return false;
+  if (!multiplayerState?.enabled || !multiplayerState.usingServer || !multiplayerState.playerId) return false;
+  if (!playerId || playerId === multiplayerState.playerId) return false;
+  const crawler = multiplayerState.remotePlayers?.get?.(playerId);
+  if (!crawler) return false;
+  const currentFloorValue = typeof currentFloor !== "undefined" ? currentFloor : crawler.currentFloor;
+  const localFloor = Number.isFinite(Number(currentFloorValue)) ? Number(currentFloorValue) : currentFloorValue;
+  const remoteFloor = Number.isFinite(Number(crawler.currentFloor)) ? Number(crawler.currentFloor) : localFloor;
+  if (remoteFloor !== localFloor) return false;
+  if (crawler.status === "failed") return false;
+  return true;
+}
+
+function syncVoicePeersToMultiplayerState() {
+  if (!voiceChat.pendingConnections) voiceChat.pendingConnections = new Set();
+  if (!voiceChat.remoteLastSeen) voiceChat.remoteLastSeen = new Map();
+  if (!isVoiceChatEnabled()) {
+    if (voiceChat.peers.size || voiceChat.remoteAudio.size || voiceChat.pendingConnections.size || voiceChat.localStream) stopVoiceChat("disabled");
+    return;
+  }
+
+  const multiplayerState = typeof multiplayer !== "undefined" ? multiplayer : null;
+  const now = Date.now();
+  const desiredPlayerIds = new Set();
+  for (const [playerId, crawler] of multiplayerState?.remotePlayers?.entries?.() || []) {
+    const updatedAt = Number(crawler?.updatedAt);
+    if (Number.isFinite(updatedAt) && updatedAt > 0) voiceChat.remoteLastSeen.set(playerId, updatedAt);
+    else if (!voiceChat.remoteLastSeen.has(playerId)) voiceChat.remoteLastSeen.set(playerId, now);
+    if (shouldHaveVoicePeer(playerId)) desiredPlayerIds.add(playerId);
+  }
+
+  const knownPeerIds = new Set([
+    ...voiceChat.peers.keys(),
+    ...voiceChat.remoteAudio.keys(),
+    ...voiceChat.pendingConnections
+  ]);
+
+  for (const playerId of desiredPlayerIds) {
+    if (!voiceChat.peers.has(playerId) && !voiceChat.pendingConnections.has(playerId)) connectVoicePeer(playerId);
+  }
+
+  for (const playerId of knownPeerIds) {
+    const crawler = multiplayerState?.remotePlayers?.get?.(playerId);
+    const lastSeen = voiceChat.remoteLastSeen.get(playerId);
+    const validUpdatedAt = Number.isFinite(Number(crawler?.updatedAt)) && Number(crawler?.updatedAt) > 0;
+    if ((!crawler || !validUpdatedAt) && Number.isFinite(lastSeen) && now - lastSeen > VOICE_REMOTE_STALE_MS) {
+      cleanupVoicePeer(playerId, "stale_remote");
+      continue;
+    }
+    if (!desiredPlayerIds.has(playerId)) cleanupVoicePeer(playerId, "no_longer_eligible");
+  }
+}
 
 function isVoicePlayerMuted(playerId) {
   return voiceChat.mutedPlayerIds.has(playerId);
@@ -173,8 +245,13 @@ function setVoiceChatMode(mode) {
   voiceChat.mode = nextMode;
   voiceChat.enabled = nextMode !== "off";
   if (!voiceChat.enabled) voiceChat.selfMuted = true;
-  if (voiceChat.enabled) startVoiceProximityTimer();
-  else stopVoiceProximityTimer();
+  if (voiceChat.enabled) {
+    startVoiceProximityTimer();
+    startVoiceLifecycleTimer();
+  } else {
+    stopVoiceProximityTimer();
+    syncVoicePeersToMultiplayerState();
+  }
   updateLocalVoiceTrackState();
   updateVoiceProximityVolumes();
   if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
@@ -214,14 +291,16 @@ function startVoiceForLobby() {
   initVoiceChat();
   if (!voiceChat.enabled) return false;
   if (!multiplayer?.enabled || !multiplayer.usingServer || !multiplayer.playerId || !multiplayer.remotePlayers) return false;
-  for (const targetPlayerId of multiplayer.remotePlayers.keys()) {
-    if (targetPlayerId && targetPlayerId !== multiplayer.playerId) connectVoicePeer(targetPlayerId, { polite: false });
-  }
+  syncVoicePeersToMultiplayerState();
   return true;
 }
 
 function stopVoiceChat(reason = "stopped") {
-  const knownPeerIds = Array.from(voiceChat.peers.keys());
+  const knownPeerIds = Array.from(new Set([
+    ...voiceChat.peers.keys(),
+    ...voiceChat.remoteAudio.keys(),
+    ...(voiceChat.pendingConnections || [])
+  ]));
   for (const targetPlayerId of knownPeerIds) {
     if (typeof sendVoiceDisconnect === "function") sendVoiceDisconnect(targetPlayerId, reason);
     cleanupVoicePeer(targetPlayerId, reason);
@@ -233,8 +312,10 @@ function stopVoiceChat(reason = "stopped") {
     }
     voiceChat.localStream = null;
   }
+  voiceChat.pendingConnections?.clear?.();
   voiceChat.selfMuted = true;
   stopVoiceProximityTimer();
+  stopVoiceLifecycleTimer();
   updateLocalVoiceTrackState();
   updateVoiceProximityVolumes();
   if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
@@ -242,6 +323,9 @@ function stopVoiceChat(reason = "stopped") {
 
 async function connectVoicePeer(targetPlayerId, options = {}) {
   if (!voiceChat.enabled || !targetPlayerId || targetPlayerId === multiplayer?.playerId) return null;
+  if (!voiceChat.pendingConnections) voiceChat.pendingConnections = new Set();
+  if (voiceChat.peers.has(targetPlayerId) || voiceChat.pendingConnections.has(targetPlayerId)) return voiceChat.peers.get(targetPlayerId) || null;
+  voiceChat.pendingConnections.add(targetPlayerId);
   const pc = createVoicePeerConnection(targetPlayerId);
   pc.voicePolite = !!options.polite;
   try {
@@ -278,6 +362,7 @@ function createVoicePeerConnection(targetPlayerId) {
     playResult?.then?.(() => updateRemoteSpeakingState(targetPlayerId, audio))?.catch?.(() => {});
   });
   pc.addEventListener("connectionstatechange", () => {
+    if (pc.connectionState === "connected") voiceChat.pendingConnections?.delete?.(targetPlayerId);
     if (["closed", "failed", "disconnected"].includes(pc.connectionState)) cleanupVoicePeer(targetPlayerId, pc.connectionState);
   });
   return pc;
@@ -313,6 +398,10 @@ function handleVoiceSignalMessage(message) {
 
 async function handleVoiceOffer(message) {
   if (!message?.fromPlayerId || !message.offer) return;
+  if (!shouldHaveVoicePeer(message.fromPlayerId)) {
+    cleanupVoicePeer(message.fromPlayerId, "no_longer_eligible");
+    return;
+  }
   try {
     const pc = createVoicePeerConnection(message.fromPlayerId);
     await pc.setRemoteDescription(new RTCSessionDescription(message.offer));
@@ -330,6 +419,7 @@ async function handleVoiceAnswer(message) {
   if (!pc || !message.answer) return;
   try {
     await pc.setRemoteDescription(new RTCSessionDescription(message.answer));
+    voiceChat.pendingConnections?.delete?.(message.fromPlayerId);
   } catch (err) {
     voiceChat.lastError = err?.message || "Could not finish voice connection.";
   }
@@ -367,6 +457,7 @@ function updateLocalVoiceTrackState() {
 }
 
 function cleanupVoicePeer(targetPlayerId, reason = "cleanup") {
+  voiceChat.pendingConnections?.delete?.(targetPlayerId);
   const pc = voiceChat.peers.get(targetPlayerId);
   if (pc) {
     pc.onicecandidate = null;
@@ -390,6 +481,19 @@ window.isVoicePlayerMuted = isVoicePlayerMuted;
 window.toggleVoicePlayerMuted = toggleVoicePlayerMuted;
 window.getVoiceRemoteStatus = getVoiceRemoteStatus;
 window.isLocalVoiceTransmitting = isLocalVoiceTransmitting;
+function getVoicePeerSummary() {
+  return {
+    enabled: voiceChat.enabled,
+    mode: voiceChat.mode,
+    peers: Array.from(voiceChat.peers.keys()),
+    pending: Array.from(voiceChat.pendingConnections || []),
+    remoteAudio: Array.from(voiceChat.remoteAudio.keys())
+  };
+}
+
 window.isRemoteVoiceActive = isRemoteVoiceActive;
+window.shouldHaveVoicePeer = shouldHaveVoicePeer;
+window.syncVoicePeersToMultiplayerState = syncVoicePeersToMultiplayerState;
+window.getVoicePeerSummary = getVoicePeerSummary;
 
 window.addEventListener("DOMContentLoaded", initVoiceChat);
