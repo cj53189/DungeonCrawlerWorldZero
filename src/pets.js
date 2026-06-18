@@ -16,12 +16,27 @@ const PET_DEFINITIONS = {
     skills: { melee: 4, magic: 0, guard: 1, tracking: 3 }
   },
   small_dog: {
-    id: "small_dog", displayName: "Small Dog", role: "Loyal Guard", cost: 0,
-    description: "A brave little dog who has not read the dungeon waiver.",
+    id: "small_dog", displayName: "Prince", role: "Loyal Guard", cost: 0,
+    description: "A brave tan pit bull who has not read the dungeon waiver and would like to inspect every stick-shaped artifact.",
     attackType: "guard_bite", primarySkill: "Guard Bite / Distract",
     baseStats: { hp: 94, damage: 10, speed: 2.55, range: 28, cooldown: 48, followDistance: 42, r: 9 },
     attributes: { strength: 6, agility: 7, endurance: 12, intellect: 4, perception: 8 },
-    skills: { melee: 3, magic: 0, guard: 4, tracking: 2 }
+    skills: { melee: 3, magic: 0, guard: 4, tracking: 2 },
+    sprite: {
+      key: "prince_pet",
+      src: "./assets/sprites/pets/prince_pet.png?v=2",
+      frameWidth: 64,
+      frameHeight: 64,
+      columns: 3,
+      rows: 4,
+      idleFrame: 1,
+      sequence: [0, 1, 2, 1],
+      animationSpeed: 9,
+      renderWidth: 50,
+      renderHeight: 50,
+      directionRows: { down: 0, up: 1, left: 2, right: 3 },
+      rowYOffset: { 2: 5, 3: 5 }
+    }
   }
 };
 const PET_MERCHANT_OPTIONS = ["fluffy_cat", "small_velociraptor", "small_dog"];
