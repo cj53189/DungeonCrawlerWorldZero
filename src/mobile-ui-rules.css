@@ -229,6 +229,7 @@
   #btnAttack { width: 76px !important; height: 76px !important; left: 28px !important; top: 28px !important; }
   #btnDodge { right: calc(var(--dcw-safe-right) + 140px) !important; bottom: calc(var(--dcw-safe-bottom) + 14px) !important; width: 64px !important; height: 64px !important; }
   #btnInteract { right: calc(var(--dcw-safe-right) + 108px) !important; bottom: calc(var(--dcw-safe-bottom) + 92px) !important; width: 60px !important; height: 60px !important; }
+  #btnVoiceTalk { right: calc(var(--dcw-safe-right) + 172px) !important; bottom: calc(var(--dcw-safe-bottom) + 92px) !important; width: 86px !important; height: 60px !important; }
   #btnWeapon { right: calc(var(--dcw-safe-right) + 22px) !important; bottom: calc(var(--dcw-safe-bottom) + 140px) !important; width: 58px !important; height: 58px !important; }
   #btnInv, #btnNew, #btnRecap, #btnLog {
     top: calc(var(--dcw-safe-top) + var(--dcw-touch-preferred) + 8px) !important;
