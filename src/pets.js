@@ -160,3 +160,121 @@ function updatePet() {
     }
   }
 }
+
+function installBossDoorPetSafetyFix() {
+  if (installBossDoorPetSafetyFix.installed) return;
+  if (typeof TILE === "undefined" || typeof roomContainsTile !== "function") return;
+
+  const baseIsCrawlerBlockingTile = typeof isCrawlerBlockingTile === "function" ? isCrawlerBlockingTile : null;
+  const baseTriggerBossAggro = typeof triggerBossAggro === "function" ? triggerBossAggro : null;
+  const baseLockBossDoors = typeof lockBossDoors === "function" ? lockBossDoors : null;
+  if (!baseIsCrawlerBlockingTile && !baseTriggerBossAggro && !baseLockBossDoors) return;
+
+  installBossDoorPetSafetyFix.installed = true;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function livePet() {
+    return typeof getActivePet === "function" ? getActivePet() : (player?.pet || player?.equipment?.pet || null);
+  }
+
+  function entityOverlapsTile(entity, tileX, tileY, padding = 1) {
+    if (!entity || !Number.isFinite(entity.x) || !Number.isFinite(entity.y)) return false;
+    const left = tileX * TILE;
+    const top = tileY * TILE;
+    const right = left + TILE;
+    const bottom = top + TILE;
+    const closestX = clamp(entity.x, left, right);
+    const closestY = clamp(entity.y, top, bottom);
+    const radius = Math.max(0, Number(entity.r) || 0) + padding;
+    return Math.hypot(entity.x - closestX, entity.y - closestY) <= radius;
+  }
+
+  function petIsInsideRoom(pet, room) {
+    if (!pet || !room) return false;
+    return roomContainsTile(room, Math.floor(pet.x / TILE), Math.floor(pet.y / TILE));
+  }
+
+  function petCanStandAt(pet, x, y) {
+    if (!pet) return false;
+    if (typeof canMoveTo === "function") return canMoveTo(x, y, pet.r || 8);
+    const tx = Math.floor(x / TILE);
+    const ty = Math.floor(y / TILE);
+    const tile = map?.[ty]?.[tx];
+    return tile === "." || tile === "S" || tile === "C" || tile === "E";
+  }
+
+  function pullPetIntoBossRoom(room = bossRoom) {
+    const pet = livePet();
+    if (!pet || !room || petIsInsideRoom(pet, room)) return false;
+
+    const tiles = typeof roomTileList === "function"
+      ? roomTileList(room, 1).filter(tile => roomContainsTile(room, tile.x, tile.y))
+      : [];
+
+    if (!tiles.length) return false;
+
+    const targetX = Number.isFinite(player?.x) ? player.x : room.cx * TILE + TILE / 2;
+    const targetY = Number.isFinite(player?.y) ? player.y : room.cy * TILE + TILE / 2;
+
+    tiles.sort((a, b) => {
+      const ax = a.x * TILE + TILE / 2;
+      const ay = a.y * TILE + TILE / 2;
+      const bx = b.x * TILE + TILE / 2;
+      const by = b.y * TILE + TILE / 2;
+      return Math.hypot(ax - targetX, ay - targetY) - Math.hypot(bx - targetX, by - targetY);
+    });
+
+    for (const tile of tiles) {
+      const x = tile.x * TILE + TILE / 2;
+      const y = tile.y * TILE + TILE / 2;
+      if (!petCanStandAt(pet, x, y)) continue;
+      pet.x = x;
+      pet.y = y;
+      pet.facingX = (Number.isFinite(player?.x) ? player.x : x) - x;
+      pet.facingY = (Number.isFinite(player?.y) ? player.y : y) - y;
+      pet.visualMoving = false;
+      return true;
+    }
+
+    return false;
+  }
+
+  if (baseIsCrawlerBlockingTile) {
+    isCrawlerBlockingTile = function isCrawlerOrPetBlockingTile(x, y, radius = 0) {
+      if (baseIsCrawlerBlockingTile(x, y, radius)) return true;
+
+      // The old check only looked at the player's center tile. This catches cases where
+      // the crawler's collision circle is still partly inside the doorway when the lock tries to spawn.
+      if (entityOverlapsTile(player, x, y, 2)) return true;
+
+      const pet = livePet();
+      if (!pet) return false;
+      const petTileX = Math.floor(pet.x / TILE);
+      const petTileY = Math.floor(pet.y / TILE);
+      if (radius > 0 && Math.abs(x - petTileX) <= radius && Math.abs(y - petTileY) <= radius) return true;
+      return entityOverlapsTile(pet, x, y, 3);
+    };
+  }
+
+  if (baseTriggerBossAggro) {
+    triggerBossAggro = function triggerBossAggroWithPetSafety(reason = "seen") {
+      pullPetIntoBossRoom(bossRoom);
+      return baseTriggerBossAggro(reason);
+    };
+  }
+
+  if (baseLockBossDoors) {
+    lockBossDoors = function lockBossDoorsWithPetSafety(room = bossRoom) {
+      pullPetIntoBossRoom(room);
+      return baseLockBossDoors(room);
+    };
+  }
+}
+
+if (typeof document !== "undefined") {
+  if (document.readyState === "complete") installBossDoorPetSafetyFix();
+  else document.addEventListener("DOMContentLoaded", installBossDoorPetSafetyFix, { once: true });
+}
