@@ -244,6 +244,12 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.CRAWLER_STATE:
           rooms.updateCrawlerState(playerId, message.state || message);
           break;
+        case CLIENT_MESSAGES.VOICE_OFFER:
+        case CLIENT_MESSAGES.VOICE_ANSWER:
+        case CLIENT_MESSAGES.VOICE_ICE_CANDIDATE:
+        case CLIENT_MESSAGES.VOICE_DISCONNECT:
+          rooms.relayVoiceSignal(playerId, message);
+          break;
         case CLIENT_MESSAGES.PARTY_INVITE_SEND:
         case CLIENT_MESSAGES.PARTY_INVITE:
           rooms.requestPartyInvite(playerId, message.targetPlayerId, message);

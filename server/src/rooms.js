@@ -366,6 +366,35 @@ class LobbyManager {
     return true;
   }
 
+  relayVoiceSignal(fromPlayerId, message = {}) {
+    const senderClient = this.requireClient(fromPlayerId);
+    if (!senderClient.lobbyCode) throw new Error("Voice signal sender is not in a lobby.");
+
+    const lobby = this.lobbies.get(senderClient.lobbyCode);
+    if (!lobby) throw new Error("Voice signal sender lobby was not found.");
+
+    const sender = lobby.players.find(candidate => candidate.id === fromPlayerId);
+    if (!sender) throw new Error("Voice signal sender is not in a lobby.");
+
+    const targetPlayerId = String(message.targetPlayerId || "");
+    if (!targetPlayerId) throw new Error("Voice signal targetPlayerId is required.");
+
+    const target = lobby.players.find(candidate => candidate.id === targetPlayerId);
+    if (!target) throw new Error("Voice signal target must be in the same lobby.");
+
+    const targetClient = this.clients.get(targetPlayerId);
+    if (!targetClient) throw new Error("Voice signal target connection was not found.");
+
+    return safeSend(targetClient.ws, message.type, {
+      fromPlayerId,
+      targetPlayerId,
+      offer: message.offer,
+      answer: message.answer,
+      candidate: message.candidate,
+      reason: message.reason
+    });
+  }
+
   updateCrawlerState(playerId, state) {
     const client = this.requireClient(playerId);
     if (!client.lobbyCode) return false;
