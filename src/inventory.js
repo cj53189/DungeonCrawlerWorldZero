@@ -1,5 +1,5 @@
 const SLOT_LABELS={weapon:"Weapon",head:"Head",chest:"Body / Armor",offhand:"Offhand / Shield",legs:"Legs",feet:"Feet",accessory:"Trinket",light:"Light",pet:"Pet"};
-const INVENTORY_CATEGORIES={gear:"Gear",items:"Consumables / Items",lootboxes:"Loot Boxes",skills:"Skills"};
+const INVENTORY_CATEGORIES={crawler:"Crawler",gear:"Gear",items:"Consumables / Items",lootboxes:"Loot Boxes",skills:"Skills"};
 let activeInventoryCategory="gear";
 let selectedInventoryItemId=null;
 let selectedEquipmentSlot=null;
@@ -146,7 +146,16 @@ function gearComparisonText(item){
  }
  return parts.length?`Compared: ${parts.join(" · ")}`:"Compared: no stat change";
 }
-function renderInventoryTabs(counts){return `<div class="inventoryTabs">${Object.entries(INVENTORY_CATEGORIES).map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}">${escapeHtml(label)}${key!=="skills"?` <span>${counts[key]||0}</span>`:""}</button>`).join("")}</div>`;}
+function renderInventoryTabs(counts){return `<div class="inventoryTabs">${Object.entries(INVENTORY_CATEGORIES).map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}"><span class="tabLabelFull">${escapeHtml(label)}</span><span class="tabLabelShort">${escapeHtml(key==="lootboxes"?"Boxes":key==="items"?"Items":label)}</span>${key!=="skills"&&key!=="crawler"?` <span>${counts[key]||0}</span>`:""}</button>`).join("")}</div>`;}
+
+function equippedSummary(slot){
+ const item=player.equipment?.[slot];
+ return item?item.name:"Empty";
+}
+function renderInventorySummaryCard(){
+ const statsHtml=[["Level",player.level],["HP",`${Math.ceil(player.hp)}/${player.maxHp}`],["ATK",player.attackDamage],["DEF",player.defense],["SPD",player.speed.toFixed(2)],["AUD",`+${player.audienceBonus}`]].map(([label,value])=>`<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("");
+ return `<section class="inventorySummaryCard" aria-label="Crawler summary"><div class="inventorySummaryStats">${statsHtml}</div><div class="inventorySummaryGear"><span><strong>Weapon</strong> ${escapeHtml(equippedSummary("weapon"))}</span><span><strong>Light</strong> ${escapeHtml(equippedSummary("light"))}</span><span><strong>Pet</strong> ${escapeHtml(equippedSummary("pet"))}</span></div></section>`;
+}
 
 function renderProgressBar(value,max,label){
  const pct=Math.max(0,Math.min(100,(Number(value)||0)/Math.max(1,Number(max)||1)*100));
@@ -197,20 +206,28 @@ function renderItemDetails(){
 function updateInventoryUI(){
  const panel=document.getElementById("inventoryPanel"); if(!panel)return; const eq=document.getElementById("equipmentStats"),list=document.getElementById("inventoryList");
  setupInventoryActionHandlers();
- const counts={gear:0,items:0,lootboxes:0,skills:0}; for(const item of player.inventory)counts[inventoryCategoryFor(item)]++;
+ const counts={crawler:0,gear:0,items:0,lootboxes:0,skills:0}; for(const item of player.inventory)counts[inventoryCategoryFor(item)]++;
  setActiveInventoryCategory(activeInventoryCategory);
+ panel.dataset.inventoryCategory=activeInventoryCategory;
+ if(eq)eq.innerHTML=renderCharacterPanel();
+ const topUi=`${renderInventorySummaryCard()}${renderInventoryTabs(counts)}`;
+ if(activeInventoryCategory==="crawler"){
+  selectedInventoryItemId=null;
+  list.innerHTML=`${topUi}<div class="inventoryContentTitle">Crawler Sheet</div><div class="mobileCrawlerSheet">${renderCharacterPanel()}</div>${renderItemDetails()}`;
+  return;
+ }
  if(activeInventoryCategory==="skills"){
   selectedInventoryItemId=null;
   selectedEquipmentSlot=null;
-  eq.innerHTML=renderCharacterPanel();
-  list.innerHTML=`${renderInventoryTabs(counts)}<div class="inventoryContentTitle">Skills / Attributes</div>${renderProgressionInventoryView()}`;
+  list.innerHTML=`${topUi}<div class="inventoryContentTitle">Skills / Attributes</div>${renderProgressionInventoryView()}`;
   return;
  }
+ selectedEquipmentSlot=null;
  let sorted=[...player.inventory].filter(item=>inventoryCategoryFor(item)===activeInventoryCategory).sort((a,b)=>(rarityPower(b.rarity)-rarityPower(a.rarity))||String(a.type).localeCompare(String(b.type))||String(a.slot||"").localeCompare(String(b.slot||""))||String(a.name).localeCompare(String(b.name)));
  if(selectedInventoryItemId&&!sorted.some(i=>i.id===selectedInventoryItemId)){selectedInventoryItemId=null;}
- const slots=[...sorted]; while(slots.length<30)slots.push(null);
- eq.innerHTML=renderCharacterPanel();
- list.innerHTML=`${renderInventoryTabs(counts)}<div class="inventoryContentTitle">${escapeHtml(INVENTORY_CATEGORIES[activeInventoryCategory])}</div><div class="lootGrid" role="grid">${slots.map(renderInventorySlot).join("")}</div>${renderItemDetails()}`;
+ const minSlots=activeInventoryCategory==="gear"?18:activeInventoryCategory==="lootboxes"?8:12;
+ const slots=[...sorted,...Array(Math.max(0,minSlots-sorted.length)).fill(null)];
+ list.innerHTML=`${topUi}<div class="inventoryContentTitle">${escapeHtml(INVENTORY_CATEGORIES[activeInventoryCategory])}</div><div class="lootGrid" role="grid">${slots.map(renderInventorySlot).join("")}</div>${renderItemDetails()}`;
 }
 function setInventoryOpenState(open){document.body.classList.toggle("inventoryOpen",!!open);}
 function toggleInventoryPanel(){const p=document.getElementById("inventoryPanel"),l=document.getElementById("logPanel"),r=document.getElementById("safeRoomRecap"); if(!p)return; if(p.classList.contains("open")){p.classList.remove("open");p.style.display="";setInventoryOpenState(false); if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur(); return;} if(l)l.style.display="none"; if(r)r.style.display="none"; updateInventoryUI(); p.style.display=""; p.classList.add("open"); setInventoryOpenState(true); if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
