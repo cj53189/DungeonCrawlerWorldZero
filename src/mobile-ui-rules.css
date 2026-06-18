@@ -302,3 +302,186 @@
   #stickBase { width: 118px !important; height: 118px !important; }
   #attackStickBase { width: 124px !important; height: 124px !important; }
 }
+
+/* Issue #99 follow-up: mobile portrait inventory is task/tab based. */
+.inventorySummaryCard { display: none; }
+.tabLabelShort { display: none; }
+.mobileCrawlerSheet { display: block; }
+
+@media (max-width: 900px) and (orientation: portrait),
+       (hover: none) and (pointer: coarse) and (orientation: portrait) {
+  #inventoryPanel.open { display: grid !important; }
+  #inventoryPanel {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    align-content: stretch !important;
+    gap: 8px !important;
+    padding: calc(var(--dcw-safe-top) + 4px) 10px calc(var(--dcw-safe-bottom) + 8px) !important;
+    overflow: hidden !important;
+  }
+
+  #inventoryPanel h3 {
+    min-height: 42px !important;
+    margin: 0 64px 0 0 !important;
+    align-items: flex-start !important;
+    padding-top: 6px !important;
+    font-size: 16px !important;
+    line-height: 1.1 !important;
+  }
+
+  #inventoryPanel .panelClose {
+    top: calc(var(--dcw-safe-top) + 2px) !important;
+    right: calc(var(--dcw-safe-right) + 2px) !important;
+  }
+
+  #equipmentStats {
+    display: none !important;
+  }
+
+  #inventoryList {
+    display: grid !important;
+    grid-template-rows: auto auto auto minmax(0, 1fr) auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    padding-right: 2px !important;
+    gap: 8px !important;
+  }
+
+  .inventorySummaryCard {
+    display: grid !important;
+    gap: 7px !important;
+    padding: 8px !important;
+    border: 1px solid rgba(255,216,107,0.22) !important;
+    border-radius: 12px !important;
+    background: rgba(0,0,0,0.26) !important;
+  }
+
+  .inventorySummaryStats {
+    display: grid !important;
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+  }
+
+  .inventorySummaryStats div {
+    min-height: 40px !important;
+    padding: 4px 3px !important;
+    border-radius: 8px !important;
+    background: rgba(255,216,107,0.07) !important;
+    text-align: center !important;
+  }
+
+  .inventorySummaryStats span,
+  .inventorySummaryGear strong {
+    display: block !important;
+    color: #cdbd9e !important;
+    font-size: 10px !important;
+    font-weight: 900 !important;
+    text-transform: uppercase !important;
+  }
+
+  .inventorySummaryStats strong {
+    color: #ffdf91 !important;
+    font-size: 12px !important;
+    line-height: 1.15 !important;
+  }
+
+  .inventorySummaryGear {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 3px !important;
+    color: #eadfcb !important;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+  }
+
+  #inventoryPanel .inventoryTabs {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 5 !important;
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+    margin: 0 !important;
+    padding: 6px 0 !important;
+    background: linear-gradient(180deg, rgba(17,10,7,0.98), rgba(17,10,7,0.88)) !important;
+  }
+
+  #inventoryPanel .inventoryTab {
+    min-width: 0 !important;
+    min-height: 48px !important;
+    padding: 6px 3px !important;
+    border-radius: 10px !important;
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+  }
+
+  #inventoryPanel .tabLabelFull { display: none !important; }
+  #inventoryPanel .tabLabelShort { display: inline !important; }
+
+  #inventoryPanel .inventoryContentTitle {
+    margin: 0 !important;
+    font-size: 13px !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  #inventoryPanel .lootGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    grid-auto-rows: minmax(72px, auto) !important;
+    gap: 8px !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 2px !important;
+  }
+
+  #inventoryPanel .lootSlot {
+    min-width: 48px !important;
+    min-height: 72px !important;
+    aspect-ratio: auto !important;
+    padding: 5px !important;
+  }
+
+  #inventoryPanel .lootSlot small,
+  #inventoryPanel .paperSlotLabel,
+  #inventoryPanel .paperSlotName,
+  #inventoryPanel .detailMeta,
+  #inventoryPanel .detailStats,
+  #inventoryPanel .detailCompare,
+  #inventoryHelp {
+    font-size: 11px !important;
+  }
+
+  #inventoryPanel .itemDetails {
+    min-height: 96px !important;
+    padding: 10px !important;
+    margin-bottom: 4px !important;
+  }
+
+  #inventoryPanel .detailTitle { font-size: 15px !important; }
+  #inventoryPanel .itemBtn { min-height: 48px !important; font-size: 13px !important; padding: 9px 12px !important; }
+
+  .mobileCrawlerSheet {
+    display: block !important;
+    min-height: 0 !important;
+  }
+
+  .mobileCrawlerSheet .characterSheet {
+    min-height: 430px !important;
+    height: auto !important;
+    padding-right: 0 !important;
+  }
+
+  .mobileCrawlerSheet .paperDoll {
+    min-height: 300px !important;
+  }
+
+  .mobileCrawlerSheet .paperSlot {
+    min-width: 48px !important;
+    min-height: 48px !important;
+    width: clamp(58px, 22vw, 86px) !important;
+  }
+
+  #inventoryHelp {
+    margin: 0 !important;
+    line-height: 1.25 !important;
+  }
+}
