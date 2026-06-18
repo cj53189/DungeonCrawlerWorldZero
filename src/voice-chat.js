@@ -6,12 +6,18 @@ var voiceChat = {
   peers: new Map(),
   remoteAudio: new Map(),
   mutedPlayerIds: new Set(),
+  peerVolumes: new Map(),
+  proximityTimer: null,
   selfMuted: true,
   initialized: false,
   lastError: null
 };
 
 const VOICE_ICE_CONFIG = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+const VOICE_FULL_VOLUME_TILES = 2;
+const VOICE_MAX_RANGE_TILES = 8;
+const VOICE_PROXIMITY_UPDATE_MS = 200;
+const VOICE_FALLBACK_TILE_SIZE = 32;
 
 function initVoiceChat() {
   if (voiceChat.initialized) return;
@@ -26,7 +32,76 @@ function initVoiceChat() {
     setVoicePushToTalkActive(false);
   });
 
+  startVoiceProximityTimer();
   updateLocalVoiceTrackState();
+}
+
+function startVoiceProximityTimer() {
+  if (voiceChat.proximityTimer) return;
+  voiceChat.proximityTimer = setInterval(updateVoiceProximityVolumes, VOICE_PROXIMITY_UPDATE_MS);
+}
+
+function stopVoiceProximityTimer() {
+  if (!voiceChat.proximityTimer) return;
+  clearInterval(voiceChat.proximityTimer);
+  voiceChat.proximityTimer = null;
+}
+
+function getVoiceTileSize() {
+  const tileSize = typeof TILE !== "undefined" ? Number(TILE) : VOICE_FALLBACK_TILE_SIZE;
+  return Number.isFinite(tileSize) && tileSize > 0 ? tileSize : VOICE_FALLBACK_TILE_SIZE;
+}
+
+function clampVoiceVolume(volume) {
+  const number = Number(volume);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(1, number));
+}
+
+function getVoiceDistanceToRemotePlayer(playerId) {
+  const multiplayerState = typeof multiplayer !== "undefined" ? multiplayer : null;
+  const localPlayer = typeof player !== "undefined" ? player : null;
+  const crawler = multiplayerState?.remotePlayers?.get?.(playerId);
+  const localX = Number(localPlayer?.x);
+  const localY = Number(localPlayer?.y);
+  const remoteX = Number(crawler?.x);
+  const remoteY = Number(crawler?.y);
+  if (!crawler || !Number.isFinite(localX) || !Number.isFinite(localY) || !Number.isFinite(remoteX) || !Number.isFinite(remoteY)) return Infinity;
+  return Math.hypot(remoteX - localX, remoteY - localY) / getVoiceTileSize();
+}
+
+function getVoiceVolumeForDistance(distanceTiles) {
+  const distance = Number(distanceTiles);
+  if (!Number.isFinite(distance)) return 0;
+  if (distance <= VOICE_FULL_VOLUME_TILES) return 1;
+  if (distance >= VOICE_MAX_RANGE_TILES) return 0;
+  const fadeRange = VOICE_MAX_RANGE_TILES - VOICE_FULL_VOLUME_TILES;
+  return clampVoiceVolume(1 - ((distance - VOICE_FULL_VOLUME_TILES) / fadeRange));
+}
+
+function updateVoiceProximityVolumes() {
+  for (const [playerId, audio] of voiceChat.remoteAudio.entries()) {
+    const distance = getVoiceDistanceToRemotePlayer(playerId);
+    const volume = voiceChat.enabled && voiceChat.mode !== "off" ? getVoiceVolumeForDistance(distance) : 0;
+    const clampedVolume = clampVoiceVolume(volume);
+    const manuallyMuted = voiceChat.mutedPlayerIds.has(playerId);
+    audio.volume = clampedVolume;
+    audio.muted = voiceChat.mode === "off" || manuallyMuted || clampedVolume <= 0;
+    voiceChat.peerVolumes.set(playerId, clampedVolume);
+  }
+}
+
+function getVoiceDebugStatus() {
+  return Array.from(voiceChat.remoteAudio.keys()).map(playerId => {
+    const distance = getVoiceDistanceToRemotePlayer(playerId);
+    const volume = voiceChat.peerVolumes.get(playerId) ?? getVoiceVolumeForDistance(distance);
+    return {
+      playerId,
+      distance,
+      volume: clampVoiceVolume(volume),
+      muted: voiceChat.mode === "off" || voiceChat.mutedPlayerIds.has(playerId) || clampVoiceVolume(volume) <= 0
+    };
+  });
 }
 
 function isVoiceTypingTarget(target) {
@@ -41,7 +116,10 @@ function setVoiceChatMode(mode) {
   voiceChat.mode = nextMode;
   voiceChat.enabled = nextMode !== "off";
   if (!voiceChat.enabled) voiceChat.selfMuted = true;
+  if (voiceChat.enabled) startVoiceProximityTimer();
+  else stopVoiceProximityTimer();
   updateLocalVoiceTrackState();
+  updateVoiceProximityVolumes();
   if (typeof updateVoiceChatSettingsUI === "function") updateVoiceChatSettingsUI();
 }
 
@@ -99,7 +177,9 @@ function stopVoiceChat(reason = "stopped") {
     voiceChat.localStream = null;
   }
   voiceChat.selfMuted = true;
+  stopVoiceProximityTimer();
   updateLocalVoiceTrackState();
+  updateVoiceProximityVolumes();
   if (typeof updateVoiceChatSettingsUI === "function") updateVoiceChatSettingsUI();
 }
 
@@ -129,7 +209,6 @@ function createVoicePeerConnection(targetPlayerId) {
     if (event.candidate && typeof sendVoiceIceCandidate === "function") sendVoiceIceCandidate(targetPlayerId, event.candidate);
   });
   pc.addEventListener("track", (event) => {
-    if (voiceChat.mutedPlayerIds.has(targetPlayerId)) return;
     let audio = voiceChat.remoteAudio.get(targetPlayerId);
     if (!audio) {
       audio = new Audio();
@@ -137,6 +216,7 @@ function createVoicePeerConnection(targetPlayerId) {
       voiceChat.remoteAudio.set(targetPlayerId, audio);
     }
     audio.srcObject = event.streams?.[0] || new MediaStream([event.track]);
+    updateVoiceProximityVolumes();
     audio.play?.().catch(() => {});
   });
   pc.addEventListener("connectionstatechange", () => {
@@ -240,6 +320,7 @@ function cleanupVoicePeer(targetPlayerId, reason = "cleanup") {
     audio.srcObject = null;
     voiceChat.remoteAudio.delete(targetPlayerId);
   }
+  voiceChat.peerVolumes.delete(targetPlayerId);
 }
 
 window.addEventListener("DOMContentLoaded", initVoiceChat);

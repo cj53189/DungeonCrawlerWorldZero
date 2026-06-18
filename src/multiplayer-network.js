@@ -522,6 +522,7 @@ function applyServerCrawlerSnapshot(snapshot) {
   }
 
   multiplayer.remotePlayers = nextRemotePlayers;
+  if (typeof updateVoiceProximityVolumes === "function") updateVoiceProximityVolumes();
 }
 
 function applyServerLobbyUpdate(update) {
