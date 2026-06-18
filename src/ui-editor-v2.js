@@ -1,6 +1,6 @@
 (function(){
   const K='dcw.uiLayout.v1';
-  const targets=[['hud','HUD','#hud',130,90],['settings','Settings','#settingsBtn',40,40,true],['popups','Popups','#announcer',150,44],['prompt','Prompt','#prompt',110,28],['debug','Debug','#testerDebugLine',180,24],['stairs','Stair HUD','#stairHud',100,28],['inventory','Inventory','#inventoryPanel',220,180],['recap','Recap','#safeRoomRecap',160,120],['log','Log','#logPanel',200,110],['loot','Loot','#lootWindow',220,160],['petMerchant','Pet Merchant','#petMerchantPanel',260,200],['skills','Skills','#progressionPanel',260,220],['center','Center Message','#centerMessage .box',240,140],['lobby','Lobby Panel','#multiplayerPanel',190,130],['lobbyButton','Lobby Button','#mpOpenPanelBtn',64,44],['minimap','Minimap','#minimapEditPanel',90,70],['moveStick','Move Stick','#stickBase',72,72],['attackStick','Attack Stick','#attackStickBase',72,72],['interact','Interact','#btnInteract',44,44],['dodge','Dodge','#btnDodge',44,44],['invButton','Inventory Button','#btnInv',44,44],['weaponButton','Weapon Button','#btnWeapon',44,44],['logButton','Log Button','#btnLog',44,44],['recapButton','Recap Button','#btnRecap',44,44],['touchSettings','Touch Settings','#btnNew',44,44],['lightButton','Light Button','#btnLight',44,44]];
+  const targets=[['hud','HUD','#hud',130,90],['settings','Settings','#settingsBtn',40,40,true],['popups','Popups','#announcer',150,44],['prompt','Prompt','#prompt',110,28],['debug','Debug','#testerDebugLine',180,24],['stairs','Stair HUD','#stairHud',100,28],['inventory','Inventory','#inventoryPanel',220,180],['recap','Recap','#safeRoomRecap',160,120],['log','Log','#logPanel',200,110],['loot','Loot','#lootWindow',220,160],['petMerchant','Pet Merchant','#petMerchantPanel',260,200],['skills','Skills','#progressionPanel',260,220],['center','Center Message','#centerMessage .box',240,140],['lobby','Lobby Panel','#multiplayerPanel',190,130],['lobbyButton','Lobby Button','#mpOpenPanelBtn',64,44],['minimap','Minimap','#minimapEditPanel',90,70],['moveStick','Move Stick','#stickBase',72,72],['attackStick','Attack Stick','#attackStickBase',72,72],['interact','Interact','#btnInteract',44,44],['dodge','Dodge','#btnDodge',44,44],['invButton','Inventory Button','#btnInv',44,44],['weaponButton','Weapon Button','#btnWeapon',44,44],['logButton','Log','#btnLog',44,44],['recapButton','Recap','#btnRecap',44,44],['touchSettings','Touch Settings','#btnNew',44,44],['lightButton','Light Button','#btnLight',44,44]];
   const originalSetup=typeof setupUiLayoutEditor==='function'?setupUiLayoutEditor:null;
   let selected=null,drag=null,armed=false,ready=false;
   const bySel=s=>document.querySelector(s);
@@ -23,4 +23,12 @@
   function bind(){if(ready)return;ready=true;css();overlay();document.addEventListener('pointerdown',pick,{capture:true,passive:false});document.addEventListener('pointermove',move,{capture:true,passive:false});document.addEventListener('pointerup',end,{capture:true,passive:false});document.addEventListener('pointercancel',end,{capture:true,passive:false});overlay().querySelector('.move').addEventListener('pointerdown',e=>start('move',e),{passive:false});overlay().querySelector('.uiEditResize').addEventListener('pointerdown',e=>start('resize',e),{passive:false});overlay().querySelector('.hide').addEventListener('click',e=>{e.preventDefault();toggleHide()});window.addEventListener('resize',place)}
   window.setupUiLayoutEditor=function(){if(originalSetup)originalSetup();bind();apply();showGear()};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{bind();apply();showGear()},{once:true});else{bind();apply();showGear()}
+})();
+
+(function loadInventoryBackbone() {
+  if (window.DCWZInventoryBackboneInstalled || document.querySelector('script[src="./src/inventory-backbone.js"]')) return;
+  const script = document.createElement("script");
+  script.src = "./src/inventory-backbone.js";
+  script.async = false;
+  document.head.appendChild(script);
 })();
