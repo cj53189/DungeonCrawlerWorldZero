@@ -80,6 +80,7 @@ function connectMultiplayerNetwork() {
     });
 
     socket.addEventListener("close", () => {
+      if (typeof stopVoiceChat === "function") stopVoiceChat("multiplayer_disconnected");
       multiplayerNetwork.connected = false;
       multiplayerNetwork.connecting = false;
       multiplayerNetwork.socket = null;
@@ -145,8 +146,25 @@ function requestServerQuickMatch(options = {}) {
 }
 
 function requestServerLeaveLobby() {
+  if (typeof stopVoiceChat === "function") stopVoiceChat("multiplayer_disconnected");
   if (!isMultiplayerNetworkReady() || !multiplayer.usingServer) return false;
   return sendMultiplayerMessage("leave_lobby");
+}
+
+function sendVoiceOffer(targetPlayerId, offer) {
+  return sendMultiplayerMessage("voice_offer", { targetPlayerId, offer });
+}
+
+function sendVoiceAnswer(targetPlayerId, answer) {
+  return sendMultiplayerMessage("voice_answer", { targetPlayerId, answer });
+}
+
+function sendVoiceIceCandidate(targetPlayerId, candidate) {
+  return sendMultiplayerMessage("voice_ice_candidate", { targetPlayerId, candidate });
+}
+
+function sendVoiceDisconnect(targetPlayerId, reason = "disconnect") {
+  return sendMultiplayerMessage("voice_disconnect", { targetPlayerId, reason });
 }
 
 function requestServerFloor0StairsReached() {
@@ -249,6 +267,7 @@ function handleMultiplayerServerMessage(message) {
       handleServerFloorStart(message);
       break;
     case "player_left":
+      if (typeof cleanupVoicePeer === "function") cleanupVoicePeer(message.playerId, "player_left");
       multiplayer.remotePlayers.delete(message.playerId);
       if (typeof announcer === "function") announcer(`${message.name || "A crawler"} left Floor 0. The collapse timer will not increase.`);
       break;
@@ -276,6 +295,14 @@ function handleMultiplayerServerMessage(message) {
       break;
     case "player_corpse_looted":
       applyPlayerCorpseLooted(message.corpseId);
+      break;
+    case "voice_offer":
+    case "voice_answer":
+    case "voice_ice_candidate":
+    case "voice_disconnect":
+      if (typeof handleVoiceSignalMessage === "function") {
+        handleVoiceSignalMessage(message);
+      }
       break;
     case "error":
       handleMultiplayerNetworkError(formatServerErrorMessage(message.message || "Floor 0 collapse server request failed."));

@@ -320,6 +320,36 @@ function syncSettingsControls() {
   setUiEditMode(uiEditMode, false);
   if (typeof updateTouchControlsToggle === "function") updateTouchControlsToggle();
   if (typeof dungeonMusic !== "undefined") dungeonMusic.updateToggleLabel();
+  updateVoiceChatSettingsUI();
+}
+
+function updateVoiceChatSettingsUI() {
+  const button = document.getElementById("voiceChatToggleBtn");
+  const status = document.getElementById("voiceChatStatusText");
+  const active = typeof voiceChat !== "undefined" && voiceChat.mode === "push_to_talk";
+  if (button) {
+    button.textContent = active ? "Push-to-talk" : "Off";
+    button.setAttribute("aria-pressed", String(active));
+  }
+  if (status) {
+    if (!active) status.textContent = "Disabled";
+    else if (voiceChat.lastError) status.textContent = `Error: ${voiceChat.lastError}`;
+    else if (voiceChat.localStream) status.textContent = voiceChat.selfMuted ? "Ready · Hold V to talk" : "Talking";
+    else status.textContent = "Waiting for microphone permission";
+  }
+}
+
+async function toggleVoiceChatFromSettings() {
+  const active = typeof voiceChat !== "undefined" && voiceChat.mode === "push_to_talk";
+  if (active) {
+    if (typeof setVoiceChatMode === "function") setVoiceChatMode("off");
+    if (typeof stopVoiceChat === "function") stopVoiceChat("disabled");
+  } else {
+    if (typeof setVoiceChatMode === "function") setVoiceChatMode("push_to_talk");
+    if (typeof requestVoiceMicrophone === "function") await requestVoiceMicrophone();
+    if (typeof startVoiceForLobby === "function") startVoiceForLobby();
+  }
+  updateVoiceChatSettingsUI();
 }
 function setupUiLayoutEditor() {
   if (document.body.dataset.settingsBound !== "true") {
@@ -335,6 +365,7 @@ function setupUiLayoutEditor() {
     document.getElementById("touchControlsToggle")?.addEventListener("click", () => {
       if (typeof setTouchControlsEnabled === "function") setTouchControlsEnabled(!inputState.touchControlsEnabled);
     });
+    document.getElementById("voiceChatToggleBtn")?.addEventListener("click", toggleVoiceChatFromSettings);
     document.getElementById("uiScaleSlider")?.addEventListener("input", e => setUiScale(e.target.value));
     document.getElementById("resetUiLayoutBtn")?.addEventListener("click", resetUiLayout);
     document.getElementById("settingsDoneBtn")?.addEventListener("click", closeSettingsPanel);
