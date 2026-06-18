@@ -491,6 +491,24 @@ function drawRemoteCrawlerBadge(crawler) {
   ctx.restore();
 }
 
+function drawRemoteCrawlerVoiceIcon(crawler) {
+  if (typeof isRemoteVoiceActive !== "function") return;
+  if (!isRemoteVoiceActive(crawler.id)) return;
+
+  ctx.save();
+  ctx.font = "bold 11px Arial";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.lineWidth = 3;
+  const iconX = crawler.x;
+  const iconY = crawler.y - 58;
+  ctx.strokeStyle = "rgba(0,0,0,0.75)";
+  ctx.fillStyle = "rgba(255,255,255,0.94)";
+  ctx.strokeText("VOICE", iconX, iconY);
+  ctx.fillText("VOICE", iconX, iconY);
+  ctx.restore();
+}
+
 function drawPvpKillMarker(crawler, yOffset = 55) {
   const kills = Math.max(0, Math.trunc(Number(crawler?.pvpKills) || 0));
   if (kills <= 0) return;
@@ -519,6 +537,7 @@ function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
         : getCharacterIdleFrame(characterDef)
     }, alpha, tint);
     drawRemoteCrawlerBadge(crawler);
+    drawRemoteCrawlerVoiceIcon(crawler);
     return;
   }
   if (!isOtherCrawlerSpriteLoaded()) {
@@ -530,6 +549,7 @@ function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
       height: 22
     });
     drawRemoteCrawlerBadge(crawler);
+    drawRemoteCrawlerVoiceIcon(crawler);
     ctx.restore();
     return;
   }
@@ -551,6 +571,7 @@ function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
   ctx.ellipse(crawler.x, crawler.y + (crawler.r || player.r) * 0.72, (crawler.r || player.r) * 1.08, Math.max(4, (crawler.r || player.r) * 0.42), 0, 0, Math.PI * 2);
   ctx.fill();
   drawRemoteCrawlerBadge(crawler);
+  drawRemoteCrawlerVoiceIcon(crawler);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(OTHER_CRAWLER_SPRITE_SHEET, frame * SPRITE_FRAME_W, row * SPRITE_FRAME_H, SPRITE_FRAME_W, SPRITE_FRAME_H, dx, dy, drawW, drawH);
   if (tint) {
