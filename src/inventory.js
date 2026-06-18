@@ -130,8 +130,13 @@ function inventoryCategoryFor(item){
  if(item.type==="gear"||item.type==="light"||item.type==="weapon")return"gear";
  return"items";
 }
+function isInventoryPortraitMode(){
+ if(typeof window==="undefined"||typeof window.matchMedia!=="function")return false;
+ return window.matchMedia("(max-width: 900px) and (orientation: portrait), (hover: none) and (pointer: coarse) and (orientation: portrait)").matches;
+}
 function setActiveInventoryCategory(category){
  activeInventoryCategory=Object.prototype.hasOwnProperty.call(INVENTORY_CATEGORIES,category)?category:"gear";
+ if(activeInventoryCategory==="crawler"&&!isInventoryPortraitMode())activeInventoryCategory="gear";
  return activeInventoryCategory;
 }
 function gearComparisonText(item){
@@ -146,7 +151,10 @@ function gearComparisonText(item){
  }
  return parts.length?`Compared: ${parts.join(" · ")}`:"Compared: no stat change";
 }
-function renderInventoryTabs(counts){return `<div class="inventoryTabs">${Object.entries(INVENTORY_CATEGORIES).map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}"><span class="tabLabelFull">${escapeHtml(label)}</span><span class="tabLabelShort">${escapeHtml(key==="lootboxes"?"Boxes":key==="items"?"Items":label)}</span>${key!=="skills"&&key!=="crawler"?` <span>${counts[key]||0}</span>`:""}</button>`).join("")}</div>`;}
+function renderInventoryTabs(counts){
+ const entries=Object.entries(INVENTORY_CATEGORIES).filter(([key])=>key!=="crawler"||isInventoryPortraitMode());
+ return `<div class="inventoryTabs">${entries.map(([key,label])=>`<button class="inventoryTab ${activeInventoryCategory===key?"active":""}" type="button" data-inventory-category="${key}" aria-pressed="${activeInventoryCategory===key}"><span class="tabLabelFull">${escapeHtml(label)}</span><span class="tabLabelShort">${escapeHtml(key==="lootboxes"?"Boxes":key==="items"?"Items":label)}</span>${key!=="skills"&&key!=="crawler"?` <span>${counts[key]||0}</span>`:""}</button>`).join("")}</div>`;
+}
 
 function equippedSummary(slot){
  const item=player.equipment?.[slot];
@@ -209,6 +217,7 @@ function updateInventoryUI(){
  const counts={crawler:0,gear:0,items:0,lootboxes:0,skills:0}; for(const item of player.inventory)counts[inventoryCategoryFor(item)]++;
  setActiveInventoryCategory(activeInventoryCategory);
  panel.dataset.inventoryCategory=activeInventoryCategory;
+ panel.dataset.inventoryMode=isInventoryPortraitMode()?"portrait":"wide";
  if(eq)eq.innerHTML=renderCharacterPanel();
  const topUi=`${renderInventorySummaryCard()}${renderInventoryTabs(counts)}`;
  if(activeInventoryCategory==="crawler"){
@@ -341,3 +350,10 @@ function renderProgressionPanel() {
 }
 function toggleProgressionPanel(){activeInventoryCategory="skills"; const p=document.getElementById("inventoryPanel"); if(!p?.classList.contains("open"))toggleInventoryPanel(); else updateInventoryUI(); if(typeof syncControllerWindowFocus==="function")syncControllerWindowFocus();}
 function closeProgressionPanel(){const p=document.getElementById("progressionPanel"); if(p){p.classList.remove("open");p.style.display="";document.body.classList.remove("progressionOpen"); if(document.activeElement&&p.contains(document.activeElement))document.activeElement.blur();}}
+
+if(typeof window!=="undefined"){
+ window.addEventListener("resize",()=>{
+  const panel=document.getElementById("inventoryPanel");
+  if(panel?.classList.contains("open"))updateInventoryUI();
+ });
+}
