@@ -1,0 +1,304 @@
+/* Mobile UI rules for issue #99: shared touch targets, modal shells, HUD, and controls. */
+:root {
+  --dcw-touch-min: 48px;
+  --dcw-touch-preferred: 56px;
+  --dcw-safe-top: max(10px, env(safe-area-inset-top));
+  --dcw-safe-right: max(10px, env(safe-area-inset-right));
+  --dcw-safe-bottom: max(10px, env(safe-area-inset-bottom));
+  --dcw-safe-left: max(10px, env(safe-area-inset-left));
+  --dcw-panel-bg: linear-gradient(145deg, rgba(15, 9, 6, 0.98), rgba(31, 20, 13, 0.98) 48%, rgba(10, 8, 8, 0.99));
+  --dcw-panel-border: 2px solid rgba(214, 181, 92, 0.82);
+  --dcw-panel-radius: 16px;
+  --dcw-panel-shadow: 0 22px 56px rgba(0, 0, 0, 0.66), 0 0 30px rgba(168, 84, 30, 0.20), inset 0 0 0 1px rgba(255, 232, 156, 0.14);
+  --dcw-mobile-body-font: 12px;
+  --dcw-mobile-label-font: 13px;
+  --dcw-mobile-title-font: 16px;
+}
+
+.panelClose {
+  min-width: var(--dcw-touch-min);
+  min-height: var(--dcw-touch-min);
+  width: var(--dcw-touch-min);
+  height: var(--dcw-touch-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  touch-action: manipulation;
+}
+
+@media (hover: none) and (pointer: coarse), (max-width: 900px) {
+  button,
+  input[type="button"],
+  input[type="range"],
+  .touchButton,
+  .inventoryTab,
+  .itemBtn,
+  .weaponCell,
+  .settingsToggle,
+  .settingsAction,
+  .mpActions button {
+    min-width: var(--dcw-touch-min);
+    min-height: var(--dcw-touch-min);
+    touch-action: manipulation;
+  }
+
+  .panelClose {
+    top: var(--dcw-safe-top) !important;
+    right: var(--dcw-safe-right) !important;
+    width: var(--dcw-touch-preferred) !important;
+    height: var(--dcw-touch-preferred) !important;
+    min-width: var(--dcw-touch-preferred) !important;
+    min-height: var(--dcw-touch-preferred) !important;
+    border-radius: 50% !important;
+    font-size: 30px !important;
+    line-height: 1 !important;
+    background: radial-gradient(circle at 35% 25%, rgba(255,255,255,0.18), rgba(0,0,0,0.76) 64%) !important;
+    border: 2px solid rgba(255, 216, 107, 0.66) !important;
+    color: #fff7d6 !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.12) !important;
+  }
+
+  #settingsPanel,
+  #inventoryPanel,
+  #lootWindow,
+  #logPanel,
+  #safeRoomRecap,
+  #petMerchantPanel,
+  #progressionPanel,
+  #multiplayerPanel {
+    position: fixed !important;
+    left: var(--dcw-safe-left) !important;
+    right: var(--dcw-safe-right) !important;
+    top: var(--dcw-safe-top) !important;
+    bottom: var(--dcw-safe-bottom) !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    max-height: none !important;
+    transform: none !important;
+    padding: calc(var(--dcw-touch-preferred) + 8px) 14px 14px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    background: var(--dcw-panel-bg) !important;
+    border: var(--dcw-panel-border) !important;
+    border-radius: var(--dcw-panel-radius) !important;
+    box-shadow: var(--dcw-panel-shadow) !important;
+    color: #f3ead8;
+    font-size: var(--dcw-mobile-body-font) !important;
+  }
+
+  #settingsOverlay {
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    padding: 0 !important;
+  }
+
+  #settingsPanel {
+    display: flex !important;
+    flex-direction: column;
+    min-height: calc(100dvh - var(--dcw-safe-top) - var(--dcw-safe-bottom));
+  }
+
+  #settingsPanel h2,
+  #inventoryPanel h3,
+  #lootWindow h3,
+  #logPanel h3,
+  #safeRoomRecap h3,
+  #petMerchantPanel h3,
+  #progressionPanel h3,
+  #multiplayerPanel .panelTitle {
+    min-height: var(--dcw-touch-min);
+    margin: 0 64px 12px 0 !important;
+    display: flex;
+    align-items: center;
+    color: #ffd86b;
+    font-size: var(--dcw-mobile-title-font) !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase;
+  }
+
+  .settingsBody,
+  #inventoryList,
+  #lootWindowGrid,
+  #logEntries,
+  #recapStats,
+  #petMerchantOptions,
+  #progressionPanel,
+  .mpMemberList {
+    min-height: 0;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  #inventoryPanel.open { display: grid !important; }
+  #inventoryPanel {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto auto minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+  }
+  #equipmentStats { border-right: 0 !important; padding-right: 0 !important; }
+  #inventoryList { overflow-y: auto !important; padding-right: 4px !important; }
+  #inventoryPanel .inventoryGrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; gap: 10px !important; }
+  #inventoryPanel .inventoryTab { font-size: 12px !important; padding: 8px 12px !important; }
+  #inventoryPanel .itemBtn { font-size: 12px !important; padding: 8px 12px !important; }
+  #inventoryPanel .itemMeta,
+  #inventoryPanel .equipMeta,
+  #inventoryPanel .itemCompare,
+  #inventoryHelp,
+  .settingsControlsTips div,
+  .mpRuleText,
+  .mpMember,
+  .partyCode { font-size: var(--dcw-mobile-body-font) !important; }
+  #inventoryPanel .inventoryTitle,
+  #inventoryPanel .itemName,
+  #inventoryPanel .equipName { font-size: var(--dcw-mobile-label-font) !important; }
+
+  #lootWindow {
+    display: none;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  #lootWindow[style*="display: block"],
+  #lootWindow[style*="display:block"] { display: grid !important; }
+  #lootWindowGrid { max-height: none !important; overflow-y: auto !important; }
+  .lootWindowFooter,
+  .settingsFooter {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 10px -4px -4px !important;
+    padding: 10px 4px 0 !important;
+    background: linear-gradient(180deg, rgba(20,13,9,0), rgba(20,13,9,0.98) 22%);
+  }
+  #takeAllLootBtn,
+  #settingsDoneBtn { min-height: var(--dcw-touch-preferred) !important; font-size: 14px !important; }
+
+  #hud {
+    top: var(--dcw-safe-top) !important;
+    left: var(--dcw-safe-left) !important;
+    width: min(210px, 48dvw) !important;
+    max-width: 48dvw !important;
+    padding: 7px 8px !important;
+    font-size: 11px !important;
+  }
+  .hudBar { height: 16px !important; }
+  .hudBarText { font-size: 10px !important; }
+  .hudMeta { font-size: 10px !important; gap: 6px !important; }
+  .hudMeta > span:first-child,
+  .hudWeapon,
+  .hudPet,
+  .hudStair { display: none !important; }
+
+  #announcer {
+    top: calc(var(--dcw-safe-top) + var(--dcw-touch-preferred) + 8px) !important;
+    right: var(--dcw-safe-right) !important;
+    width: min(300px, 46dvw) !important;
+    max-width: calc(100dvw - var(--dcw-safe-left) - var(--dcw-safe-right)) !important;
+    gap: 6px !important;
+  }
+  .popup {
+    padding: 9px 10px !important;
+    border-width: 1px !important;
+    animation: slideIn 0.2s ease-out, fadeOut 0.35s ease-in 5.4s forwards !important;
+  }
+  .popup .title { font-size: 13px !important; }
+  .popup .body { font-size: 12px !important; line-height: 1.3 !important; }
+
+  .settingsButton {
+    top: var(--dcw-safe-top) !important;
+    right: var(--dcw-safe-right) !important;
+    width: var(--dcw-touch-preferred) !important;
+    height: var(--dcw-touch-preferred) !important;
+  }
+
+  #stickBase {
+    left: var(--dcw-safe-left) !important;
+    bottom: var(--dcw-safe-bottom) !important;
+    width: 126px !important;
+    height: 126px !important;
+  }
+  #attackStickBase {
+    right: var(--dcw-safe-right) !important;
+    bottom: var(--dcw-safe-bottom) !important;
+    width: 132px !important;
+    height: 132px !important;
+  }
+  .touchButton { min-width: var(--dcw-touch-min) !important; min-height: var(--dcw-touch-min) !important; }
+  #btnAttack { width: 76px !important; height: 76px !important; left: 28px !important; top: 28px !important; }
+  #btnDodge { right: calc(var(--dcw-safe-right) + 140px) !important; bottom: calc(var(--dcw-safe-bottom) + 14px) !important; width: 64px !important; height: 64px !important; }
+  #btnInteract { right: calc(var(--dcw-safe-right) + 108px) !important; bottom: calc(var(--dcw-safe-bottom) + 92px) !important; width: 60px !important; height: 60px !important; }
+  #btnWeapon { right: calc(var(--dcw-safe-right) + 22px) !important; bottom: calc(var(--dcw-safe-bottom) + 140px) !important; width: 58px !important; height: 58px !important; }
+  #btnInv, #btnNew, #btnRecap, #btnLog {
+    top: calc(var(--dcw-safe-top) + var(--dcw-touch-preferred) + 8px) !important;
+    width: var(--dcw-touch-min) !important;
+    height: var(--dcw-touch-min) !important;
+    font-size: 11px !important;
+  }
+  #btnLog { right: var(--dcw-safe-right) !important; }
+  #btnRecap { right: calc(var(--dcw-safe-right) + 54px) !important; }
+  #btnNew { right: calc(var(--dcw-safe-right) + 108px) !important; }
+  #btnInv { right: calc(var(--dcw-safe-right) + 162px) !important; }
+}
+
+@media (orientation: landscape) and (max-height: 540px),
+       (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  #inventoryPanel,
+  #lootWindow,
+  #settingsPanel,
+  #logPanel,
+  #safeRoomRecap,
+  #petMerchantPanel,
+  #progressionPanel,
+  #multiplayerPanel {
+    border-radius: 14px !important;
+    padding: calc(var(--dcw-touch-preferred) + 4px) 12px 10px !important;
+    font-size: 12px !important;
+  }
+
+  #inventoryPanel {
+    grid-template-columns: minmax(230px, 34%) minmax(0, 1fr) !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    column-gap: 12px !important;
+  }
+  #inventoryPanel h3,
+  #inventoryPanel .panelClose,
+  #inventoryHelp { grid-column: 1 / -1 !important; }
+  #equipmentStats { overflow-y: auto !important; }
+  #inventoryList { max-height: none !important; }
+  #inventoryPanel .inventoryGrid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)) !important; }
+  #inventoryPanel .equipGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  #inventoryPanel .weaponGrid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+  #lootWindow { grid-template-rows: auto minmax(0, 1fr) auto !important; }
+  #lootWindowGrid.inventoryGrid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important; }
+
+  #hud { width: 190px !important; max-width: 32dvw !important; }
+  #announcer { width: min(260px, 34dvw) !important; }
+}
+
+@media (orientation: portrait) and (hover: none),
+       (orientation: portrait) and (max-width: 700px) {
+  #inventoryPanel,
+  #lootWindow,
+  #settingsPanel,
+  #logPanel,
+  #safeRoomRecap,
+  #petMerchantPanel,
+  #progressionPanel,
+  #multiplayerPanel {
+    border-radius: 0 !important;
+  }
+  #inventoryPanel .inventoryGrid,
+  #lootWindowGrid.inventoryGrid { grid-template-columns: 1fr !important; }
+  #hud { width: calc(100dvw - var(--dcw-safe-left) - var(--dcw-safe-right) - var(--dcw-touch-preferred) - 16px) !important; max-width: none !important; }
+  #announcer {
+    top: calc(var(--dcw-safe-top) + 118px) !important;
+    left: var(--dcw-safe-left) !important;
+    right: var(--dcw-safe-right) !important;
+    width: auto !important;
+  }
+  #stickBase { width: 118px !important; height: 118px !important; }
+  #attackStickBase { width: 124px !important; height: 124px !important; }
+}
