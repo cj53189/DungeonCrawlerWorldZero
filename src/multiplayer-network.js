@@ -146,7 +146,7 @@ function requestServerQuickMatch(options = {}) {
 }
 
 function requestServerLeaveLobby() {
-  if (typeof stopVoiceChat === "function") stopVoiceChat("multiplayer_disconnected");
+  if (typeof stopVoiceChat === "function") stopVoiceChat("left_lobby");
   if (!isMultiplayerNetworkReady() || !multiplayer.usingServer) return false;
   return sendMultiplayerMessage("leave_lobby");
 }
@@ -256,23 +256,28 @@ function handleMultiplayerServerMessage(message) {
       break;
     case "lobby_update":
       applyServerLobbyUpdate(message);
+      if (typeof syncVoicePeersToMultiplayerState === "function") syncVoicePeersToMultiplayerState();
       break;
     case "staging_complete":
       handleServerFloor0Resolved({ lobbyCode: message.lobbyCode, advancedPlayerIds: [], failedPlayerIds: [multiplayer.playerId], players: [] });
       break;
     case "floor0_resolved":
       handleServerFloor0Resolved(message);
+      if (typeof syncVoicePeersToMultiplayerState === "function") syncVoicePeersToMultiplayerState();
       break;
     case "floor_start":
       handleServerFloorStart(message);
+      if (typeof syncVoicePeersToMultiplayerState === "function") syncVoicePeersToMultiplayerState();
       break;
     case "player_left":
       if (typeof cleanupVoicePeer === "function") cleanupVoicePeer(message.playerId, "player_left");
       multiplayer.remotePlayers.delete(message.playerId);
       if (typeof announcer === "function") announcer(`${message.name || "A crawler"} left Floor 0. The collapse timer will not increase.`);
+      if (typeof syncVoicePeersToMultiplayerState === "function") syncVoicePeersToMultiplayerState();
       break;
     case "crawler_snapshot":
       applyServerCrawlerSnapshot(message);
+      if (typeof syncVoicePeersToMultiplayerState === "function") syncVoicePeersToMultiplayerState();
       break;
     case "floor0_world_state":
       applyFloor0WorldState(message);
