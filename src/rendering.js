@@ -502,10 +502,12 @@ function drawRemoteCrawlerVoiceIcon(crawler) {
   ctx.lineWidth = 3;
   const iconX = crawler.x;
   const iconY = crawler.y - 58;
+  const channel = typeof getVoiceChannelForPlayer === "function" ? getVoiceChannelForPlayer(crawler.id) : "proximity";
+  const label = channel === "party" ? "PARTY" : "VOICE";
   ctx.strokeStyle = "rgba(0,0,0,0.75)";
   ctx.fillStyle = "rgba(255,255,255,0.94)";
-  ctx.strokeText("VOICE", iconX, iconY);
-  ctx.fillText("VOICE", iconX, iconY);
+  ctx.strokeText(label, iconX, iconY);
+  ctx.fillText(label, iconX, iconY);
   ctx.restore();
 }
 

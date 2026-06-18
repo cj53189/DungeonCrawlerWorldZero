@@ -194,14 +194,18 @@
       if (!isLocal) {
         const voiceStatus = typeof getVoiceRemoteStatus === "function"
           ? getVoiceRemoteStatus(member.id)
-          : { connected: false, muted: false, inRange: false };
+          : { connected: false, muted: false, volume: 0, channel: "proximity" };
         const voiceLabel = document.createElement("span");
         voiceLabel.className = "mpVoiceStatus";
         voiceLabel.textContent = voiceStatus.muted
           ? "Voice: muted"
-          : voiceStatus.connected
-            ? (voiceStatus.inRange ? "Voice: near" : "Voice: far")
-            : "Voice: off";
+          : voiceStatus.channel === "party"
+            ? "Voice: party"
+            : voiceStatus.volume > 0
+              ? "Voice: nearby"
+              : voiceStatus.connected
+                ? "Voice: far"
+                : "Voice: off";
 
         const muteButton = document.createElement("button");
         muteButton.type = "button";

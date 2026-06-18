@@ -98,14 +98,45 @@ function getVoiceVolumeForDistance(distanceTiles) {
   return clampVoiceVolume(1 - ((distance - VOICE_FULL_VOLUME_TILES) / fadeRange));
 }
 
+function getLocalVoicePartyId() {
+  const multiplayerState = typeof multiplayer !== "undefined" ? multiplayer : null;
+  const localPlayer = typeof player !== "undefined" ? player : null;
+  return multiplayerState?.partyId || localPlayer?.partyId || null;
+}
+
+function getRemoteVoicePartyId(playerId) {
+  const multiplayerState = typeof multiplayer !== "undefined" ? multiplayer : null;
+  const crawler = multiplayerState?.remotePlayers?.get?.(playerId);
+  return crawler?.partyId || null;
+}
+
+function isVoicePartyMember(playerId) {
+  const localPartyId = getLocalVoicePartyId();
+  const remotePartyId = getRemoteVoicePartyId(playerId);
+  return !!localPartyId && !!remotePartyId && localPartyId === remotePartyId;
+}
+
+function getVoiceChannelForPlayer(playerId) {
+  return isVoicePartyMember(playerId) ? "party" : "proximity";
+}
+
 function updateVoiceProximityVolumes() {
+  const enabled = isVoiceChatEnabled();
   for (const [playerId, audio] of voiceChat.remoteAudio.entries()) {
-    const distance = getVoiceDistanceToRemotePlayer(playerId);
-    const volume = isVoiceChatEnabled() ? getVoiceVolumeForDistance(distance) : 0;
-    const clampedVolume = clampVoiceVolume(volume);
     const manuallyMuted = isVoicePlayerMuted(playerId);
+    let volume = 0;
+
+    if (enabled && !manuallyMuted) {
+      if (getVoiceChannelForPlayer(playerId) === "party") {
+        volume = 1;
+      } else {
+        volume = getVoiceVolumeForDistance(getVoiceDistanceToRemotePlayer(playerId));
+      }
+    }
+
+    const clampedVolume = clampVoiceVolume(volume);
     audio.volume = clampedVolume;
-    audio.muted = !isVoiceChatEnabled() || manuallyMuted || clampedVolume <= 0;
+    audio.muted = !enabled || manuallyMuted || clampedVolume <= 0;
     voiceChat.peerVolumes.set(playerId, clampedVolume);
     updateRemoteSpeakingState(playerId, audio);
   }
@@ -198,11 +229,13 @@ function isLocalVoiceTransmitting() {
 
 function getVoiceRemoteStatus(playerId) {
   const volume = voiceChat.peerVolumes?.get(playerId) ?? 0;
+  const channel = getVoiceChannelForPlayer(playerId);
   return {
     connected: !!(voiceChat.peers?.has(playerId) || voiceChat.remoteAudio?.has(playerId)),
     muted: isVoicePlayerMuted(playerId),
     volume,
-    inRange: volume > 0
+    inRange: channel === "party" || volume > 0,
+    channel
   };
 }
 
@@ -228,7 +261,8 @@ function getVoiceDebugStatus() {
       playerId,
       distance,
       volume: clampVoiceVolume(volume),
-      muted: voiceChat.mode === "off" || voiceChat.mutedPlayerIds.has(playerId) || clampVoiceVolume(volume) <= 0
+      muted: voiceChat.mode === "off" || voiceChat.mutedPlayerIds.has(playerId) || clampVoiceVolume(volume) <= 0,
+      channel: getVoiceChannelForPlayer(playerId)
     };
   });
 }
@@ -480,6 +514,8 @@ function cleanupVoicePeer(targetPlayerId, reason = "cleanup") {
 window.isVoicePlayerMuted = isVoicePlayerMuted;
 window.toggleVoicePlayerMuted = toggleVoicePlayerMuted;
 window.getVoiceRemoteStatus = getVoiceRemoteStatus;
+window.getVoiceChannelForPlayer = getVoiceChannelForPlayer;
+window.isVoicePartyMember = isVoicePartyMember;
 window.isLocalVoiceTransmitting = isLocalVoiceTransmitting;
 function getVoicePeerSummary() {
   return {
