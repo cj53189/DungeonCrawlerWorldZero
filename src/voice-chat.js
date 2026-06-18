@@ -7,6 +7,8 @@ var voiceChat = {
   remoteAudio: new Map(),
   mutedPlayerIds: new Set(),
   peerVolumes: new Map(),
+  localSpeaking: false,
+  remoteSpeaking: new Map(),
   proximityTimer: null,
   selfMuted: true,
   initialized: false,
@@ -82,13 +84,68 @@ function getVoiceVolumeForDistance(distanceTiles) {
 function updateVoiceProximityVolumes() {
   for (const [playerId, audio] of voiceChat.remoteAudio.entries()) {
     const distance = getVoiceDistanceToRemotePlayer(playerId);
-    const volume = voiceChat.enabled && voiceChat.mode !== "off" ? getVoiceVolumeForDistance(distance) : 0;
+    const volume = isVoiceChatEnabled() ? getVoiceVolumeForDistance(distance) : 0;
     const clampedVolume = clampVoiceVolume(volume);
-    const manuallyMuted = voiceChat.mutedPlayerIds.has(playerId);
+    const manuallyMuted = isVoicePlayerMuted(playerId);
     audio.volume = clampedVolume;
-    audio.muted = voiceChat.mode === "off" || manuallyMuted || clampedVolume <= 0;
+    audio.muted = !isVoiceChatEnabled() || manuallyMuted || clampedVolume <= 0;
     voiceChat.peerVolumes.set(playerId, clampedVolume);
+    updateRemoteSpeakingState(playerId, audio);
   }
+  if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
+}
+
+
+function isVoicePlayerMuted(playerId) {
+  return voiceChat.mutedPlayerIds.has(playerId);
+}
+
+function setVoicePlayerMuted(playerId, muted) {
+  if (!playerId) return false;
+  if (muted) voiceChat.mutedPlayerIds.add(playerId);
+  else voiceChat.mutedPlayerIds.delete(playerId);
+  updateVoiceProximityVolumes();
+  if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
+  if (typeof renderQuickPartyUi === "function") renderQuickPartyUi();
+  return true;
+}
+
+function toggleVoicePlayerMuted(playerId) {
+  return setVoicePlayerMuted(playerId, !isVoicePlayerMuted(playerId));
+}
+
+function isVoiceChatEnabled() {
+  return !!voiceChat.enabled && voiceChat.mode !== "off";
+}
+
+function isLocalVoiceTransmitting() {
+  return isVoiceChatEnabled()
+    && voiceChat.localStream
+    && Array.from(voiceChat.localStream.getAudioTracks()).some(track => track.enabled);
+}
+
+function getVoiceRemoteStatus(playerId) {
+  const volume = voiceChat.peerVolumes?.get(playerId) ?? 0;
+  return {
+    connected: !!(voiceChat.peers?.has(playerId) || voiceChat.remoteAudio?.has(playerId)),
+    muted: isVoicePlayerMuted(playerId),
+    volume,
+    inRange: volume > 0
+  };
+}
+
+function updateRemoteSpeakingState(playerId, audio = voiceChat.remoteAudio?.get(playerId)) {
+  if (!playerId || !voiceChat.remoteSpeaking) return;
+  const active = !!audio && !audio.paused && !audio.muted && (voiceChat.peerVolumes?.get(playerId) ?? 0) > 0 && !isVoicePlayerMuted(playerId);
+  if (active) voiceChat.remoteSpeaking.set(playerId, Date.now() + (VOICE_PROXIMITY_UPDATE_MS * 2));
+  else voiceChat.remoteSpeaking.delete(playerId);
+}
+
+function isRemoteVoiceActive(playerId) {
+  const status = getVoiceRemoteStatus(playerId);
+  if (!status.connected || status.muted || status.volume <= 0) return false;
+  const activeUntil = voiceChat.remoteSpeaking?.get(playerId) || 0;
+  return activeUntil > Date.now();
 }
 
 function getVoiceDebugStatus() {
@@ -120,7 +177,7 @@ function setVoiceChatMode(mode) {
   else stopVoiceProximityTimer();
   updateLocalVoiceTrackState();
   updateVoiceProximityVolumes();
-  if (typeof updateVoiceChatSettingsUI === "function") updateVoiceChatSettingsUI();
+  if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
 }
 
 async function requestVoiceMicrophone() {
@@ -130,7 +187,7 @@ async function requestVoiceMicrophone() {
   if (!navigator.mediaDevices?.getUserMedia) {
     voiceChat.lastError = "Microphone access is not available in this browser.";
     if (typeof announcer === "function") announcer("Voice chat needs a browser with microphone support.");
-    if (typeof updateVoiceChatSettingsUI === "function") updateVoiceChatSettingsUI();
+    if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
     return null;
   }
 
@@ -142,13 +199,13 @@ async function requestVoiceMicrophone() {
     for (const pc of voiceChat.peers.values()) {
       addLocalVoiceTracks(pc);
     }
-    if (typeof updateVoiceChatSettingsUI === "function") updateVoiceChatSettingsUI();
+    if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
     return stream;
   } catch (err) {
     voiceChat.lastError = err?.message || "Microphone permission was denied.";
     updateLocalVoiceTrackState();
     if (typeof announcer === "function") announcer("Voice chat could not access your microphone. Check browser permissions to use push-to-talk.");
-    if (typeof updateVoiceChatSettingsUI === "function") updateVoiceChatSettingsUI();
+    if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
     return null;
   }
 }
@@ -180,7 +237,7 @@ function stopVoiceChat(reason = "stopped") {
   stopVoiceProximityTimer();
   updateLocalVoiceTrackState();
   updateVoiceProximityVolumes();
-  if (typeof updateVoiceChatSettingsUI === "function") updateVoiceChatSettingsUI();
+  if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
 }
 
 async function connectVoicePeer(targetPlayerId, options = {}) {
@@ -217,7 +274,8 @@ function createVoicePeerConnection(targetPlayerId) {
     }
     audio.srcObject = event.streams?.[0] || new MediaStream([event.track]);
     updateVoiceProximityVolumes();
-    audio.play?.().catch(() => {});
+    const playResult = audio.play?.();
+    playResult?.then?.(() => updateRemoteSpeakingState(targetPlayerId, audio))?.catch?.(() => {});
   });
   pc.addEventListener("connectionstatechange", () => {
     if (["closed", "failed", "disconnected"].includes(pc.connectionState)) cleanupVoicePeer(targetPlayerId, pc.connectionState);
@@ -295,6 +353,7 @@ function handleVoiceDisconnect(message) {
 function setVoicePushToTalkActive(active) {
   if (voiceChat.mode !== "push_to_talk") return;
   voiceChat.selfMuted = !active;
+  voiceChat.localSpeaking = !!active && !!isLocalVoiceTransmitting();
   updateLocalVoiceTrackState();
 }
 
@@ -303,7 +362,8 @@ function updateLocalVoiceTrackState() {
   for (const track of voiceChat.localStream?.getAudioTracks?.() || []) {
     track.enabled = shouldEnable;
   }
-  if (typeof updateVoiceChatSettingsUI === "function") updateVoiceChatSettingsUI();
+  voiceChat.localSpeaking = !!isLocalVoiceTransmitting();
+  if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
 }
 
 function cleanupVoicePeer(targetPlayerId, reason = "cleanup") {
@@ -321,6 +381,15 @@ function cleanupVoicePeer(targetPlayerId, reason = "cleanup") {
     voiceChat.remoteAudio.delete(targetPlayerId);
   }
   voiceChat.peerVolumes.delete(targetPlayerId);
+  voiceChat.remoteSpeaking?.delete(targetPlayerId);
+  if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
+  if (typeof renderQuickPartyUi === "function") renderQuickPartyUi();
 }
+
+window.isVoicePlayerMuted = isVoicePlayerMuted;
+window.toggleVoicePlayerMuted = toggleVoicePlayerMuted;
+window.getVoiceRemoteStatus = getVoiceRemoteStatus;
+window.isLocalVoiceTransmitting = isLocalVoiceTransmitting;
+window.isRemoteVoiceActive = isRemoteVoiceActive;
 
 window.addEventListener("DOMContentLoaded", initVoiceChat);

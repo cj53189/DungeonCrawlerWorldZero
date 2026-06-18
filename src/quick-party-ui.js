@@ -190,6 +190,37 @@
       statusSpan.textContent = `${role}${floorStatus}`;
 
       row.append(nameSpan, statusSpan);
+
+      if (!isLocal) {
+        const voiceStatus = typeof getVoiceRemoteStatus === "function"
+          ? getVoiceRemoteStatus(member.id)
+          : { connected: false, muted: false, inRange: false };
+        const voiceLabel = document.createElement("span");
+        voiceLabel.className = "mpVoiceStatus";
+        voiceLabel.textContent = voiceStatus.muted
+          ? "Voice: muted"
+          : voiceStatus.connected
+            ? (voiceStatus.inRange ? "Voice: near" : "Voice: far")
+            : "Voice: off";
+
+        const muteButton = document.createElement("button");
+        muteButton.type = "button";
+        muteButton.className = "mpVoiceMuteBtn";
+        muteButton.textContent = voiceStatus.muted ? "Unmute" : "Mute";
+        muteButton.title = voiceStatus.muted ? "Unmute voice for this crawler" : "Mute voice for this crawler";
+        muteButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof toggleVoicePlayerMuted === "function") toggleVoicePlayerMuted(member.id);
+          renderQuickPartyUi();
+        });
+
+        const voiceControls = document.createElement("div");
+        voiceControls.className = "mpVoiceControls";
+        voiceControls.append(voiceLabel, muteButton);
+        row.appendChild(voiceControls);
+      }
+
       list.appendChild(row);
     }
   }
@@ -218,11 +249,15 @@
     const style = document.createElement("style");
     style.id = "quickPartyUiStyles";
     style.textContent = `
+      .mpMember { gap: 6px; }
       .mpMember span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .mpMember span:last-child { text-align: right; font-weight: 800; font-size: 10px; color: #cbd3ff; }
+      .mpMember > span:nth-child(2) { text-align: right; font-weight: 800; font-size: 10px; color: #cbd3ff; }
+      .mpVoiceControls { display:flex; align-items:center; justify-content:flex-end; gap:4px; flex-wrap:wrap; }
+      .mpVoiceStatus { font-size:9px; font-weight:900; color:#9fd7ff; white-space:nowrap; }
+      .mpVoiceMuteBtn { min-height:24px; padding:2px 6px; font-size:10px; font-weight:900; }
       .mpMemberParty { border-color: rgba(156,255,177,0.32); background: rgba(156,255,177,0.08); }
       .mpMemberLocal { border-color: rgba(255,216,107,0.32); }
-      .mpMemberSolo span:last-child { color: #d7d7d7; }
+      .mpMemberSolo > span:nth-child(2) { color: #d7d7d7; }
       .mpMemberInvite { border-color: rgba(255,216,107,0.48); background: rgba(255,216,107,0.08); }
       .mpPendingInviteCard { display:flex; align-items:center; gap:8px; padding:8px; margin:0 0 6px; border:1px solid rgba(255,216,107,0.62); border-radius:8px; background:rgba(255,216,107,0.12); }
       .mpPendingInviteText { flex:1; min-width:0; font-size:12px; font-weight:900; color:#fff2ba; }

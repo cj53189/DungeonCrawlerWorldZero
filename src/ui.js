@@ -327,17 +327,26 @@ function updateVoiceChatSettingsUI() {
   const button = document.getElementById("voiceChatToggleBtn");
   const status = document.getElementById("voiceChatStatusText");
   const active = typeof voiceChat !== "undefined" && voiceChat.mode === "push_to_talk";
+  const multiplayerReady = typeof multiplayer !== "undefined" && multiplayer?.enabled && multiplayer?.usingServer && multiplayer?.playerId;
   if (button) {
     button.textContent = active ? "Push-to-talk" : "Off";
     button.setAttribute("aria-pressed", String(active));
   }
   if (status) {
-    if (!active) status.textContent = "Disabled";
-    else if (voiceChat.lastError) status.textContent = `Error: ${voiceChat.lastError}`;
-    else if (voiceChat.localStream) status.textContent = voiceChat.selfMuted ? "Ready · Hold V to talk" : "Talking";
-    else status.textContent = "Waiting for microphone permission";
+    if (!active) status.textContent = "Off · Mic: muted";
+    else if (!multiplayerReady) status.textContent = "Multiplayer required · Mic: muted";
+    else if (voiceChat.lastError) status.textContent = "Mic blocked";
+    else if (typeof isLocalVoiceTransmitting === "function" && isLocalVoiceTransmitting()) status.textContent = "Talking · Mic: talking";
+    else if (voiceChat.localStream) status.textContent = "Push-to-talk ready · Hold V · Mic: hold V";
+    else status.textContent = "Push-to-talk ready · Hold V";
   }
 }
+
+function updateVoiceChatUi() {
+  updateVoiceChatSettingsUI();
+}
+
+window.updateVoiceChatUi = updateVoiceChatUi;
 
 async function toggleVoiceChatFromSettings() {
   const active = typeof voiceChat !== "undefined" && voiceChat.mode === "push_to_talk";
