@@ -87,6 +87,14 @@
           <span>Volume <strong id="musicVolumeValue">35%</strong></span>
           <input id="musicVolumeSlider" type="range" min="0" max="100" step="5" value="35">
         </label>
+        <div class="settingsRow">
+          <span>Voice Chat <small>Hold V to talk</small></span>
+          <button id="voiceChatToggleBtn" class="settingsToggle" type="button" aria-pressed="false">Off</button>
+        </div>
+        <div class="settingsRow" aria-live="polite">
+          <span>Status</span>
+          <small id="voiceChatStatusText">Disabled</small>
+        </div>
       </section>
       <section class="settingsSection">
         <h3>Interface</h3>
@@ -253,6 +261,7 @@
 <script defer src="./src/simulation.js"></script>
 <script defer src="./src/inventory.js"></script>
 <script defer src="./src/multiplayer-network.js"></script>
+<script defer src="./src/voice-chat.js"></script>
 <script defer src="./src/multiplayer.js"></script>
 <script defer src="./src/ui.js"></script>
 <script defer src="./src/leaderboard.js"></script>
