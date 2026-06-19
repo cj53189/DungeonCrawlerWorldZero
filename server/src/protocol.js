@@ -103,22 +103,6 @@ function parseClientMessage(raw) {
   return { message };
 }
 
-function scheduleVoiceRelayExtension() {
-  if (scheduleVoiceRelayExtension.scheduled) return;
-  scheduleVoiceRelayExtension.scheduled = true;
-  process.nextTick(() => {
-    try {
-      const { LobbyManager } = require("./rooms");
-      const { applyVoiceRelayExtension } = require("./voice-relay-extension");
-      if (LobbyManager && typeof applyVoiceRelayExtension === "function") applyVoiceRelayExtension(LobbyManager);
-    } catch (err) {
-      console.warn("Voice relay extension could not be installed.", err?.message || err);
-    }
-  });
-}
-
-scheduleVoiceRelayExtension();
-
 module.exports = {
   CLIENT_MESSAGES,
   SERVER_MESSAGES,
