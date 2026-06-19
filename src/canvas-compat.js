@@ -271,15 +271,3 @@
     install();
   }
 })();
-
-(function loadVoiceDebugOverlayAfterGameScripts() {
-  function loadVoiceDebugOverlay() {
-    if (document.querySelector('script[src="./src/voice-debug-overlay.js"]')) return;
-    const script = document.createElement("script");
-    script.src = "./src/voice-debug-overlay.js";
-    document.head.appendChild(script);
-  }
-
-  if (document.readyState === "complete") loadVoiceDebugOverlay();
-  else window.addEventListener("load", loadVoiceDebugOverlay, { once: true });
-})();
