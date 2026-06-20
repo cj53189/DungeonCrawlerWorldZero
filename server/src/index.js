@@ -226,7 +226,7 @@ wss.on("connection", (ws) => {
         case CLIENT_MESSAGES.PARTY_CREATE:
         case CLIENT_MESSAGES.CREATE_LOBBY:
           rooms.updateClientProfile(playerId, message.profile || message);
-          rooms.joinQuickMatch(playerId);
+          rooms.createPrivateLobby(playerId);
           break;
         case CLIENT_MESSAGES.PARTY_JOIN_BY_CODE:
         case CLIENT_MESSAGES.JOIN_LOBBY:

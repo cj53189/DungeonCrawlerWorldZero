@@ -82,9 +82,27 @@ const FLOOR0_COLLAPSE_CAPS_MS = Object.freeze({
   4: 3 * 60 * 1000
 });
 
+let serverSeq = 0;
+
+function nextServerSeq() {
+  serverSeq = (serverSeq + 1) % Number.MAX_SAFE_INTEGER;
+  return serverSeq;
+}
+
+function serverMessageMetadata(payload = {}) {
+  const floor = payload.currentFloor ?? payload.floor;
+  return {
+    ...(payload.runId ? { runId: payload.runId } : {}),
+    ...(floor === undefined ? {} : { currentFloor: floor, floor }),
+    serverSeq: nextServerSeq(),
+    serverTick: Date.now(),
+    serverTime: Date.now()
+  };
+}
+
 function safeSend(ws, type, payload = {}) {
   if (ws.readyState !== ws.OPEN) return false;
-  ws.send(JSON.stringify({ type, ...payload }));
+  ws.send(JSON.stringify({ type, ...serverMessageMetadata(payload), ...payload }));
   return true;
 }
 
@@ -98,6 +116,16 @@ function parseClientMessage(raw) {
 
   if (!message || typeof message !== "object" || typeof message.type !== "string") {
     return { error: "Message must include a string type." };
+  }
+
+  if (message.clientSeq !== undefined && (!Number.isFinite(Number(message.clientSeq)) || Number(message.clientSeq) < 0)) {
+    return { error: "clientSeq must be a non-negative number when provided." };
+  }
+  if (message.sentAt !== undefined && !Number.isFinite(Number(message.sentAt))) {
+    return { error: "sentAt must be a timestamp number when provided." };
+  }
+  if (message.runId !== undefined && typeof message.runId !== "string") {
+    return { error: "runId must be a string when provided." };
   }
 
   return { message };

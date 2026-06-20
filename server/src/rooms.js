@@ -26,6 +26,8 @@ const PLAYER_COLORS = ["#75c7ff", "#ff9bd1", "#ffd86b", "#9cffb1"];
 const CRAWLER_STATE_BROADCAST_MS = 100;
 const FLOOR0_ENEMY_SNAPSHOT_MS = 150;
 const CRAWLER_STATUS_VALUES = new Set(["active", "downed", "stasis"]);
+function messageFromEvent(event = {}) { return { type: `world:${event.type || "event"}`, clientSeq: event.clientSeq }; }
+
 const FLOOR0_ADVANCE_STATUSES = Object.freeze({
   EXPLORING: "exploring",
   AT_STAIRS: "at_stairs",
@@ -225,7 +227,8 @@ class LobbyManager {
       crawlerSnapshotTimer: null,
       enemySnapshotTimer: null,
       lastCrawlerSnapshotAt: 0,
-      lastEnemySnapshotAt: 0
+      lastEnemySnapshotAt: 0,
+      acceptedWorldEventIds: new Set()
     };
     lobby.floor0 = this.createFloor0Metadata(lobby, lobby.floor0CollapseAt);
     lobby.floorWorldStates.set(0, lobby.worldState);
@@ -253,7 +256,8 @@ class LobbyManager {
       floor0Status: FLOOR0_ADVANCE_STATUSES.EXPLORING,
       floor0ReachedStairsAt: null,
       lastPvpDownCredit: null,
-      pvpDamageAuthorityUntil: 0
+      pvpDamageAuthorityUntil: 0,
+      lastClientSeqByType: new Map()
     });
     if (!lobby.arena) this.applyFloor0LateJoinTimer(lobby);
     if (lobby.arena) return;
@@ -395,6 +399,28 @@ class LobbyManager {
     });
   }
 
+  validateRunFloorMessage(lobby, message = {}, { requireRunId = false, requireFloor = true } = {}) {
+    if (!lobby || !message || typeof message !== "object") return false;
+    if (requireRunId && message.runId !== lobby.runId) return false;
+    if (message.runId && message.runId !== lobby.runId) return false;
+    const messageFloor = message.currentFloor ?? message.floor;
+    if (!requireFloor && messageFloor === undefined) return true;
+    if (!Number.isFinite(Number(messageFloor))) return false;
+    return Math.trunc(Number(messageFloor)) === lobby.floor;
+  }
+
+  acceptClientSequence(player, message = {}) {
+    if (!player || !message || message.clientSeq === undefined) return true;
+    const seq = Math.trunc(Number(message.clientSeq));
+    if (!Number.isFinite(seq) || seq < 0) return false;
+    if (!player.lastClientSeqByType) player.lastClientSeqByType = new Map();
+    const key = String(message.type || "message");
+    const last = player.lastClientSeqByType.get(key) || 0;
+    if (seq <= last) return false;
+    player.lastClientSeqByType.set(key, seq);
+    return true;
+  }
+
   updateCrawlerState(playerId, state) {
     const client = this.requireClient(playerId);
     if (!client.lobbyCode) return false;
@@ -404,6 +430,9 @@ class LobbyManager {
 
     const player = lobby.players.find(candidate => candidate.id === playerId);
     if (!player) return false;
+
+    if (!this.acceptClientSequence(player, state)) return false;
+    if (!this.validateRunFloorMessage(lobby, state, { requireFloor: true })) return false;
 
     const sanitized = this.sanitizeCrawlerState(state);
     if (!sanitized || sanitized.currentFloor !== lobby.floor) {
@@ -507,6 +536,7 @@ class LobbyManager {
     lobby.lastCrawlerSnapshotAt = now;
     this.broadcast(lobby, SERVER_MESSAGES.CRAWLER_SNAPSHOT, {
       lobbyCode: lobby.code,
+      runId: lobby.runId,
       currentFloor: lobby.floor,
       players: lobby.players
         .filter(player => player.crawlerState?.currentFloor === lobby.floor)
@@ -535,6 +565,8 @@ class LobbyManager {
     const target = lobby.players.find(candidate => candidate.id === targetId);
     if (!attacker || !target) return reject("attacker/target not in same run");
     if (attacker.id === target.id) return reject("self damage");
+    if (!this.acceptClientSequence(attacker, message)) return reject("stale damage message");
+    if (!this.validateRunFloorMessage(lobby, message, { requireFloor: true })) return reject("wrong run or floor");
     if (lobby.floor < 1 || Math.trunc(Number(message.floor)) !== lobby.floor) return reject("floor pvp disabled");
     if (attacker.partyId && target.partyId && attacker.partyId === target.partyId) return reject("same party");
     if (!attacker.crawlerState || !target.crawlerState) return reject("missing crawler state");
@@ -569,6 +601,7 @@ class LobbyManager {
 
     const payload = {
       lobbyCode: lobby.code,
+      runId: lobby.runId,
       attackerId: attacker.id,
       targetPlayerId: target.id,
       damage: beforeHp - hp,
@@ -591,6 +624,9 @@ class LobbyManager {
     if (!client.lobbyCode) return false;
     const lobby = this.lobbies.get(client.lobbyCode);
     if (!lobby || !event || typeof event !== "object") return false;
+    const player = lobby.players.find(candidate => candidate.id === playerId);
+    if (!this.acceptClientSequence(player, messageFromEvent(event))) return false;
+    if (!this.validateRunFloorMessage(lobby, event, { requireFloor: false })) return false;
 
     const normalized = this.applyFloor0WorldEvent(lobby, event);
     if (!normalized) return false;
@@ -610,17 +646,28 @@ class LobbyManager {
     const id = typeof event.id === "string" ? event.id.slice(0, 80) : null;
     if (!id) return null;
 
+    const eventId = typeof event.eventId === "string" ? event.eventId.slice(0, 120) : `${type}:${id}`;
+    if (!lobby.acceptedWorldEventIds) lobby.acceptedWorldEventIds = new Set();
+    if (lobby.acceptedWorldEventIds.has(eventId)) return null;
+
     if (type === "door_opened") {
       world.openedDoorIds.add(id);
-      return { type, id };
+      lobby.acceptedWorldEventIds.add(eventId);
+      return { type, id, eventId };
     }
     if (type === "chest_opened") {
       world.openedChestIds.add(id);
-      return { type, id };
+      lobby.acceptedWorldEventIds.add(eventId);
+      return { type, id, eventId };
     }
     if (type === "loot_taken") {
       world.takenLootIds.add(id);
-      return { type, id };
+      lobby.acceptedWorldEventIds.add(eventId);
+      return { type, id, eventId };
+    }
+    if (type === "stairwell_found") {
+      lobby.acceptedWorldEventIds.add(eventId);
+      return { type, id, eventId, stairs: event.stairs || null };
     }
     if (type === "enemy_damaged" || type === "enemy_killed") {
       const state = this.sanitizeEnemyState(event.enemy || event);
@@ -631,7 +678,8 @@ class LobbyManager {
         : { ...existing, ...state, alive: type === "enemy_killed" ? false : state.alive };
       if (type === "enemy_killed") merged.hp = 0;
       world.enemyStates.set(merged.enemyId, merged);
-      return { type, id: state.enemyId, enemy: { ...merged } };
+      lobby.acceptedWorldEventIds.add(eventId);
+      return { type, id: state.enemyId, eventId, enemy: { ...merged } };
     }
     return null;
   }
@@ -643,6 +691,8 @@ class LobbyManager {
     if (!lobby) return false;
 
     const player = lobby.players.find(candidate => candidate.id === playerId);
+    if (!this.acceptClientSequence(player, message)) return false;
+    if (!this.validateRunFloorMessage(lobby, message, { requireFloor: true })) return false;
     const roomId = Number.isFinite(Number(message.roomId)) ? Math.trunc(Number(message.roomId)) : player?.crawlerState?.currentRoomId;
     if (!Number.isFinite(roomId)) return false;
 
@@ -745,6 +795,7 @@ class LobbyManager {
     if (!enemies.length) return;
     const payload = {
       lobbyCode: lobby.code,
+      runId: lobby.runId,
       currentFloor: lobby.floor,
       activeRoomIds: Array.from(occupiedRooms),
       ownerPlayerId,
@@ -1003,8 +1054,8 @@ class LobbyManager {
     const corpse = { id, kind: "player", playerCorpse: true, deadPlayerId: player.id, deadPlayerName: player.name, floor: lobby.floor, x: player.crawlerState.x, y: player.crawlerState.y, roomId: player.crawlerState.currentRoomId ?? null, r: 13, name: `${player.name}'s Corpse`, loot, looted: loot.length === 0, createdAt: Date.now() };
     player.playerCorpseId = id;
     world.playerCorpses.set(id, corpse);
-    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_DIED, { lobbyCode: lobby.code, playerId: player.id, corpse });
-    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_CREATED, { lobbyCode: lobby.code, corpse });
+    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_DIED, { lobbyCode: lobby.code, runId: lobby.runId, currentFloor: lobby.floor, playerId: player.id, corpse });
+    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_CREATED, { lobbyCode: lobby.code, runId: lobby.runId, currentFloor: lobby.floor, corpse });
     if (corpse.looted) world.playerCorpses.delete(id);
     return corpse;
   }
@@ -1013,6 +1064,9 @@ class LobbyManager {
     const client = this.requireClient(playerId);
     const lobby = client.lobbyCode ? this.lobbies.get(client.lobbyCode) : null;
     if (!lobby) return false;
+    const player = lobby.players.find(candidate => candidate.id === playerId);
+    if (!this.acceptClientSequence(player, message)) return false;
+    if (!this.validateRunFloorMessage(lobby, message, { requireFloor: false })) return false;
     const world = this.currentWorldState(lobby);
     const corpse = world.playerCorpses?.get(String(message.corpseId || ""));
     if (!corpse || corpse.looted || corpse.deadPlayerId === playerId) return false;
@@ -1024,11 +1078,11 @@ class LobbyManager {
       if (!Number.isFinite(index) || index < 0 || index >= corpse.loot.length) return false;
       taken.push(corpse.loot.splice(index, 1)[0]);
     }
-    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_LOOT_TAKEN, { lobbyCode: lobby.code, corpseId: corpse.id, looterPlayerId: playerId, loot: taken, lootIndex: takeAll ? null : message.lootIndex, remainingLoot: corpse.loot.map(item => ({ ...item })) });
+    this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_LOOT_TAKEN, { lobbyCode: lobby.code, runId: lobby.runId, currentFloor: lobby.floor, eventId: `player_corpse_looted:${corpse.id}:${playerId}`, corpseId: corpse.id, looterPlayerId: playerId, loot: taken, lootIndex: takeAll ? null : message.lootIndex, remainingLoot: corpse.loot.map(item => ({ ...item })) });
     if (!corpse.loot.length) {
       corpse.looted = true;
       world.playerCorpses.delete(corpse.id);
-      this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_LOOTED, { lobbyCode: lobby.code, corpseId: corpse.id });
+      this.broadcast(lobby, SERVER_MESSAGES.PLAYER_CORPSE_LOOTED, { lobbyCode: lobby.code, runId: lobby.runId, currentFloor: lobby.floor, eventId: `player_corpse_looted:${corpse.id}`, corpseId: corpse.id });
     }
     return true;
   }
