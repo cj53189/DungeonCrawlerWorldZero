@@ -63,9 +63,14 @@ function resetState(options = {}) {
   const preserveRun = !!options.preserveRun;
   if (Object.prototype.hasOwnProperty.call(options, "arena")) multiplayer.arena = !!options.arena;
   const snapshot = options.snapshot || null;
+  const targetFloor = Number(options.targetFloor);
+  const hasTargetFloor = Number.isFinite(targetFloor);
 
   if (!preserveRun) {
     resetRunProgress();
+  }
+  if (hasTargetFloor) {
+    currentFloor = Math.trunc(targetFloor);
   }
   enemies = [];
   corpses = [];

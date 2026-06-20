@@ -627,10 +627,15 @@ function showFloorSplash() {
 
 function advanceToNextFloor() {
   if (!pendingFloorAdvance) return;
+  const targetFloor = currentFloor + 1;
   const snapshot = captureRunProgress();
-  currentFloor++;
+  currentFloor = targetFloor;
   pendingFloorAdvance = false;
-  resetState({ preserveRun: true, snapshot });
+  resetState({ preserveRun: true, snapshot, targetFloor });
+  currentFloor = targetFloor;
+  gameWon = false;
+  gameLost = false;
+  updateHUD();
   if (typeof syncMusicToGameState === "function") syncMusicToGameState();
   showFloorSplash();
 }
