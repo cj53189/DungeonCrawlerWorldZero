@@ -1,0 +1,113 @@
+/* Mobile landscape gameplay fixes.
+   Keeps touch action buttons from covering Dungeon AI popups and leaves a clear play area. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape),
+       (orientation: landscape) and (max-height: 540px) {
+  body.showTouchControls #announcer {
+    top: calc(var(--dcw-safe-top) + (var(--dcw-touch-preferred) * 2) + 20px) !important;
+    right: var(--dcw-safe-right) !important;
+    width: min(320px, 36dvw) !important;
+    max-width: min(320px, 36dvw) !important;
+    max-height: calc(100dvh - var(--dcw-safe-top) - var(--dcw-safe-bottom) - 190px) !important;
+    overflow: hidden !important;
+    z-index: 20 !important;
+  }
+
+  body.showTouchControls .popup {
+    padding: 7px 9px !important;
+    border-width: 1px !important;
+  }
+
+  body.showTouchControls .popup .title {
+    font-size: 12px !important;
+    line-height: 1.1 !important;
+  }
+
+  body.showTouchControls .popup .body {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+
+  body.showTouchControls #btnInv,
+  body.showTouchControls #btnNew,
+  body.showTouchControls #btnRecap,
+  body.showTouchControls #btnLog {
+    top: calc(var(--dcw-safe-top) + var(--dcw-touch-preferred) + 8px) !important;
+    width: var(--dcw-touch-min) !important;
+    height: var(--dcw-touch-min) !important;
+    font-size: 10px !important;
+    z-index: 30 !important;
+  }
+
+  body.showTouchControls #btnLog { right: var(--dcw-safe-right) !important; }
+  body.showTouchControls #btnRecap { right: calc(var(--dcw-safe-right) + 54px) !important; }
+  body.showTouchControls #btnNew { right: calc(var(--dcw-safe-right) + 108px) !important; }
+  body.showTouchControls #btnInv { right: calc(var(--dcw-safe-right) + 162px) !important; }
+
+  body.showTouchControls .settingsButton {
+    z-index: 32 !important;
+  }
+
+  body.showTouchControls #mpOpenPanelBtn {
+    top: var(--dcw-safe-top) !important;
+    right: calc(var(--dcw-safe-right) + var(--dcw-touch-preferred) + 12px) !important;
+    min-width: 76px !important;
+    min-height: var(--dcw-touch-preferred) !important;
+    z-index: 31 !important;
+  }
+
+  body.showTouchControls #testerDebugLine {
+    bottom: calc(var(--dcw-safe-bottom) + 2px) !important;
+    max-width: 42dvw !important;
+    font-size: 11px !important;
+    opacity: 0.8 !important;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 430px) {
+  body.showTouchControls #announcer {
+    top: calc(var(--dcw-safe-top) + (var(--dcw-touch-preferred) * 2) + 12px) !important;
+    width: min(300px, 34dvw) !important;
+    max-width: min(300px, 34dvw) !important;
+  }
+
+  body.showTouchControls #stickBase {
+    width: 116px !important;
+    height: 116px !important;
+  }
+
+  body.showTouchControls #attackStickBase {
+    width: 122px !important;
+    height: 122px !important;
+  }
+
+  body.showTouchControls #btnAttack {
+    width: 70px !important;
+    height: 70px !important;
+    left: 26px !important;
+    top: 26px !important;
+  }
+
+  body.showTouchControls #btnDodge {
+    right: calc(var(--dcw-safe-right) + 128px) !important;
+    width: 58px !important;
+    height: 58px !important;
+  }
+
+  body.showTouchControls #btnInteract {
+    right: calc(var(--dcw-safe-right) + 96px) !important;
+    width: 56px !important;
+    height: 56px !important;
+  }
+
+  body.showTouchControls #btnVoiceTalk {
+    right: calc(var(--dcw-safe-right) + 154px) !important;
+    width: 78px !important;
+    height: 56px !important;
+  }
+
+  body.showTouchControls #btnWeapon {
+    bottom: calc(var(--dcw-safe-bottom) + 128px) !important;
+    width: 54px !important;
+    height: 54px !important;
+  }
+}
