@@ -1684,8 +1684,7 @@ body.progressionOpen { overflow: hidden; }
 .runLifecycleTitle { color: #7cf7ff; font-weight: 900; text-transform: uppercase; }
 .runLifecycleMeta { color: #cbd3ff; font-size: 12px; margin-top: 4px; }
 .runLifecycleActions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.runLifecycleActions button,
-.preserveCrawlerBtn {
+.runLifecycleActions button {
   border: 1px solid rgba(124, 247, 255, 0.65);
   border-radius: 999px;
   background: rgba(8, 16, 28, 0.96);
@@ -1695,10 +1694,3 @@ body.progressionOpen { overflow: hidden; }
   padding: 8px 10px;
   text-transform: uppercase;
 }
-.preserveCrawlerBtn {
-  bottom: 18px;
-  left: 18px;
-  position: fixed;
-  z-index: 80;
-}
-body.titleActive .preserveCrawlerBtn { display: none; }

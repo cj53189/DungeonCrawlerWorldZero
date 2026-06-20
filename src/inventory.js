@@ -66,6 +66,7 @@ function openLootBox(id){
  if(!player.safe){announcer("Loot boxes may only be opened in safe rooms. The dungeon believes in responsible dopamine distribution.");return;}
  const category=inventoryCategoryFor(box);
  player.inventory.splice(idx,1); stats.lootBoxesOpened++; const coins=8+Math.floor(Math.random()*16)+rarityPower(box.rarity)*6; player.coins+=coins;
+ if (typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("loot_box_opened");
  const gear=generateGear(box.rarity==="Rare"||box.rarity==="Epic"); player.inventory.push(gear); stats.gearFound++;
  moveInventorySelectionAfterRemoval(idx, category);
  achievement("LOOT BOX OPENED",`You opened ${box.name} and received ${coins} coins and ${gear.name}. Pants-based civilization remains possible.`,`open_${box.id}`);
@@ -257,7 +258,7 @@ function rewardChestLoot(room=null){
  }
  if(themeId==="storageRoom"&&Math.random()<.45){addItem(generateLootBox()); updateInventoryUI(); updateHUD(); return;}
  const roll=Math.random();
- if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; addPlayerFeedbackText(`+${gained} gold`, { color: "#ffd86b", size: 15 }); achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}
+ if(roll<.42){const gained=5+Math.floor(Math.random()*12); player.coins+=gained; if (typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("coins_gained"); addPlayerFeedbackText(`+${gained} gold`, { color: "#ffd86b", size: 15 }); achievement("CHEST LOOT",`You found ${gained} coins. The dungeon reminds you that wealth is not a personality, but it helps.`,`coins_${Date.now()}_${Math.random()}`);}
  else if(roll<.68)addItem(generateLootBox());
  else if(roll<.78)addItem(generateTorchItem());
  else if(roll<.88)addItem(generateWeapon());
@@ -280,6 +281,7 @@ function gainXP(amount, options = {}) {
   }
 
   updateHUD();
+  if (typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("xp_gained");
 }
 
 function levelUpPlayer() {

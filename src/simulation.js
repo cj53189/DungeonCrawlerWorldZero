@@ -339,6 +339,7 @@ function updatePlayer() {
     stats.safeRoomEntries++;
     if (stats.safeRoomEntries > 1) announcer("Safe room re-entry detected. Press R or Y if you require the dungeon to summarize your questionable choices.");
     else announcer("Safe room entered. Press R or Y for your performance review, assuming your ego is insured.");
+    if (typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("safe_room_entered");
   }
 
   if (!player.safe && player.wasSafe) hideSafeRoomRecap();
@@ -347,6 +348,7 @@ function updatePlayer() {
   if (currentTile !== "S" && !achievements.has("leftSafeRoom")) achievement("NEW ACHIEVEMENT: Bad Decision Geography", "You left the safe room. Statistically speaking, this is where problems begin.", "leftSafeRoom");
 
   if (currentTile === "E" && !gameWon) {
+    if (typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("stairwell_entered");
     descendStairwell();
   }
 }
@@ -520,6 +522,7 @@ function damageCrawlerFromEnemy(crawler, enemy) {
     addPlayerFeedbackText(`-${dmg} HP`, { color: "#ff6b6b", size: 16 });
     applyKnockback(player, enemy.x, enemy.y, (5 + Math.min(4, dmg * 0.18)) * enemyPlayerKnockbackMultiplier(enemy));
     stats.damageTaken += dmg;
+    if (dmg >= 10 && typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("major_damage");
     stats.riskyMoments++;
     changeAudience(1);
     enemy.damageCooldown = 70;
@@ -1156,6 +1159,7 @@ function discoverStairwellIfVisible() {
 
   if (seen[stairwellY]?.[stairwellX]) {
     stairwellFound = true;
+    if (typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("stairwell_discovered");
     minimapDirty = true;
     achievement("NEW DISCOVERY: STAIRWELL LOCATED", "The stairwell has been permanently marked on your map. You may descend at any time. This is not the same thing as a good idea.", "stairwellFound");
     announcer("Stairwell located. The dungeon reminds you that leaving early is survival, not glory.");
