@@ -289,7 +289,41 @@ function installQuickPartyCodeClient() {
   }
 }
 
-function gameLoop() {
+let lastGameLoopTimestamp = 0;
+let lastTesterReadinessFrame = -60;
+
+function recordFrameTiming(timestamp) {
+  if (!lastGameLoopTimestamp) {
+    lastGameLoopTimestamp = timestamp || performance.now();
+    return;
+  }
+  const now = timestamp || performance.now();
+  const delta = Math.max(0, now - lastGameLoopTimestamp);
+  lastGameLoopTimestamp = now;
+  frameTimingSamples.push(delta);
+  if (frameTimingSamples.length > 60) frameTimingSamples.shift();
+  if (frameTimingSamples.length < 60) return;
+  const average = frameTimingSamples.reduce((sum, value) => sum + value, 0) / frameTimingSamples.length;
+  if (performanceMode || average <= 24) {
+    frameTimingSlowSince = 0;
+    return;
+  }
+  if (!frameTimingSlowSince) frameTimingSlowSince = now;
+  if (!frameTimingSuggestionShown && now - frameTimingSlowSince > 3500) {
+    frameTimingSuggestionShown = true;
+    if (typeof announcer === "function") announcer(`Average frame time is ${average.toFixed(1)}ms. Enable Performance Mode in Settings for Chromebooks or low-end devices.`);
+  }
+}
+
+function shouldUpdateTesterReadinessThisFrame() {
+  if (!performanceMode) return true;
+  if (frameCount - lastTesterReadinessFrame < 30) return false;
+  lastTesterReadinessFrame = frameCount;
+  return true;
+}
+
+function gameLoop(timestamp) {
+  recordFrameTiming(timestamp);
   if (typeof syncMusicToGameState === "function") syncMusicToGameState();
   pollGamepad();
   updatePanelScrollFromController();
@@ -306,7 +340,7 @@ function gameLoop() {
   }
   if (typeof maybeSendLocalCrawlerState === "function") maybeSendLocalCrawlerState();
   if (typeof maybeSendFloor0EnemySnapshot === "function") maybeSendFloor0EnemySnapshot();
-  if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
+  if (typeof updateTesterReadinessUI === "function" && shouldUpdateTesterReadinessThisFrame()) updateTesterReadinessUI();
   draw();
   requestAnimationFrame(gameLoop);
 }

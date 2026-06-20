@@ -26,6 +26,8 @@ function toggleSafeRoomRecap() {
   if (panel.style.display === "block") hideSafeRoomRecap(); else showSafeRoomRecap();
 }
 
+let lastPromptText = null;
+
 function updatePrompt() {
   const prompt = document.getElementById("prompt");
   let text = "";
@@ -51,6 +53,8 @@ function updatePrompt() {
     if (inviteTarget) text = `Invite ${inviteTarget.name || "Crawler"} to party`;
   }
   if (!text && player.safe) text = "Safe Room";
+  if (text === lastPromptText) return;
+  lastPromptText = text;
   prompt.textContent = text;
   prompt.style.display = text ? "block" : "none";
 }
@@ -319,8 +323,29 @@ function syncSettingsControls() {
   setUiScale(uiScale, false);
   setUiEditMode(uiEditMode, false);
   if (typeof updateTouchControlsToggle === "function") updateTouchControlsToggle();
+  updatePerformanceModeToggle();
   if (typeof dungeonMusic !== "undefined") dungeonMusic.updateToggleLabel();
   updateVoiceChatSettingsUI();
+}
+
+
+function updatePerformanceModeToggle() {
+  const button = document.getElementById("performanceModeToggle");
+  if (!button) return;
+  button.textContent = performanceMode ? "On" : "Off";
+  button.setAttribute("aria-pressed", String(performanceMode));
+  button.classList.toggle("off", !performanceMode);
+}
+
+function setPerformanceMode(enabled, persist = true) {
+  performanceMode = !!enabled;
+  document.body?.classList.toggle("performanceMode", performanceMode);
+  if (persist) {
+    try { localStorage.setItem(PERFORMANCE_MODE_STORAGE_KEY, String(performanceMode)); } catch {}
+  }
+  frameTimingSlowSince = 0;
+  frameTimingSuggestionShown = false;
+  updatePerformanceModeToggle();
 }
 
 function updateVoiceChatSettingsUI() {
@@ -382,6 +407,7 @@ function setupUiLayoutEditor() {
     uiScale = readSavedUiScale();
     setUiScale(uiScale, false);
     setUiEditMode(uiEditMode, false);
+    setPerformanceMode(performanceMode, false);
     document.getElementById("settingsBtn")?.addEventListener("click", openSettingsPanel);
     document.getElementById("closeSettingsBtn")?.addEventListener("click", closeSettingsPanel);
     document.getElementById("settingsOverlay")?.addEventListener("pointerdown", e => { if (e.target.id === "settingsOverlay") closeSettingsPanel(); });
@@ -390,6 +416,7 @@ function setupUiLayoutEditor() {
       if (typeof setTouchControlsEnabled === "function") setTouchControlsEnabled(!inputState.touchControlsEnabled);
     });
     document.getElementById("voiceChatToggleBtn")?.addEventListener("click", toggleVoiceChatFromSettings);
+    document.getElementById("performanceModeToggle")?.addEventListener("click", () => setPerformanceMode(!performanceMode));
     document.getElementById("uiScaleSlider")?.addEventListener("input", e => setUiScale(e.target.value));
     document.getElementById("resetUiLayoutBtn")?.addEventListener("click", resetUiLayout);
     document.getElementById("settingsDoneBtn")?.addEventListener("click", closeSettingsPanel);

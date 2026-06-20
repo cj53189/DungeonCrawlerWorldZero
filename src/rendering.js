@@ -1251,6 +1251,7 @@ function drawRadialLight(light) {
 
 function drawAtmosphericLighting(startX, endX, startY, endY) {
   if (!lightingEnabled) return;
+  if (performanceMode && frameCount % 3 !== 0) return;
 
   const playerFlicker = 0.94 + Math.sin(frameCount * 0.19) * 0.045 + Math.sin(frameCount * 0.47) * 0.018;
   const lights = [];
@@ -1266,6 +1267,7 @@ function drawAtmosphericLighting(startX, endX, startY, endY) {
   }
 
   for (const light of environmentalLights) {
+    if (performanceMode && light.type !== "crystal" && (light.tileX + light.tileY + frameCount) % 2 !== 0) continue;
     if (!shouldDrawEnvironmentalLight(light, startX, endX, startY, endY)) continue;
     const flicker = light.type === "crystal"
       ? 0.96 + Math.sin(frameCount * 0.055 + light.tileX) * 0.04
@@ -1445,7 +1447,7 @@ function draw() {
   drawPetMerchant();
   drawAtmosphericLighting(startX, endX, startY, endY);
   drawEnvironmentalLightFixtures();
-  drawEngravedRoomNames(camX, camY);
+  if (!performanceMode) drawEngravedRoomNames(camX, camY);
   drawTutorialSigns();
 
   for (const corpse of corpses) {
@@ -1663,12 +1665,13 @@ function drawMinimap(){
 
   ctx.drawImage(minimapCanvas,x0,y0);
 
+  const drawDynamicMarkers = !performanceMode || frameCount % 6 === 0;
   ctx.fillStyle="#ffffff";
   ctx.beginPath();
   ctx.arc(x0+(player.x/TILE)*scale,y0+(player.y/TILE)*scale,3.2,0,Math.PI*2);
   ctx.fill();
 
-  for (const corpse of corpses) {
+  if (drawDynamicMarkers) for (const corpse of corpses) {
     if (corpse.looted) continue;
     const cx = Math.floor(corpse.x / TILE);
     const cy = Math.floor(corpse.y / TILE);
@@ -1679,7 +1682,7 @@ function drawMinimap(){
     ctx.fill();
   }
 
-  if(stairwellFound && stairwellX !== null && stairwellY !== null){
+  if(drawDynamicMarkers && stairwellFound && stairwellX !== null && stairwellY !== null){
     const sx = x0 + (stairwellX + 0.5) * scale;
     const sy = y0 + (stairwellY + 0.5) * scale;
     const pulse = 4.8 + Math.sin(frameCount * 0.08) * 1.2;
@@ -1693,7 +1696,7 @@ function drawMinimap(){
     ctx.lineWidth = 1;
   }
 
-  if(bossEnemy && bossEnemy.hp>0){
+  if(drawDynamicMarkers && bossEnemy && bossEnemy.hp>0){
     const bx=Math.floor(bossEnemy.x/TILE), by=Math.floor(bossEnemy.y/TILE);
     if(seen[by]?.[bx]){
       ctx.fillStyle="#ffd86b";
@@ -1759,7 +1762,7 @@ function drawMobileMinimap(){
     }
   }
 
-  for (const corpse of corpses) {
+  if (drawDynamicMarkers) for (const corpse of corpses) {
     if (corpse.looted) continue;
     const cx = Math.floor(corpse.x / TILE);
     const cy = Math.floor(corpse.y / TILE);
@@ -1774,7 +1777,7 @@ function drawMobileMinimap(){
     drawMobileWaypointMarker(safeWaypoint.x, safeWaypoint.y, "rgba(91,235,126,0.96)", "rgba(205,255,214,0.98)", centerX, centerY, innerRadius, "S");
   }
 
-  if(stairwellFound && stairwellX !== null && stairwellY !== null){
+  if(drawDynamicMarkers && stairwellFound && stairwellX !== null && stairwellY !== null){
     drawMobileWaypointMarker(stairwellX + 0.5, stairwellY + 0.5, "rgba(80,160,255,0.96)", "rgba(190,215,255,1)", centerX, centerY, innerRadius, "⇩");
   }
 
