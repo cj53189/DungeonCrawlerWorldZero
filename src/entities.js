@@ -310,10 +310,12 @@ function awardCorpseLootItem(corpse, item) {
   if (item.type === "coins") {
     const amount = Math.max(0, Number(item.amount) || 0);
     player.coins += amount;
+    if (typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("corpse_coins_taken");
     addPlayerFeedbackText(`+${amount} gold`, { color: "#ffd86b", size: 15 });
     announcer(`You took ${amount} coins from ${corpse.name}. Brave accounting.`);
   } else {
     player.inventory.push(item);
+    if (typeof saveCrawlerRunCheckpoint === "function") saveCrawlerRunCheckpoint("corpse_loot_taken");
     if (item.type === "lootbox") stats.lootBoxesFound++;
     if (item.type === "gear") stats.gearFound++;
     achievement(item.type === "weapon" ? "WEAPON LOOTED" : "CORPSE LOOT", `You took ${item.name} from ${corpse.name}. ${itemDescription(item)}`, `corpse_take_${corpse.id}_${item.id}`);
