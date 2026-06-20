@@ -111,3 +111,75 @@
     height: 54px !important;
   }
 }
+
+/* Chromebooks and small laptop windows should not inherit the phone/tablet combat HUD.
+   This overrides earlier max-height landscape rules whenever the primary input is mouse/trackpad. */
+@media (hover: hover) and (pointer: fine) and (orientation: landscape) {
+  #hud {
+    top: 12px !important;
+    left: 12px !important;
+    width: 245px !important;
+    max-width: min(245px, 36vw) !important;
+    padding: 10px 12px !important;
+    font-size: 14px !important;
+  }
+
+  #hud .hudBar {
+    height: 18px !important;
+  }
+
+  #hud .hudBarText {
+    font-size: 11px !important;
+  }
+
+  #hud .hudMeta {
+    font-size: 12px !important;
+  }
+
+  #hud .hudMeta > span:first-child,
+  #hud .hudWeapon,
+  #hud .hudPet,
+  #hud .hudStair {
+    display: flex !important;
+  }
+
+  #hud .hudWeapon,
+  #hud .hudPet,
+  #hud .hudStair {
+    display: block !important;
+  }
+
+  #announcer {
+    top: 16px !important;
+    right: 16px !important;
+    width: min(340px, 34vw) !important;
+    max-width: min(340px, 34vw) !important;
+  }
+
+  .popup .title {
+    font-size: 16px !important;
+  }
+
+  .popup .body {
+    font-size: 14px !important;
+  }
+
+  .mpOpenPanelBtn {
+    top: 12px !important;
+    left: 285px !important;
+    right: auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  .settingsButton {
+    top: 12px !important;
+    right: 14px !important;
+  }
+
+  #testerDebugLine {
+    bottom: 6px !important;
+    max-width: min(92vw, 760px) !important;
+    font-size: 10px !important;
+  }
+}
