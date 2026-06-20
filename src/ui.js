@@ -756,7 +756,13 @@ function updateTesterReadinessUI() {
   }
 
   const debug = document.getElementById("testerDebugLine");
-  if (debug) debug.textContent = `build/source: Render · connection: ${connection.label}${lobbyText}`;
+  if (debug) {
+    const net = multiplayer.networkDiagnostics || {};
+    const diagText = multiplayer.usingServer
+      ? ` · net in/out: ${net.incomingPerSecond || 0}/${net.outgoingPerSecond || 0}s · stale: ${net.droppedStaleMessages || 0} · run: ${net.runId || "-"} · floor: ${net.floor ?? currentFloor} · join: ${net.joinState || "-"}`
+      : "";
+    debug.textContent = `build/source: Render · connection: ${connection.label}${lobbyText}${diagText}`;
+  }
 
   const copySupported = isCopyInviteSupported();
   const copyGameLink = document.getElementById("copyGameLinkBtn");

@@ -25,7 +25,19 @@ const multiplayerNetwork = {
   lastCrawlerStateSignature: null,
   lastEnemySnapshotSentAt: 0,
   lastEnemySnapshotSignature: null,
-  loggedEnemySyncOwners: new Set()
+  loggedEnemySyncOwners: new Set(),
+  clientSeq: 0,
+  lastServerSeq: 0,
+  lastServerMessageAt: 0,
+  incomingMessageCount: 0,
+  outgoingMessageCount: 0,
+  incomingPerSecond: 0,
+  outgoingPerSecond: 0,
+  diagnosticsWindowStartedAt: Date.now(),
+  droppedStaleMessages: 0,
+  pingEstimateMs: null,
+  lastEntityVersions: new Map(),
+  appliedWorldEventIds: new Set()
 };
 
 const FLOOR0_ENEMY_SYNC_SNAP_DISTANCE = TILE * 3;
@@ -76,6 +88,7 @@ function connectMultiplayerNetwork() {
         handleMultiplayerNetworkError("Received an unreadable Floor 0 collapse server message.");
         return;
       }
+      updateNetworkDiagnostics("in");
       handleMultiplayerServerMessage(message);
     });
 
@@ -118,9 +131,47 @@ function scheduleMultiplayerReconnect() {
   if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
 }
 
+function multiplayerMessageMetadata(payload = {}) {
+  const floor = payload.currentFloor ?? payload.floor ?? payload.state?.currentFloor ?? currentFloor;
+  return {
+    ...(multiplayer.currentRunId ? { runId: multiplayer.currentRunId } : {}),
+    ...(Number.isFinite(Number(floor)) ? { currentFloor: Math.trunc(Number(floor)), floor: Math.trunc(Number(floor)) } : {}),
+    clientSeq: ++multiplayerNetwork.clientSeq,
+    sentAt: Date.now()
+  };
+}
+
+function updateNetworkDiagnostics(direction) {
+  const now = Date.now();
+  if (now - multiplayerNetwork.diagnosticsWindowStartedAt >= 1000) {
+    multiplayerNetwork.incomingPerSecond = multiplayerNetwork.incomingMessageCount;
+    multiplayerNetwork.outgoingPerSecond = multiplayerNetwork.outgoingMessageCount;
+    multiplayerNetwork.incomingMessageCount = 0;
+    multiplayerNetwork.outgoingMessageCount = 0;
+    multiplayerNetwork.diagnosticsWindowStartedAt = now;
+  }
+  if (direction === "in") multiplayerNetwork.incomingMessageCount++;
+  if (direction === "out") multiplayerNetwork.outgoingMessageCount++;
+  multiplayer.networkDiagnostics = getMultiplayerNetworkDiagnostics();
+}
+
+function getMultiplayerNetworkDiagnostics() {
+  return {
+    pingEstimate: multiplayerNetwork.pingEstimateMs,
+    lastServerMessageAt: multiplayerNetwork.lastServerMessageAt,
+    outgoingPerSecond: multiplayerNetwork.outgoingPerSecond,
+    incomingPerSecond: multiplayerNetwork.incomingPerSecond,
+    droppedStaleMessages: multiplayerNetwork.droppedStaleMessages,
+    runId: multiplayer.currentRunId || null,
+    floor: currentFloor,
+    joinState: multiplayer.currentJoinState || null
+  };
+}
+
 function sendMultiplayerMessage(type, payload = {}) {
   if (!multiplayerNetwork.socket || multiplayerNetwork.socket.readyState !== WebSocket.OPEN) return false;
-  multiplayerNetwork.socket.send(JSON.stringify({ type, ...payload }));
+  multiplayerNetwork.socket.send(JSON.stringify({ type, ...multiplayerMessageMetadata(payload), ...payload }));
+  updateNetworkDiagnostics("out");
   return true;
 }
 
@@ -223,8 +274,35 @@ function prepareServerLobbyState({ status, lobbyCode = null, partyId = null }) {
   if (typeof announcer === "function") announcer("Server Floor 0 collapse request sent.");
 }
 
+function isStaleServerMessage(message) {
+  if (!message || typeof message !== "object") return true;
+  multiplayerNetwork.lastServerMessageAt = Date.now();
+  if (Number.isFinite(Number(message.serverTime)) && Number.isFinite(Number(message.sentAt))) {
+    multiplayerNetwork.pingEstimateMs = Math.max(0, Date.now() - Number(message.serverTime));
+  }
+  const type = String(message.type || "");
+  const runScopedTypes = new Set(["lobby_update", "floor0_resolved", "floor_start", "crawler_snapshot", "floor0_world_state", "floor0_world_event", "floor0_enemy_snapshot", "pvp_damage_applied", "player_died", "player_corpse_created", "player_corpse_loot_taken", "player_corpse_looted"]);
+  if (message.runId && multiplayer.currentRunId && message.runId !== multiplayer.currentRunId && runScopedTypes.has(type)) {
+    multiplayerNetwork.droppedStaleMessages++;
+    return true;
+  }
+  const floor = message.currentFloor ?? message.floor;
+  if (Number.isFinite(Number(floor)) && Math.trunc(Number(floor)) < currentFloor && runScopedTypes.has(type)) {
+    multiplayerNetwork.droppedStaleMessages++;
+    return true;
+  }
+  const seq = Number(message.serverSeq ?? message.serverTick);
+  if (Number.isFinite(seq) && seq < (multiplayerNetwork.lastServerSeq || 0) && runScopedTypes.has(type)) {
+    multiplayerNetwork.droppedStaleMessages++;
+    return true;
+  }
+  if (Number.isFinite(seq)) multiplayerNetwork.lastServerSeq = Math.max(multiplayerNetwork.lastServerSeq || 0, seq);
+  return false;
+}
+
 function handleMultiplayerServerMessage(message) {
   if (!message || typeof message.type !== "string") return;
+  if (isStaleServerMessage(message)) return;
 
   switch (message.type) {
     case "welcome":
@@ -466,7 +544,7 @@ function maybeSendLocalCrawlerState(now = Date.now()) {
 
   multiplayerNetwork.lastCrawlerStateSentAt = now;
   multiplayerNetwork.lastCrawlerStateSignature = signature;
-  return sendMultiplayerMessage("crawler_state", { state });
+  return sendMultiplayerMessage("crawler_state", { state: { ...state, runId: multiplayer.currentRunId || undefined, currentFloor, floor: currentFloor } });
 }
 
 function applyServerCrawlerSnapshot(snapshot) {
@@ -479,7 +557,8 @@ function applyServerCrawlerSnapshot(snapshot) {
   }
 
   const rosterById = new Map((multiplayer.lobbyMembers?.length ? multiplayer.lobbyMembers : multiplayer.partyMembers).map(member => [member.id, member]));
-  const nextRemotePlayers = new Map();
+  const seenRemotePlayerIds = new Set();
+  const now = Date.now();
 
   for (const crawler of snapshot.players || []) {
     if (!crawler || crawler.id === multiplayer.playerId) continue;
@@ -496,12 +575,16 @@ function applyServerCrawlerSnapshot(snapshot) {
     const movedDistance = previousCrawler ? Math.hypot(x - previousCrawler.x, y - previousCrawler.y) : 0;
     const moving = movedDistance > 0.5 && updatedAt !== previousUpdatedAt;
 
-    nextRemotePlayers.set(crawler.id, {
+    const previous = multiplayer.remotePlayers?.get(crawler.id);
+    const displayX = Number.isFinite(Number(previous?.x)) ? Number(previous.x) : x;
+    const displayY = Number.isFinite(Number(previous?.y)) ? Number(previous.y) : y;
+    const record = previous || { id: crawler.id, x, y, targetX: x, targetY: y };
+    Object.assign(record, {
       id: crawler.id,
       name: member?.name || crawler.name || "Crawler",
       characterId: getCharacterDef(crawler.characterId || member?.characterId).id,
-      x,
-      y,
+      x: displayX,
+      y: displayY,
       r: player.r,
       aimX: Number.isFinite(Number(crawler.aimX)) ? Number(crawler.aimX) : undefined,
       aimY: Number.isFinite(Number(crawler.aimY)) ? Number(crawler.aimY) : undefined,
@@ -522,11 +605,25 @@ function applyServerCrawlerSnapshot(snapshot) {
       knockbackFrames: Math.max(0, Math.trunc(Number(crawler.knockbackFrames) || 0)),
       knockbackUntil: Number(crawler.knockbackUntil) || 0,
       moving,
-      updatedAt
+      updatedAt,
+      targetX: x,
+      targetY: y,
+      targetUpdatedAt: now,
+      lastSeenAt: now
     });
+    if (previous) {
+      const lerp = Math.min(1, Math.max(0.18, (now - (previous.targetUpdatedAt || now)) / 250));
+      record.x = displayX + (record.targetX - displayX) * lerp;
+      record.y = displayY + (record.targetY - displayY) * lerp;
+    }
+    seenRemotePlayerIds.add(crawler.id);
+    multiplayer.remotePlayers.set(crawler.id, record);
   }
 
-  multiplayer.remotePlayers = nextRemotePlayers;
+  for (const [id, crawler] of multiplayer.remotePlayers.entries()) {
+    if (seenRemotePlayerIds.has(id)) continue;
+    if (now - (crawler.lastSeenAt || 0) > 5000) multiplayer.remotePlayers.delete(id);
+  }
   if (typeof updateVoiceProximityVolumes === "function") updateVoiceProximityVolumes();
 }
 
@@ -911,6 +1008,7 @@ function resetFloor0WorldState() {
     enemyStates: new Map()
   };
   multiplayerNetwork.loggedEnemySyncOwners.clear();
+  multiplayerNetwork.appliedWorldEventIds.clear();
   multiplayerNetwork.lastCrawlerStateSignature = null;
   multiplayerNetwork.lastEnemySnapshotSignature = null;
 }
@@ -987,7 +1085,8 @@ function rememberFloor0EnemyState(payload) {
 function sendFloor0WorldEvent(event) {
   if (!multiplayer.enabled || !multiplayer.usingServer || currentFloor !== 0) return false;
   if (!event?.type || !event.id || !isMultiplayerNetworkReady()) return false;
-  return sendMultiplayerMessage("floor0_world_event", { event });
+  const stableEvent = { ...event, eventId: event.eventId || `${event.type}:${event.id}`, runId: multiplayer.currentRunId || undefined, currentFloor, floor: currentFloor };
+  return sendMultiplayerMessage("floor0_world_event", { event: stableEvent });
 }
 
 function sendFloor0EnemyEvent(type, enemy) {
@@ -1006,6 +1105,9 @@ function applyFloor0WorldEventMessage(message) {
 function applyFloor0WorldEvent(event) {
   if (!event?.type || !event.id) return false;
   if (!multiplayer.floor0WorldState) resetFloor0WorldState();
+  const eventId = event.eventId || `${event.type}:${event.id}`;
+  if (multiplayerNetwork.appliedWorldEventIds.has(eventId)) return false;
+  multiplayerNetwork.appliedWorldEventIds.add(eventId);
   if (event.type === "door_opened") {
     multiplayer.floor0WorldState.openedDoorIds.add(event.id);
     applyFloor0DoorOpened(event.id);
@@ -1203,7 +1305,7 @@ function applyPlayerCorpseLooted(corpseId) {
 function takeServerPlayerCorpseLoot(corpse, index, takeAll = false) {
   if (!corpse?.playerCorpse || !multiplayer.enabled || !multiplayer.usingServer) return false;
   if (corpse.deadPlayerId === multiplayer.playerId) { if (typeof announcer === "function") announcer("You cannot loot your own corpse in this PvP test."); return false; }
-  return sendMultiplayerMessage("player_corpse_loot_take", { corpseId: corpse.id, lootIndex: index, takeAll });
+  return sendMultiplayerMessage("player_corpse_loot_take", { corpseId: corpse.id, lootIndex: index, takeAll, runId: multiplayer.currentRunId || undefined, currentFloor, floor: currentFloor });
 }
 
 function applyFloor0EnemySnapshot(message) {
@@ -1242,5 +1344,5 @@ function maybeSendFloor0EnemySnapshot(now = Date.now()) {
 
   multiplayerNetwork.lastEnemySnapshotSentAt = now;
   multiplayerNetwork.lastEnemySnapshotSignature = signature;
-  return sendMultiplayerMessage("floor0_enemy_snapshot", { roomId, enemies: activeEnemies });
+  return sendMultiplayerMessage("floor0_enemy_snapshot", { roomId, enemies: activeEnemies, runId: multiplayer.currentRunId || undefined, currentFloor, floor: currentFloor });
 }

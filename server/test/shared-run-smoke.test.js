@@ -315,3 +315,47 @@ test('PvP Arena damage uses PvP rules and blocks same-party friendly fire', () =
 
   manager.destroyLobby(run);
 });
+
+test('private lobby creation does not join quick match', () => {
+  const manager = new LobbyManager();
+  const a = addClient(manager, 'private_a');
+  const b = addClient(manager, 'private_b');
+
+  const privateRun = manager.createPrivateLobby('private_a');
+  const quickRun = manager.joinQuickMatch('private_b');
+
+  assert.equal(privateRun.mode, 'private');
+  assert.notEqual(privateRun.code, quickRun.code);
+  assert.match(last(a, 'lobby_created').lobbyCode, /^RUNE-/);
+  assert.equal(last(a, 'lobby_joined').mode, 'private');
+  assert.equal(last(b, 'lobby_joined').mode, 'quick_match');
+
+  manager.destroyLobby(privateRun);
+  manager.destroyLobby(quickRun);
+});
+
+test('Floor 0 world events are idempotent by eventId', () => {
+  const manager = new LobbyManager();
+  addClient(manager, 'event_a');
+  const run = manager.joinQuickMatch('event_a');
+
+  assert.equal(manager.handleFloor0WorldEvent('event_a', {
+    type: 'loot_taken',
+    id: 'floor0:loot:1,2',
+    eventId: 'loot-once',
+    runId: run.runId,
+    currentFloor: 0,
+    clientSeq: 1
+  }), true);
+  assert.equal(manager.handleFloor0WorldEvent('event_a', {
+    type: 'loot_taken',
+    id: 'floor0:loot:1,2',
+    eventId: 'loot-once',
+    runId: run.runId,
+    currentFloor: 0,
+    clientSeq: 2
+  }), false);
+  assert.deepEqual(Array.from(run.worldState.takenLootIds), ['floor0:loot:1,2']);
+
+  manager.destroyLobby(run);
+});
