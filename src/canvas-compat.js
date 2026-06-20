@@ -271,3 +271,208 @@
     install();
   }
 })();
+
+(function installFloorTransitionCarryoverHotfix() {
+  if (window.__dcwFloorTransitionCarryoverHotfix) return;
+  window.__dcwFloorTransitionCarryoverHotfix = true;
+
+  const EQUIPMENT_SLOTS = ["weapon", "head", "chest", "offhand", "legs", "feet", "accessory", "light", "pet"];
+  const originalResetState = window.resetState;
+
+  function cloneValue(value, fallback = null) {
+    if (value === undefined) return fallback;
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch {
+      try { return structuredClone(value); }
+      catch { return fallback; }
+    }
+  }
+
+  function cloneInventory() {
+    return Array.isArray(player?.inventory) ? player.inventory.map(item => cloneValue(item, { ...item })) : [];
+  }
+
+  function cloneEquipment() {
+    const equipment = {};
+    for (const slot of EQUIPMENT_SLOTS) {
+      const item = player?.equipment?.[slot] || null;
+      equipment[slot] = item ? cloneValue(item, { ...item }) : null;
+    }
+    return equipment;
+  }
+
+  function cloneStats() {
+    const snapshot = {};
+    if (!stats || typeof stats !== "object") return snapshot;
+    for (const key of Object.keys(stats)) snapshot[key] = stats[key];
+    return snapshot;
+  }
+
+  function achievementIdArray(value) {
+    if (value instanceof Set) return Array.from(value);
+    if (Array.isArray(value)) return value;
+    return [];
+  }
+
+  function mergeAchievementHistory(snapshotHistory = []) {
+    const live = Array.isArray(achievementHistory) ? achievementHistory.map(entry => ({ ...entry })) : [];
+    const saved = Array.isArray(snapshotHistory) ? snapshotHistory.map(entry => ({ ...entry })) : [];
+    const seen = new Set();
+    const merged = [];
+    for (const entry of [...live, ...saved]) {
+      const key = `${entry?.title || ""}|${entry?.body || ""}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(entry);
+    }
+    return merged.slice(0, 16);
+  }
+
+  window.captureRunProgress = function captureRunProgressWithCarryoverGuard() {
+    return {
+      player: {
+        level: Number(player?.level) || 1,
+        xp: Number(player?.xp) || 0,
+        xpToNext: Number(player?.xpToNext) || 40,
+        maxHp: Number(player?.maxHp) || 100,
+        hp: Math.max(1, Number(player?.hp) || 1),
+        attackDamage: Number(player?.attackDamage) || 20,
+        baseSpeed: Number(player?.baseSpeed) || 2.45,
+        speed: Number(player?.speed) || Number(player?.baseSpeed) || 2.45,
+        defense: Number(player?.defense) || 0,
+        audienceBonus: Number(player?.audienceBonus) || 0,
+        coins: Math.max(0, Number(player?.coins) || 0),
+        currentWeaponId: player?.currentWeaponId || "fists",
+        aimX: Number(player?.aimX) || 1,
+        aimY: Number(player?.aimY) || 0,
+        inventory: cloneInventory(),
+        equipment: cloneEquipment(),
+        progression: player?.progression ? cloneValue(player.progression, null) : null,
+        pet: player?.pet ? cloneValue(player.pet, null) : null
+      },
+      stats: cloneStats(),
+      audienceScore: Number(audienceScore) || 10,
+      currentReputation: currentReputation || "Undeclared Menace",
+      achievementHistory: Array.isArray(achievementHistory) ? achievementHistory.map(entry => ({ ...entry })) : [],
+      achievements: achievements instanceof Set ? Array.from(achievements) : []
+    };
+  };
+
+  window.restoreRunProgress = function restoreRunProgressWithCarryoverGuard(snapshot) {
+    if (!snapshot?.player) return;
+    const saved = snapshot.player;
+    const spawn = { x: player.x, y: player.y, currentRoomId: player.currentRoomId, safe: player.safe, wasSafe: player.wasSafe };
+
+    player.level = Number(saved.level) || 1;
+    player.xp = Math.max(0, Number(saved.xp) || 0);
+    player.xpToNext = Math.max(1, Number(saved.xpToNext) || 40);
+    player.maxHp = Math.max(1, Number(saved.maxHp) || 100);
+    player.hp = Math.max(1, Math.min(Number(saved.hp) || player.maxHp, player.maxHp));
+    player.attackDamage = Math.max(1, Number(saved.attackDamage) || 20);
+    player.baseSpeed = Math.max(0.1, Number(saved.baseSpeed) || 2.45);
+    player.speed = Math.max(0.1, Number(saved.speed) || player.baseSpeed);
+    player.defense = Math.max(0, Number(saved.defense) || 0);
+    player.audienceBonus = Math.max(0, Number(saved.audienceBonus) || 0);
+    player.coins = Math.max(0, Number(saved.coins) || 0);
+    player.currentWeaponId = saved.currentWeaponId || "fists";
+    player.aimX = Number(saved.aimX) || 1;
+    player.aimY = Number(saved.aimY) || 0;
+    player.inventory = Array.isArray(saved.inventory) ? saved.inventory.map(item => cloneValue(item, { ...item })) : [];
+    player.equipment = Object.fromEntries(EQUIPMENT_SLOTS.map(slot => [slot, saved.equipment?.[slot] ? cloneValue(saved.equipment[slot], { ...saved.equipment[slot] }) : null]));
+
+    if (typeof setActivePet === "function") {
+      setActivePet(saved.pet ? cloneValue(saved.pet, null) : (player.equipment.pet || null));
+    } else {
+      player.pet = saved.pet ? cloneValue(saved.pet, null) : (player.equipment.pet || null);
+    }
+
+    if (saved.progression) {
+      player.progression = typeof mergeProgression === "function" ? mergeProgression(saved.progression) : cloneValue(saved.progression, null);
+    }
+
+    if (snapshot.stats && typeof stats === "object") {
+      for (const key of Object.keys(stats)) {
+        if (key === "floorRooms") continue;
+        if (Object.prototype.hasOwnProperty.call(snapshot.stats, key)) stats[key] = snapshot.stats[key];
+      }
+    }
+
+    audienceScore = Number(snapshot.audienceScore) || audienceScore || 10;
+    currentReputation = snapshot.currentReputation || currentReputation || "Undeclared Menace";
+
+    const savedAchievements = achievementIdArray(snapshot.achievements);
+    const liveAchievements = achievements instanceof Set ? Array.from(achievements) : [];
+    achievements = new Set([...savedAchievements, ...liveAchievements]);
+    achievementHistory = mergeAchievementHistory(snapshot.achievementHistory);
+
+    if (typeof recalcEquipmentStats === "function") recalcEquipmentStats();
+    if (!Number.isFinite(player.speed)) player.speed = player.baseSpeed;
+    player.hp = Math.max(1, Math.min(player.hp, player.maxHp));
+
+    player.x = spawn.x;
+    player.y = spawn.y;
+    player.currentRoomId = spawn.currentRoomId;
+    player.safe = spawn.safe;
+    player.wasSafe = spawn.wasSafe;
+
+    if (typeof updateInventoryUI === "function") updateInventoryUI();
+    if (typeof updateHUD === "function") updateHUD();
+    if (typeof renderLog === "function") renderLog();
+  };
+
+  if (typeof originalResetState === "function" && !originalResetState.__dcwCarryoverWrapped) {
+    window.resetState = function resetStateWithCarryoverGuard(options = {}) {
+      const preserveRun = !!options?.preserveRun;
+      const snapshot = options?.snapshot || (preserveRun ? window.__dcwPendingRunSnapshot : null);
+      const targetFloor = Number(options?.targetFloor);
+      const hasTargetFloor = Number.isFinite(targetFloor);
+      const guardedOptions = preserveRun && snapshot ? { ...options, snapshot } : options;
+
+      if (preserveRun && hasTargetFloor) currentFloor = Math.trunc(targetFloor);
+      const result = originalResetState.call(this, guardedOptions);
+
+      if (preserveRun && snapshot) {
+        if (hasTargetFloor) currentFloor = Math.trunc(targetFloor);
+        window.restoreRunProgress(snapshot);
+        if (hasTargetFloor) currentFloor = Math.trunc(targetFloor);
+        gameWon = false;
+        gameLost = false;
+        pendingFloorAdvance = false;
+        if (typeof updateHUD === "function") updateHUD();
+      }
+
+      return result;
+    };
+    window.resetState.__dcwCarryoverWrapped = true;
+  }
+
+  window.advanceToNextFloor = function advanceToNextFloorWithCarryoverGuard() {
+    if (!pendingFloorAdvance) return;
+    const targetFloor = Math.max(1, Math.trunc(Number(currentFloor) || 0) + 1);
+    const snapshot = window.captureRunProgress();
+    window.__dcwPendingRunSnapshot = snapshot;
+
+    currentFloor = targetFloor;
+    pendingFloorAdvance = false;
+
+    if (typeof resetState === "function") {
+      resetState({ preserveRun: true, snapshot, targetFloor });
+    }
+
+    currentFloor = targetFloor;
+    window.restoreRunProgress(snapshot);
+    currentFloor = targetFloor;
+    gameWon = false;
+    gameLost = false;
+    pendingFloorAdvance = false;
+    window.__dcwPendingRunSnapshot = null;
+
+    if (typeof syncMusicToGameState === "function") syncMusicToGameState();
+    if (typeof updateVisibility === "function") updateVisibility(true);
+    if (typeof updateHUD === "function") updateHUD();
+    if (typeof showFloorSplash === "function") showFloorSplash();
+  };
+
+  window.advanceToNextFloor.__dcwCarryoverWrapped = true;
+})();
