@@ -1,0 +1,1 @@
+drawDynamicMarkers = true;
