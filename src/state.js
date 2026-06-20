@@ -16,6 +16,14 @@ let activeLootCorpseId = null;
 let dungeonVisuals = { floor: [], decals: [] };
 let environmentalLights = [];
 let lightingEnabled = true;
+const PERFORMANCE_MODE_STORAGE_KEY = "dcw.performanceMode.v1";
+let performanceMode = (() => {
+  try { return localStorage.getItem(PERFORMANCE_MODE_STORAGE_KEY) === "true"; }
+  catch { return false; }
+})();
+let frameTimingSamples = [];
+let frameTimingSlowSince = 0;
+let frameTimingSuggestionShown = false;
 let projectiles = [], attackTelegraphs = [];
 let bossRoom=null,bossEnemy=null,currentRoomName="Safe Room",currentRoomSubtitle="";
 let currentFloor = 0, stairwellFound = false, stairwellX = null, stairwellY = null, finalDescentAnnounced = false;

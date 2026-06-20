@@ -394,9 +394,9 @@ if (drawCombatVisualsWithoutBossHell && !drawCombatVisualsWithoutBossHell.__boss
 
 const resetStateWithoutBossHell = typeof resetState === "function" ? resetState : null;
 if (resetStateWithoutBossHell && !resetStateWithoutBossHell.__bossHellWrapped) {
-  resetState = function resetStateWithBossHell() {
+  resetState = function resetStateWithBossHell(...args) {
     clearBossHellProjectiles();
-    resetStateWithoutBossHell();
+    return resetStateWithoutBossHell(...args);
   };
   resetState.__bossHellWrapped = true;
 }
