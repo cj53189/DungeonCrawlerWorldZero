@@ -113,3 +113,22 @@ function buildCharacterSpriteSheet(appearance) {
   characterSpriteBuildCache.set(key, canvas);
   return canvas;
 }
+
+(function loadFormattedWeaponAssetsAfterGameScripts() {
+  function loadAssets() {
+    if (!document.querySelector('link[href="./src/weapon-icons.css"]')) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "./src/weapon-icons.css";
+      document.head.appendChild(link);
+    }
+    if (!document.querySelector('script[src="./src/weapon-icons.js"]')) {
+      const script = document.createElement("script");
+      script.src = "./src/weapon-icons.js";
+      document.head.appendChild(script);
+    }
+  }
+
+  if (document.readyState === "complete") loadAssets();
+  else window.addEventListener("load", loadAssets, { once: true });
+})();
