@@ -115,6 +115,13 @@ function buildCharacterSpriteSheet(appearance) {
 }
 
 (function loadFormattedWeaponAssetsAfterGameScripts() {
+  function loadWeaponBalance() {
+    if (document.querySelector('script[src="./src/weapon-balance.js"]')) return;
+    const balance = document.createElement("script");
+    balance.src = "./src/weapon-balance.js";
+    document.head.appendChild(balance);
+  }
+
   function loadAssets() {
     if (!document.querySelector('link[href="./src/weapon-icons.css"]')) {
       const link = document.createElement("link");
@@ -122,11 +129,17 @@ function buildCharacterSpriteSheet(appearance) {
       link.href = "./src/weapon-icons.css";
       document.head.appendChild(link);
     }
-    if (!document.querySelector('script[src="./src/weapon-icons.js"]')) {
-      const script = document.createElement("script");
-      script.src = "./src/weapon-icons.js";
-      document.head.appendChild(script);
+    const existingIconsScript = document.querySelector('script[src="./src/weapon-icons.js"]');
+    if (existingIconsScript) {
+      if (window.RPG_WEAPON_ICONS) loadWeaponBalance();
+      else existingIconsScript.addEventListener("load", loadWeaponBalance, { once: true });
+      return;
     }
+
+    const script = document.createElement("script");
+    script.src = "./src/weapon-icons.js";
+    script.addEventListener("load", loadWeaponBalance, { once: true });
+    document.head.appendChild(script);
   }
 
   if (document.readyState === "complete") loadAssets();
