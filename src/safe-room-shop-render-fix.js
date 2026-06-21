@@ -11,6 +11,9 @@
     torch: { id: "torch", name: "Crawler Torch", type: "light", cost: 10, icon: "☼", description: "A spare light source for bad rooms and worse decisions." }
   });
 
+  let renderingFixedShop = false;
+  let watcherInstalled = false;
+
   function nowMs() {
     return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
   }
@@ -25,7 +28,7 @@
 
   function esc(value) {
     if (typeof escapeHtml === "function") return escapeHtml(value);
-    return String(value ?? "").replace(/[&<>\"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+    return String(value ?? "").replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
   }
 
   function makeIdSafe(prefix) {
@@ -118,11 +121,33 @@
     return `${pet.displayName || pet.name || "Pet"} · ${hp <= 0 || pet.down || pet.status === "downed" ? "DOWN" : `${hp}/${max} HP`} · Lv ${pet.level || 1}`;
   }
 
+  function markFixedShopLayout(panel, box) {
+    if (panel) panel.dataset.safeRoomShopLayout = "fixed";
+    if (box) box.dataset.safeRoomShopLayout = "fixed";
+  }
+
+  function isShopOpen(panel = document.getElementById("petMerchantPanel")) {
+    if (!panel) return false;
+    const style = window.getComputedStyle(panel);
+    return panel.classList.contains("open") || style.display !== "none";
+  }
+
+  function hasFixedShopLayout() {
+    const panel = document.getElementById("petMerchantPanel");
+    const box = document.getElementById("petMerchantOptions");
+    if (!panel || !box || !isShopOpen(panel)) return true;
+    return box.dataset.safeRoomShopLayout === "fixed"
+      && !!box.querySelector("button[data-shop-buy='health_potion'], button[data-shop-buy=\"health_potion\"]")
+      && !!box.querySelector("button[data-shop-sell-junk]")
+      && !!box.querySelector("button[data-shop-exit]");
+  }
+
   function renderFixedSafeRoomShopPanel() {
     const panel = document.getElementById("petMerchantPanel");
     const box = document.getElementById("petMerchantOptions");
     const title = document.getElementById("petMerchantTitle");
     if (!panel || !box) return false;
+    renderingFixedShop = true;
     if (title) title.textContent = "Safe Room Shop";
     const sellables = carriedSellables();
     const junk = junkItems();
@@ -134,7 +159,23 @@
       <section class="shopSection"><h4>Run Companions</h4><div class="shopGrid petGrid">${petCards}</div></section>
       <section class="shopSection"><h4>Sell Carried Items</h4><div class="shopSellSummary"><span>${sellables.length} carried · ${junk.length} junk marked</span><button type="button" data-shop-sell-junk>Sell All Junk</button><button type="button" class="shopExitButton" data-shop-exit>Exit Shop</button></div><div class="shopSellList">${sellRows}</div></section>
     `;
+    panel.classList.add("safeRoomShopPanel");
+    markFixedShopLayout(panel, box);
+    setTimeout(() => { renderingFixedShop = false; }, 0);
     return true;
+  }
+
+  function forceFixedShopSoon() {
+    const repair = () => {
+      if (renderingFixedShop) return;
+      const panel = document.getElementById("petMerchantPanel");
+      if (!panel || !isShopOpen(panel)) return;
+      if (!hasFixedShopLayout()) renderFixedSafeRoomShopPanel();
+    };
+    repair();
+    setTimeout(repair, 0);
+    setTimeout(repair, 60);
+    setTimeout(repair, 160);
   }
 
   function openFixedSafeRoomShopPanel() {
@@ -145,6 +186,7 @@
     panel.style.display = "block";
     panel.classList.add("open", "safeRoomShopPanel");
     document.body.classList.add("safeRoomShopOpen");
+    forceFixedShopSoon();
     if (typeof syncControllerWindowFocus === "function") syncControllerWindowFocus();
     return true;
   }
@@ -283,6 +325,10 @@
     window.closeSafeRoomShopPanel = closeFixedSafeRoomShopPanel;
     window.hidePetMerchantPanel = closeFixedSafeRoomShopPanel;
 
+    try { renderSafeRoomShopPanel = renderFixedSafeRoomShopPanel; } catch {}
+    try { openSafeRoomShopPanel = openFixedSafeRoomShopPanel; } catch {}
+    try { hidePetMerchantPanel = closeFixedSafeRoomShopPanel; } catch {}
+
     if (typeof interact === "function" && !interact.__safeRoomShopRenderFixWrapped) {
       const original = interact;
       interact = function interactWithFixedShop(...args) {
@@ -296,9 +342,24 @@
     }
   }
 
+  function watchShopPanel() {
+    if (watcherInstalled) return;
+    const panel = document.getElementById("petMerchantPanel");
+    const box = document.getElementById("petMerchantOptions");
+    if (!panel || !box) return;
+    watcherInstalled = true;
+    const observer = new MutationObserver(() => {
+      if (renderingFixedShop) return;
+      forceFixedShopSoon();
+    });
+    observer.observe(panel, { attributes: true, childList: true, subtree: true, attributeFilter: ["class", "style", "data-safe-room-shop-layout"] });
+    observer.observe(box, { attributes: true, childList: true, subtree: true, attributeFilter: ["data-safe-room-shop-layout"] });
+  }
+
   function install() {
     bindShopClicks();
     patchGlobals();
+    watchShopPanel();
     const panel = document.getElementById("petMerchantPanel");
     if (panel?.classList.contains("open") || panel?.style.display === "block") renderFixedSafeRoomShopPanel();
   }
