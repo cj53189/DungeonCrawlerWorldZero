@@ -149,8 +149,22 @@
 })();
 
 (function loadInventoryUiScrollPatchAfterGameScripts() {
-  if (document.querySelector('script[src="./src/inventory-ui-hardening.js"]')) return;
+  function loadMobileSkillsLayout() {
+    if (document.querySelector('script[src="./src/mobile-skills-layout.js"]')) return;
+    const mobileSkills = document.createElement("script");
+    mobileSkills.src = "./src/mobile-skills-layout.js";
+    document.head.appendChild(mobileSkills);
+  }
+
+  const existing = document.querySelector('script[src="./src/inventory-ui-hardening.js"]');
+  if (existing) {
+    if (window.__dcwInventoryUiHardeningInstalled) loadMobileSkillsLayout();
+    else existing.addEventListener("load", loadMobileSkillsLayout, { once: true });
+    return;
+  }
+
   const script = document.createElement("script");
   script.src = "./src/inventory-ui-hardening.js";
+  script.addEventListener("load", loadMobileSkillsLayout, { once: true });
   document.head.appendChild(script);
 })();
