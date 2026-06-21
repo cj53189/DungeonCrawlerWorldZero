@@ -149,10 +149,23 @@
 })();
 
 (function loadInventoryUiScrollPatchAfterGameScripts() {
+  function loadMobileSettingsWorkshop() {
+    if (document.querySelector('script[src="./src/mobile-settings-workshop.js"]')) return;
+    const settingsWorkshop = document.createElement("script");
+    settingsWorkshop.src = "./src/mobile-settings-workshop.js";
+    document.head.appendChild(settingsWorkshop);
+  }
+
   function loadMobileSkillsLayout() {
-    if (document.querySelector('script[src="./src/mobile-skills-layout.js"]')) return;
+    const existingMobileSkills = document.querySelector('script[src="./src/mobile-skills-layout.js"]');
+    if (existingMobileSkills) {
+      if (window.__dcwMobileSkillsLayoutInstalled) loadMobileSettingsWorkshop();
+      else existingMobileSkills.addEventListener("load", loadMobileSettingsWorkshop, { once: true });
+      return;
+    }
     const mobileSkills = document.createElement("script");
     mobileSkills.src = "./src/mobile-skills-layout.js";
+    mobileSkills.addEventListener("load", loadMobileSettingsWorkshop, { once: true });
     document.head.appendChild(mobileSkills);
   }
 
