@@ -6,6 +6,23 @@
   window.__dcwSafeRoomShopCloseFixInstalled = true;
 
   const STYLE_ID = "safeRoomShopCloseFixStyles";
+  const REOPEN_LOCK_MS = 1000;
+  let suppressShopOpenUntil = 0;
+
+  function nowMs() {
+    return typeof performance !== "undefined" && typeof performance.now === "function" ? performance.now() : Date.now();
+  }
+
+  function suppressShopReopen(ms = REOPEN_LOCK_MS) {
+    suppressShopOpenUntil = Math.max(suppressShopOpenUntil, nowMs() + ms);
+    window.__dcwSuppressShopOpenUntil = suppressShopOpenUntil;
+  }
+
+  function shopOpenSuppressed() {
+    const globalUntil = Number(window.__dcwSuppressShopOpenUntil) || 0;
+    suppressShopOpenUntil = Math.max(suppressShopOpenUntil, globalUntil);
+    return nowMs() < suppressShopOpenUntil;
+  }
 
   function shopPanel() {
     return document.getElementById("petMerchantPanel");
@@ -23,6 +40,8 @@
   }
 
   function closeSafeRoomShopPanel(event = null) {
+    suppressShopReopen();
+
     if (event) {
       event.preventDefault?.();
       event.stopPropagation?.();
@@ -184,6 +203,10 @@
     if (typeof openSafeRoomShopPanel === "function" && !openSafeRoomShopPanel.__safeRoomShopCloseFixWrapped) {
       const originalOpen = openSafeRoomShopPanel;
       openSafeRoomShopPanel = function openShopWithCloseFix(...args) {
+        if (shopOpenSuppressed()) {
+          syncShopOpenClass();
+          return false;
+        }
         const result = originalOpen.apply(this, args);
         setTimeout(syncShopOpenClass, 0);
         setTimeout(bindCloseButton, 0);
