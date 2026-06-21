@@ -20,9 +20,24 @@
   let overlayCanvas = null;
   let overlayCtx = null;
 
+  const FLOOR_CHOICES = Object.freeze({
+    normal: Object.freeze([[3, 0], [3, 1], [3, 2], [3, 3]]),
+    damaged: Object.freeze([[3, 2], [3, 3], [2, 4], [2, 5]]),
+    dirty: Object.freeze([[4, 0], [4, 1], [4, 2], [3, 3]]),
+    mossy: Object.freeze([[4, 0], [4, 1], [2, 8], [1, 8]]),
+    safe: Object.freeze([[4, 0], [4, 1], [4, 2]]),
+    boss: Object.freeze([[3, 4], [3, 5], [2, 4]]),
+    treasure: Object.freeze([[4, 0], [4, 1], [4, 2]]),
+    crypt: Object.freeze([[3, 0], [3, 1], [10, 1], [10, 4]]),
+    sewer: Object.freeze([[4, 1], [4, 2], [2, 8], [1, 8]])
+  });
+  const CHEST_CHOICES = Object.freeze([[6, 7], [6, 8], [6, 9], [6, 10]]);
+  const STAIR_CHOICES = Object.freeze([[2, 8], [10, 8], [10, 10]]);
+
   image.onload = () => {
     loaded = true;
     failed = false;
+    patchRendererHooks();
     if (isEnabled()) renderOverlay();
   };
   image.onerror = () => {
@@ -66,6 +81,65 @@
     targetCtx.drawImage(image, sx, sy, sw, sh, dx, dy, size, size);
     targetCtx.restore();
     return true;
+  }
+
+  function tileHashForPreview(x, y, salt = 0) {
+    const tx = Math.floor(Number(x || 0) / Math.max(1, Number(window.TILE || 32)));
+    const ty = Math.floor(Number(y || 0) / Math.max(1, Number(window.TILE || 32)));
+    let n = (tx * 374761393 + ty * 668265263 + salt * 1442695041) >>> 0;
+    n ^= n << 13;
+    n ^= n >>> 17;
+    n ^= n << 5;
+    return (n >>> 0) / 4294967295;
+  }
+
+  function pickChoice(choices, px, py, salt = 0) {
+    const pool = choices?.length ? choices : FLOOR_CHOICES.normal;
+    return pool[Math.floor(tileHashForPreview(px, py, salt) * pool.length) % pool.length];
+  }
+
+  function drawGameTile(row, col, px, py, isVisible, alpha = 0.92) {
+    if (!loaded || failed || typeof ctx === "undefined") return false;
+    const size = Number(window.TILE || 32);
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = (isVisible ? alpha : alpha * 0.42);
+    const drawn = drawTile(ctx, row, col, px, py, size);
+    ctx.restore();
+    return drawn;
+  }
+
+  function patchRendererHooks() {
+    if (window.__kenneyTinyDungeonRendererPatched) return;
+    window.__kenneyTinyDungeonRendererPatched = true;
+
+    if (typeof drawFloorAtlasTile === "function") {
+      const originalDrawFloorAtlasTile = drawFloorAtlasTile;
+      drawFloorAtlasTile = function drawKenneyTinyFloorTile(detail, px, py, isVisible) {
+        if (!isEnabled() || !loaded) return originalDrawFloorAtlasTile(detail, px, py, isVisible);
+        const choices = FLOOR_CHOICES[detail?.floorType] || FLOOR_CHOICES.normal;
+        const [row, col] = pickChoice(choices, px, py, 201);
+        return drawGameTile(row, col, px, py, isVisible, 0.9) || originalDrawFloorAtlasTile(detail, px, py, isVisible);
+      };
+    }
+
+    if (typeof drawChestTile === "function") {
+      const originalDrawChestTile = drawChestTile;
+      drawChestTile = function drawKenneyTinyChest(px, py, isVisible) {
+        if (!isEnabled() || !loaded) return originalDrawChestTile(px, py, isVisible);
+        const [row, col] = pickChoice(CHEST_CHOICES, px, py, 202);
+        if (!drawGameTile(row, col, px, py, isVisible, 1)) originalDrawChestTile(px, py, isVisible);
+      };
+    }
+
+    if (typeof drawPortalTile === "function") {
+      const originalDrawPortalTile = drawPortalTile;
+      drawPortalTile = function drawKenneyTinyStairs(px, py, isVisible) {
+        if (!isEnabled() || !loaded) return originalDrawPortalTile(px, py, isVisible);
+        const [row, col] = pickChoice(STAIR_CHOICES, px, py, 203);
+        if (!drawGameTile(row, col, px, py, isVisible, 1)) originalDrawPortalTile(px, py, isVisible);
+      };
+    }
   }
 
   function injectStyles() {
@@ -154,7 +228,7 @@
           <button type="button" data-close>Hide</button>
         </header>
         <canvas aria-label="Tiny Dungeon tile contact sheet"></canvas>
-        <p>Preview only. Tiles are 16×16 and should be drawn at 2× scale for the current 32px map. Press Ctrl/⌘ + Shift + T to toggle.</p>
+        <p>Preview only. Tiles are 16×16 and draw at 2× scale for the current 32px map. Press Ctrl/⌘ + Shift + T to toggle.</p>
       `;
       overlay.querySelector("[data-close]")?.addEventListener("click", () => setEnabled(false));
       overlayCanvas = overlay.querySelector("canvas");
