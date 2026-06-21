@@ -98,6 +98,15 @@
         padding-bottom: max(42px, env(safe-area-inset-bottom)) !important;
       }
 
+      #inventoryPanel.open[data-inventory-category="skills"] .progressionInventory,
+      #inventoryPanel.open[data-inventory-category="skills"] .progressionInventory *,
+      #inventoryPanel.open[data-inventory-category="skills"] .attributeRow,
+      #inventoryPanel.open[data-inventory-category="skills"] .skillRow,
+      #inventoryPanel.open[data-inventory-category="skills"] button.attributeRow,
+      #inventoryPanel.open[data-inventory-category="skills"] button.skillRow {
+        touch-action: pan-y !important;
+      }
+
       #inventoryPanel.open[data-inventory-category="skills"] #inventoryHelp {
         display: none !important;
       }
@@ -380,11 +389,49 @@
     }, { capture: true, passive: true });
   }
 
+  function bindSkillsManualTouchScroll() {
+    let drag = null;
+
+    const skillsScrollerFromEvent = event => event.target?.closest?.("#inventoryPanel.open[data-inventory-category='skills'] .progressionInventory") || null;
+
+    document.addEventListener("touchstart", event => {
+      const scroller = skillsScrollerFromEvent(event);
+      if (!scroller || scroller.scrollHeight <= scroller.clientHeight + 2) {
+        drag = null;
+        return;
+      }
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      drag = { scroller, lastY: touch.clientY, moved: false };
+    }, { capture: true, passive: true });
+
+    document.addEventListener("touchmove", event => {
+      if (!drag) return;
+      const touch = event.touches?.[0];
+      if (!touch) return;
+      const deltaY = drag.lastY - touch.clientY;
+      if (Math.abs(deltaY) < 1) return;
+      const before = drag.scroller.scrollTop;
+      drag.scroller.scrollTop += deltaY;
+      drag.lastY = touch.clientY;
+      drag.moved = drag.moved || Math.abs(drag.scroller.scrollTop - before) > 0;
+
+      if (drag.moved) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, { capture: true, passive: false });
+
+    document.addEventListener("touchend", () => { drag = null; }, { capture: true, passive: true });
+    document.addEventListener("touchcancel", () => { drag = null; }, { capture: true, passive: true });
+  }
+
   function install() {
     injectStyles();
     patchControllerScroll();
     patchOpenCloseHooks();
     allowModalTouchScroll();
+    bindSkillsManualTouchScroll();
     refreshPanels();
     window.addEventListener("resize", () => setTimeout(refreshPanels, 0));
     window.addEventListener("orientationchange", () => setTimeout(refreshPanels, 80));
