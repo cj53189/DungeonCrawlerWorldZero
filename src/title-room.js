@@ -694,19 +694,20 @@
   }
 
   function drawSelectedCharacter() {
-    const def = typeof getCharacterDef === "function" ? getCharacterDef(playerProfile?.characterId) : null;
-    const sheet = getCharacterSheet(def);
-    const rows = def?.directionRows || { down: 0, up: 1, left: 2, right: 3 };
-    const row = Math.abs(aimX) > Math.abs(aimY) ? (aimX < 0 ? rows.left : rows.right) : (aimY < 0 ? rows.up : rows.down);
-    const frame = lastMoveLen > 0.08 ? [0, 1, 2, 1][Math.floor(pulse / 12) % 4] : (Number.isFinite(Number(def?.idleFrame)) ? Number(def.idleFrame) : 0);
+    const def = typeof getCharacterDef === "function" ? getCharacterDef(DEFAULT_CHARACTER_ID || "player_base") : null;
+    const sheet = typeof getCharacterSpriteSheet === "function" ? getCharacterSpriteSheet(def?.id) : getCharacterSheet(def);
+    const row = def?.directionRows?.down ?? 0;
+    const frame = Number.isFinite(Number(def?.idleFrame)) ? Number(def.idleFrame) : 1;
     const renderW = (Number(def?.renderWidth) || 34) * 1.45;
     const renderH = (Number(def?.renderHeight) || 42) * 1.45;
+    const sx = frame * def.frameWidth;
+    const sy = row * def.frameHeight;
     ctx.save();
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
-    ctx.beginPath(); ctx.ellipse(playerX, playerY + 10, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
     if (sheet && sheet.complete && sheet.naturalWidth >= def.frameWidth * def.columns && sheet.naturalHeight >= def.frameHeight * def.rows) {
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath(); ctx.ellipse(playerX, playerY + 10, 20, 7, 0, 0, Math.PI * 2); ctx.fill();
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(sheet, frame * def.frameWidth, row * def.frameHeight, def.frameWidth, def.frameHeight, playerX - renderW / 2, playerY + PLAYER_RADIUS - renderH, renderW, renderH);
+      ctx.drawImage(sheet, sx, sy, def.frameWidth, def.frameHeight, playerX - renderW / 2, playerY + PLAYER_RADIUS - renderH, renderW, renderH);
     } else {
       ctx.fillStyle = "#f1f1f1";
       ctx.strokeStyle = "rgba(255,216,107,0.82)";
