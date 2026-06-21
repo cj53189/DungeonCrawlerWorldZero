@@ -172,10 +172,23 @@
     }).observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] });
   }
 
+  function loadShopV2ScrollFix() {
+    if (document.querySelector('script[src="./src/safe-room-shop-v2-scroll-fix.js"]')) return;
+    const scrollFix = document.createElement("script");
+    scrollFix.src = "./src/safe-room-shop-v2-scroll-fix.js";
+    document.head.appendChild(scrollFix);
+  }
+
   function loadShopV2() {
-    if (document.querySelector('script[src="./src/safe-room-shop-v2.js"]')) return;
+    const existing = document.querySelector('script[src="./src/safe-room-shop-v2.js"]');
+    if (existing) {
+      if (window.__dcwSafeRoomShopV2Installed) loadShopV2ScrollFix();
+      else existing.addEventListener("load", loadShopV2ScrollFix, { once: true });
+      return;
+    }
     const script = document.createElement("script");
     script.src = "./src/safe-room-shop-v2.js";
+    script.addEventListener("load", loadShopV2ScrollFix, { once: true });
     document.head.appendChild(script);
   }
 
