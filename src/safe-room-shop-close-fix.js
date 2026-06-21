@@ -1,6 +1,6 @@
-// Hardens the Safe Room Shop close button on mobile/controller builds.
-// The shop uses the old pet merchant panel, while mobile touch controls sit above gameplay.
-// This patch makes the close button a capture-level control and hides touch controls while the shop is open.
+// Hardens Safe Room Shop exit controls on mobile/controller builds.
+// The top-right X can be unreliable on some mobile layouts, so this also adds
+// a large Exit Shop button beside Sell All Junk at the bottom of the shop list.
 (function installSafeRoomShopCloseFix() {
   if (window.__dcwSafeRoomShopCloseFixInstalled) return;
   window.__dcwSafeRoomShopCloseFixInstalled = true;
@@ -72,6 +72,27 @@
         cursor: pointer !important;
       }
 
+      #petMerchantPanel.safeRoomShopPanel .shopExitButton,
+      body.safeRoomShopOpen .shopExitButton {
+        border: 1px solid rgba(124,247,255,0.48) !important;
+        border-radius: 999px !important;
+        background: linear-gradient(135deg, rgba(70,142,164,0.96), rgba(22,35,54,0.96)) !important;
+        color: #effcff !important;
+        font-weight: 900 !important;
+        min-height: 48px !important;
+        padding: 8px 12px !important;
+        touch-action: manipulation !important;
+        pointer-events: auto !important;
+        cursor: pointer !important;
+      }
+
+      #petMerchantPanel.safeRoomShopPanel .shopFooterExit {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
       @media (hover: none) and (pointer: coarse), (max-width: 900px) {
         body.safeRoomShopOpen #closePetMerchantBtn,
         #petMerchantPanel.safeRoomShopPanel #closePetMerchantBtn {
@@ -79,9 +100,51 @@
           top: var(--dcw-safe-top, max(10px, env(safe-area-inset-top))) !important;
           right: var(--dcw-safe-right, max(10px, env(safe-area-inset-right))) !important;
         }
+
+        #petMerchantPanel.safeRoomShopPanel .shopSellSummary {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          align-items: stretch !important;
+        }
+
+        #petMerchantPanel.safeRoomShopPanel .shopSellSummary span {
+          grid-column: 1 / -1;
+        }
+
+        #petMerchantPanel.safeRoomShopPanel .shopExitButton,
+        #petMerchantPanel.safeRoomShopPanel .shopSellSummary button {
+          min-height: 52px !important;
+          width: 100% !important;
+        }
       }
     `;
     document.head.appendChild(style);
+  }
+
+  function ensureExitShopButton() {
+    const panel = shopPanel();
+    if (!panel || !shopIsOpen(panel)) return;
+    const existing = panel.querySelector("button[data-shop-exit]");
+    if (existing) return;
+
+    const sellJunkButton = panel.querySelector("button[data-shop-sell-junk]");
+    const exitButton = document.createElement("button");
+    exitButton.type = "button";
+    exitButton.className = "shopExitButton";
+    exitButton.dataset.shopExit = "true";
+    exitButton.textContent = "Exit Shop";
+
+    if (sellJunkButton?.parentElement) {
+      sellJunkButton.insertAdjacentElement("afterend", exitButton);
+      return;
+    }
+
+    const options = document.getElementById("petMerchantOptions");
+    if (!options) return;
+    const footer = document.createElement("div");
+    footer.className = "shopFooterExit";
+    footer.appendChild(exitButton);
+    options.appendChild(footer);
   }
 
   function bindCloseButton() {
@@ -101,12 +164,13 @@
     document.body.dataset.safeRoomShopCloseFixDocumentBound = "true";
 
     const closeFromTarget = event => {
-      if (!event.target?.closest?.("#closePetMerchantBtn")) return;
+      if (!event.target?.closest?.("#closePetMerchantBtn, button[data-shop-exit]")) return;
       closeSafeRoomShopPanel(event);
     };
 
     document.addEventListener("pointerdown", closeFromTarget, { capture: true, passive: false });
     document.addEventListener("touchstart", closeFromTarget, { capture: true, passive: false });
+    document.addEventListener("mousedown", closeFromTarget, { capture: true, passive: false });
     document.addEventListener("click", closeFromTarget, { capture: true });
 
     document.addEventListener("keydown", event => {
@@ -123,10 +187,22 @@
         const result = originalOpen.apply(this, args);
         setTimeout(syncShopOpenClass, 0);
         setTimeout(bindCloseButton, 0);
+        setTimeout(ensureExitShopButton, 0);
         return result;
       };
       openSafeRoomShopPanel.__safeRoomShopCloseFixWrapped = true;
       window.openSafeRoomShopPanel = openSafeRoomShopPanel;
+    }
+
+    if (typeof renderSafeRoomShopPanel === "function" && !renderSafeRoomShopPanel.__safeRoomShopExitWrapped) {
+      const originalRender = renderSafeRoomShopPanel;
+      renderSafeRoomShopPanel = function renderShopWithExitButton(...args) {
+        const result = originalRender.apply(this, args);
+        setTimeout(ensureExitShopButton, 0);
+        return result;
+      };
+      renderSafeRoomShopPanel.__safeRoomShopExitWrapped = true;
+      window.renderSafeRoomShopPanel = renderSafeRoomShopPanel;
     }
 
     if (typeof hidePetMerchantPanel === "function" && !hidePetMerchantPanel.__safeRoomShopCloseFixWrapped) {
@@ -148,7 +224,10 @@
     const panel = shopPanel();
     if (!panel || panel.dataset.safeRoomShopCloseFixObserved === "true") return;
     panel.dataset.safeRoomShopCloseFixObserved = "true";
-    new MutationObserver(syncShopOpenClass).observe(panel, { attributes: true, attributeFilter: ["class", "style"] });
+    new MutationObserver(() => {
+      syncShopOpenClass();
+      ensureExitShopButton();
+    }).observe(panel, { attributes: true, childList: true, subtree: true, attributeFilter: ["class", "style"] });
     syncShopOpenClass();
   }
 
@@ -159,6 +238,7 @@
     patchShopOpenCloseFunctions();
     watchPanel();
     syncShopOpenClass();
+    ensureExitShopButton();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
