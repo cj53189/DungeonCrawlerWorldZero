@@ -17,7 +17,8 @@
     section.className = "settingsSection settingsWorkshopSection";
     section.innerHTML = `
       <h3>Workshop</h3>
-      <div class="settingsWorkshopIntro">Tune the game UI without hunting for tiny dev buttons.</div>
+      <div class="settingsWorkshopIntro">Advanced layout tools for testing mobile and controller UI.</div>
+      <div id="workshopScaleReadout" class="workshopScaleReadout">UI Scale: 100%</div>
       <div class="settingsWorkshopGrid" role="group" aria-label="Workshop controls">
         <button id="workshopUiEditBtn" class="settingsAction workshopAction" type="button">UI Edit Mode: Off</button>
         <button id="workshopResetLayoutBtn" class="settingsAction workshopAction" type="button">Reset UI Layout</button>
@@ -26,9 +27,8 @@
       </div>
       <div class="settingsWorkshopContent" aria-label="Workshop help">
         <div><strong>UI Edit Mode</strong><span>Turn this on, then drag HUD, inventory, recap, log, and minimap boxes to test layouts.</span></div>
-        <div><strong>Safe mobile rule</strong><span>Portrait and landscape should never require tiny corner taps. Close buttons stay large and reachable.</span></div>
-        <div><strong>Scrolling rule</strong><span>Settings and workshop content use the whole panel as the scroll page on phones.</span></div>
-        <div><strong>Color rule</strong><span>Do not rely on subtle color only. Use labels, outlines, and shape changes too.</span></div>
+        <div><strong>Mobile rule</strong><span>Portrait and landscape should use large controls, clear labels, and reachable close buttons.</span></div>
+        <div><strong>Scroll rule</strong><span>Settings and workshop content use the whole panel as the scroll page on phones.</span></div>
       </div>
     `;
 
@@ -37,9 +37,21 @@
     else body.appendChild(section);
   }
 
+  function markDuplicateMobileControls() {
+    const duplicateControls = [
+      document.getElementById("uiEditToggle")?.closest(".settingsRow"),
+      document.getElementById("uiScaleSlider")?.closest(".settingsRow"),
+      document.getElementById("resetUiLayoutBtn")
+    ].filter(Boolean);
+    duplicateControls.forEach(el => el.classList.add("settingsWorkshopDuplicateMobile"));
+  }
+
   function syncWorkshopButtons() {
     const editBtn = document.getElementById("workshopUiEditBtn");
+    const readout = document.getElementById("workshopScaleReadout");
+    const slider = document.getElementById("uiScaleSlider");
     if (editBtn) editBtn.textContent = document.body.classList.contains("uiEditMode") ? "UI Edit Mode: On" : "UI Edit Mode: Off";
+    if (readout && slider) readout.textContent = `UI Scale: ${slider.value || "100"}%`;
   }
 
   function bindWorkshopButtons() {
@@ -68,6 +80,7 @@
         const step = Number(slider.step) || 5;
         slider.value = String(Math.max(Number(slider.min) || 75, Number(slider.value || 100) - step));
         slider.dispatchEvent(new Event("input", { bubbles: true }));
+        syncWorkshopButtons();
       });
     }
     if (upBtn && upBtn.dataset.bound !== "true") {
@@ -78,6 +91,7 @@
         const step = Number(slider.step) || 5;
         slider.value = String(Math.min(Number(slider.max) || 125, Number(slider.value || 100) + step));
         slider.dispatchEvent(new Event("input", { bubbles: true }));
+        syncWorkshopButtons();
       });
     }
   }
@@ -92,6 +106,18 @@
         font-size: 12px;
         line-height: 1.35;
         margin-bottom: 8px;
+      }
+
+      .workshopScaleReadout {
+        margin-bottom: 8px;
+        padding: 7px 9px;
+        border: 1px solid rgba(255,216,107,0.16);
+        border-radius: 999px;
+        background: rgba(0,0,0,0.22);
+        color: #ffd86b;
+        font-size: 12px;
+        font-weight: 900;
+        text-align: center;
       }
 
       .settingsWorkshopGrid {
@@ -205,6 +231,10 @@
         body.settingsMobileLayout #settingsPanel .settingsSection {
           margin-top: 10px !important;
           padding: 10px !important;
+        }
+
+        body.settingsMobileLayout #settingsPanel .settingsWorkshopDuplicateMobile {
+          display: none !important;
         }
 
         body.settingsMobileLayout #settingsPanel .settingsRow {
@@ -364,6 +394,7 @@
 
   function install() {
     injectWorkshopSection();
+    markDuplicateMobileControls();
     injectStyles();
     bindWorkshopButtons();
     patchSettingsPanelHooks();
