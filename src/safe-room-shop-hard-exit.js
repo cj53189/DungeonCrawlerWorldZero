@@ -172,12 +172,20 @@
     }).observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] });
   }
 
+  function loadShopV2() {
+    if (document.querySelector('script[src="./src/safe-room-shop-v2.js"]')) return;
+    const script = document.createElement("script");
+    script.src = "./src/safe-room-shop-v2.js";
+    document.head.appendChild(script);
+  }
+
   function install() {
     injectStyles();
     ensureHardExitButton();
     bindDocumentFallback();
     patchCloseGlobals();
     watchPanel();
+    loadShopV2();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
