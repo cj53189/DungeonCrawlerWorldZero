@@ -11,7 +11,7 @@
   }
 
   function escapeHtml(value){
-    return String(value).replace(/[&<>\"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
+    return String(value).replace(/[&<>"]/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]));
   }
 
   function writeLog(text){
@@ -28,7 +28,6 @@
     style.id=STYLE_ID;
     style.textContent=`
       .devWorkshopButton{border:1px solid rgba(255,216,107,.46);border-radius:10px;background:rgba(123,44,255,.22);color:#fff4cc;font-weight:900;min-height:38px;cursor:pointer}
-      #devWorkshopFab{position:fixed;right:max(12px,env(safe-area-inset-right));top:max(64px,env(safe-area-inset-top));z-index:145;padding:8px 10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 8px 24px rgba(0,0,0,.38)}
       #${PANEL_ID}{position:fixed;right:max(12px,env(safe-area-inset-right));top:max(96px,env(safe-area-inset-top));z-index:160;width:min(430px,calc(100vw - 24px));max-height:min(78vh,720px);overflow:auto;padding:12px;border:1px solid rgba(255,216,107,.46);border-radius:14px;background:rgba(9,8,14,.95);color:#fff4cc;box-shadow:0 16px 48px rgba(0,0,0,.62);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
       #${PANEL_ID}[hidden]{display:none!important}
       #${PANEL_ID} header{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
@@ -46,9 +45,13 @@
       #${PANEL_ID} .status{font-size:11px;color:#d8cfff;display:grid;gap:3px}
       #${PANEL_ID} .log{display:grid;gap:5px;max-height:110px;overflow:auto;font-size:11px;color:#e9e1ff}
       #${PANEL_ID} .log div{border-left:2px solid rgba(255,216,107,.36);padding-left:7px}
-      @media(max-width:700px),(max-height:560px){#devWorkshopFab{top:auto;bottom:max(72px,env(safe-area-inset-bottom));right:8px}#${PANEL_ID}{left:8px;right:8px;top:8px;width:auto;max-height:calc(100vh - 16px)}#${PANEL_ID} .grid{grid-template-columns:1fr}}
+      @media(max-width:700px),(max-height:560px){#${PANEL_ID}{left:8px;right:8px;top:8px;width:auto;max-height:calc(100vh - 16px)}#${PANEL_ID} .grid{grid-template-columns:1fr}}
     `;
     document.head.appendChild(style);
+  }
+
+  function removeLegacyWorkshopFab(){
+    document.getElementById("devWorkshopFab")?.remove();
   }
 
   function roomInfo(){
@@ -227,6 +230,7 @@
 
   function installOpeners(){
     injectStyles();
+    removeLegacyWorkshopFab();
     const danger=document.querySelector(".dangerSection");
     if(danger&&!document.getElementById("openDevWorkshopBtn")){
       const btn=document.createElement("button");
@@ -236,16 +240,6 @@
       btn.textContent="Open Dungeon Workshop";
       btn.addEventListener("click",openWorkshop);
       danger.appendChild(btn);
-    }
-    if(!document.getElementById("devWorkshopFab")){
-      const fab=document.createElement("button");
-      fab.id="devWorkshopFab";
-      fab.className="devWorkshopButton";
-      fab.type="button";
-      fab.textContent="Workshop";
-      fab.title="Open Dungeon Workshop (Ctrl/Command+Shift+W)";
-      fab.addEventListener("click",toggleWorkshop);
-      document.body.appendChild(fab);
     }
   }
 
