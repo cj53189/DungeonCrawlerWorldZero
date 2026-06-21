@@ -5,6 +5,7 @@
 
   const STYLE_ID = "inventoryUiHardeningStyles";
   const SCROLLABLE_SELECTOR = [
+    "#inventoryPanel[data-inventory-category='skills'] .progressionInventory",
     "#inventoryList",
     "#equipmentStats",
     "#lootWindowGrid",
@@ -75,6 +76,38 @@
         overflow-y: auto;
       }
 
+      #inventoryPanel.open[data-inventory-category="skills"] {
+        min-height: 0 !important;
+      }
+
+      #inventoryPanel.open[data-inventory-category="skills"] #inventoryList {
+        display: grid !important;
+        grid-template-rows: auto auto auto minmax(0, 1fr) !important;
+        min-height: 0 !important;
+        overflow: hidden !important;
+      }
+
+      #inventoryPanel.open[data-inventory-category="skills"] .progressionInventory {
+        min-height: 0 !important;
+        max-height: 100% !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+        -webkit-overflow-scrolling: touch !important;
+        touch-action: pan-y !important;
+        padding-right: 4px;
+        padding-bottom: max(42px, env(safe-area-inset-bottom)) !important;
+      }
+
+      #inventoryPanel.open[data-inventory-category="skills"] #inventoryHelp {
+        display: none !important;
+      }
+
+      #inventoryPanel.open[data-inventory-category="skills"] .inventoryScrollHint {
+        grid-column: 1 / -1;
+        align-self: end;
+        margin-top: 0;
+      }
+
       #lootWindowGrid {
         max-height: min(48vh, 360px);
       }
@@ -109,6 +142,27 @@
           padding-right: 4px !important;
         }
 
+        #inventoryPanel.open[data-inventory-category="skills"] {
+          grid-template-rows: auto minmax(0, 1fr) auto !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] #equipmentStats {
+          display: none !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] #inventoryList {
+          overflow: hidden !important;
+          min-height: 0 !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] .progressionInventory {
+          overflow-y: auto !important;
+          min-height: 0 !important;
+          max-height: 100% !important;
+          touch-action: pan-y !important;
+          -webkit-overflow-scrolling: touch !important;
+        }
+
         #lootWindow[style*="display: block"],
         #lootWindow[style*="display:block"] {
           display: grid !important;
@@ -119,6 +173,28 @@
         #lootWindowGrid {
           max-height: none !important;
           overflow-y: auto !important;
+        }
+      }
+
+      @media (orientation: portrait) and (hover: none),
+             (orientation: portrait) and (max-width: 900px) {
+        #inventoryPanel.open[data-inventory-category="skills"] {
+          height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+          max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+          overflow: hidden !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] #inventoryList {
+          grid-template-rows: auto auto auto minmax(0, 1fr) !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] .progressionSummary {
+          grid-template-columns: 1fr !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] .attributeGrid,
+        #inventoryPanel.open[data-inventory-category="skills"] .skillList {
+          grid-template-columns: 1fr !important;
         }
       }
 
@@ -144,6 +220,20 @@
         #inventoryPanel.open #inventoryList {
           max-height: none !important;
           overflow-y: auto !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] #equipmentStats {
+          display: none !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] #inventoryList {
+          grid-column: 1 / -1 !important;
+          overflow: hidden !important;
+        }
+
+        #inventoryPanel.open[data-inventory-category="skills"] .progressionInventory {
+          overflow-y: auto !important;
+          min-height: 0 !important;
         }
 
         #inventoryPanel .paperDoll,
@@ -199,6 +289,9 @@
   function bestScrollTarget(root = activeWindowRoot()) {
     const candidates = scrollCandidates(root);
     if (!candidates.length) return null;
+    if (root?.id === "inventoryPanel" && root.dataset.inventoryCategory === "skills") {
+      return candidates.find(el => el.classList?.contains("progressionInventory")) || candidates.find(el => el.id === "inventoryList") || candidates[0];
+    }
     const preferredIds = ["inventoryList", "lootWindowGrid", "petMerchantOptions", "progressionPanel", "logPanel", "safeRoomRecap"];
     return candidates.find(el => preferredIds.includes(el.id)) || candidates[0];
   }
@@ -253,12 +346,18 @@
     if (inventory) {
       inventory.classList.toggle("dcwScrollableModal", inventory.classList.contains("open"));
       ensureScrollHint(inventory, "Touch scroll · Right stick scroll · D-pad selects");
+      const progression = inventory.querySelector(".progressionInventory");
+      if (progression) {
+        progression.style.overflowY = "auto";
+        progression.style.webkitOverflowScrolling = "touch";
+        progression.style.touchAction = "pan-y";
+      }
     }
     if (loot) ensureScrollHint(loot, "Touch scroll · Right stick scroll · Take items or Take All");
   }
 
   function patchOpenCloseHooks() {
-    for (const name of ["toggleInventoryPanel", "openCorpseLootWindow", "renderCorpseLootWindow", "toggleProgressionPanel", "showSafeRoomRecap", "toggleLog"]) {
+    for (const name of ["toggleInventoryPanel", "openCorpseLootWindow", "renderCorpseLootWindow", "toggleProgressionPanel", "showSafeRoomRecap", "toggleLog", "setActiveInventoryCategory", "updateInventoryUI"]) {
       const original = window[name];
       if (typeof original !== "function" || original.__inventoryUiHardeningWrapped) continue;
       const wrapped = function inventoryUiHardeningWrappedFunction(...args) {
@@ -275,10 +374,8 @@
 
   function allowModalTouchScroll() {
     document.addEventListener("touchmove", event => {
-      const target = event.target?.closest?.("#lootWindow, #petMerchantPanel, #progressionPanel, #multiplayerPanel");
+      const target = event.target?.closest?.("#inventoryPanel .progressionInventory, #inventoryPanel #inventoryList, #lootWindow, #petMerchantPanel, #progressionPanel, #multiplayerPanel");
       if (!target) return;
-      // Existing global touch guard only whitelists a few panels. Stop the event
-      // before that guard can cancel native scroll inside these modal panels.
       event.stopPropagation();
     }, { capture: true, passive: true });
   }
