@@ -149,10 +149,23 @@
 })();
 
 (function loadInventoryUiScrollPatchAfterGameScripts() {
+  function loadSafeRoomShopCloseFix() {
+    if (document.querySelector('script[src="./src/safe-room-shop-close-fix.js"]')) return;
+    const closeFix = document.createElement("script");
+    closeFix.src = "./src/safe-room-shop-close-fix.js";
+    document.head.appendChild(closeFix);
+  }
+
   function loadSafeRoomShop() {
-    if (document.querySelector('script[src="./src/safe-room-shop.js"]')) return;
+    const existingShop = document.querySelector('script[src="./src/safe-room-shop.js"]');
+    if (existingShop) {
+      if (window.__dcwSafeRoomShopInstalled) loadSafeRoomShopCloseFix();
+      else existingShop.addEventListener("load", loadSafeRoomShopCloseFix, { once: true });
+      return;
+    }
     const shop = document.createElement("script");
     shop.src = "./src/safe-room-shop.js";
+    shop.addEventListener("load", loadSafeRoomShopCloseFix, { once: true });
     document.head.appendChild(shop);
   }
 
