@@ -4,107 +4,30 @@
   window.__dcwWeaponBalancePassInstalled = true;
 
   const BALANCE = Object.freeze({
-    sword: {
-      name: "Sword", feel: "Reliable blade", weight: 13, rarityVariance: 2,
-      damage: 20, range: 66, cooldown: 26,
-      attackShape: { type: "arc", radius: 66, angle: Math.PI * 0.62 },
-      telegraphColor: "rgba(145,205,255,0.56)"
-    },
-    dagger: {
-      name: "Dagger", feel: "Fast short blade", weight: 11, rarityVariance: 1,
-      damage: 14, range: 44, cooldown: 16,
-      attackShape: { type: "arc", radius: 44, angle: Math.PI * 0.48 },
-      telegraphColor: "rgba(210,165,255,0.56)"
-    },
-    greatsword: {
-      name: "Greatsword", feel: "Heavy wide blade", weight: 5, rarityVariance: 3,
-      damage: 29, range: 80, cooldown: 40,
-      attackShape: { type: "arc", radius: 80, angle: Math.PI * 0.76 },
-      telegraphColor: "rgba(145,205,255,0.56)"
-    },
-    axe: {
-      name: "Axe", feel: "Slow heavy cleaver", weight: 8, rarityVariance: 3,
-      damage: 32, range: 60, cooldown: 42,
-      attackShape: { type: "arc", radius: 60, angle: Math.PI * 0.72 },
-      telegraphColor: "rgba(255,145,110,0.58)"
-    },
-    spear: {
-      name: "Spear", feel: "Long narrow thrust", weight: 8, rarityVariance: 2,
-      damage: 22, range: 122, cooldown: 32,
-      attackShape: { type: "line", length: 122, width: 18 },
-      telegraphColor: "rgba(155,255,175,0.58)"
-    },
-    halberd: {
-      name: "Halberd", feel: "Reach weapon", weight: 4, rarityVariance: 3,
-      damage: 27, range: 108, cooldown: 40,
-      attackShape: { type: "line", length: 108, width: 24 },
-      telegraphColor: "rgba(155,255,175,0.58)"
-    },
-    hammer: {
-      name: "Hammer", feel: "Brutal close bonk", weight: 6, rarityVariance: 4,
-      damage: 39, range: 48, cooldown: 56,
-      attackShape: { type: "circle", radius: 48 },
-      telegraphColor: "rgba(255,190,90,0.58)"
-    },
-    mace: {
-      name: "Mace", feel: "Compact blunt force", weight: 8, rarityVariance: 3,
-      damage: 34, range: 50, cooldown: 46,
-      attackShape: { type: "circle", radius: 50 },
-      telegraphColor: "rgba(255,190,90,0.58)"
-    },
-    shield: {
-      name: "Shield", feel: "Defensive bash", weight: 5, rarityVariance: 1,
-      damage: 13, range: 44, cooldown: 22, defenseBonus: 1,
-      attackShape: { type: "circle", radius: 44 },
-      telegraphColor: "rgba(160,210,255,0.52)"
-    },
-    bow: {
-      name: "Bow", feel: "Steady ranged fire", weight: 9, rarityVariance: 2,
-      damage: 19, range: 320, cooldown: 40,
-      attackShape: { type: "projectile", speed: 7.5, radius: 4 },
-      telegraphColor: "rgba(255,240,135,0.62)"
-    },
-    crossbow: {
-      name: "Crossbow", feel: "Slow hard shot", weight: 5, rarityVariance: 3,
-      damage: 30, range: 300, cooldown: 56,
-      attackShape: { type: "projectile", speed: 8.8, radius: 4 },
-      telegraphColor: "rgba(255,240,135,0.62)"
-    },
-    staff: {
-      name: "Staff", feel: "Quick magic bolt", weight: 7, rarityVariance: 2,
-      damage: 16, range: 260, cooldown: 45,
-      attackShape: { type: "projectile", speed: 6.4, radius: 5 },
-      telegraphColor: "rgba(195,145,255,0.62)"
-    },
-    tome: {
-      name: "Tome", feel: "Slow charged spell", weight: 4, rarityVariance: 3,
-      damage: 24, range: 220, cooldown: 56,
-      attackShape: { type: "projectile", speed: 5.7, radius: 7 },
-      telegraphColor: "rgba(255,125,80,0.64)"
-    }
+    sword: { name: "Sword", feel: "Reliable blade", weight: 13, rarityVariance: 2, damage: 20, range: 66, cooldown: 26, attackShape: { type: "arc", radius: 66, angle: Math.PI * 0.62 }, telegraphColor: "rgba(145,205,255,0.56)" },
+    dagger: { name: "Dagger", feel: "Fast short blade", weight: 11, rarityVariance: 1, damage: 14, range: 44, cooldown: 16, attackShape: { type: "arc", radius: 44, angle: Math.PI * 0.48 }, telegraphColor: "rgba(210,165,255,0.56)" },
+    greatsword: { name: "Greatsword", feel: "Heavy wide blade", weight: 5, rarityVariance: 3, damage: 29, range: 80, cooldown: 40, attackShape: { type: "arc", radius: 80, angle: Math.PI * 0.76 }, telegraphColor: "rgba(145,205,255,0.56)" },
+    axe: { name: "Axe", feel: "Slow heavy cleaver", weight: 8, rarityVariance: 3, damage: 32, range: 60, cooldown: 42, attackShape: { type: "arc", radius: 60, angle: Math.PI * 0.72 }, telegraphColor: "rgba(255,145,110,0.58)" },
+    spear: { name: "Spear", feel: "Long narrow thrust", weight: 8, rarityVariance: 2, damage: 22, range: 122, cooldown: 32, attackShape: { type: "line", length: 122, width: 18 }, telegraphColor: "rgba(155,255,175,0.58)" },
+    halberd: { name: "Halberd", feel: "Reach weapon", weight: 4, rarityVariance: 3, damage: 27, range: 108, cooldown: 40, attackShape: { type: "line", length: 108, width: 24 }, telegraphColor: "rgba(155,255,175,0.58)" },
+    hammer: { name: "Hammer", feel: "Brutal close bonk", weight: 6, rarityVariance: 4, damage: 39, range: 48, cooldown: 56, attackShape: { type: "circle", radius: 48 }, telegraphColor: "rgba(255,190,90,0.58)" },
+    mace: { name: "Mace", feel: "Compact blunt force", weight: 8, rarityVariance: 3, damage: 34, range: 50, cooldown: 46, attackShape: { type: "circle", radius: 50 }, telegraphColor: "rgba(255,190,90,0.58)" },
+    shield: { name: "Shield", feel: "Defensive bash", weight: 5, rarityVariance: 1, damage: 13, range: 44, cooldown: 22, defenseBonus: 1, attackShape: { type: "circle", radius: 44 }, telegraphColor: "rgba(160,210,255,0.52)" },
+    bow: { name: "Bow", feel: "Steady ranged fire", weight: 9, rarityVariance: 2, damage: 19, range: 320, cooldown: 40, attackShape: { type: "projectile", speed: 7.5, radius: 4 }, telegraphColor: "rgba(255,240,135,0.62)" },
+    crossbow: { name: "Crossbow", feel: "Slow hard shot", weight: 5, rarityVariance: 3, damage: 30, range: 300, cooldown: 56, attackShape: { type: "projectile", speed: 8.8, radius: 4 }, telegraphColor: "rgba(255,240,135,0.62)" },
+    staff: { name: "Staff", feel: "Quick magic bolt", weight: 7, rarityVariance: 2, damage: 16, range: 260, cooldown: 45, attackShape: { type: "projectile", speed: 6.4, radius: 5 }, telegraphColor: "rgba(195,145,255,0.62)" },
+    tome: { name: "Tome", feel: "Slow charged spell", weight: 4, rarityVariance: 3, damage: 24, range: 220, cooldown: 56, attackShape: { type: "projectile", speed: 5.7, radius: 7 }, telegraphColor: "rgba(255,125,80,0.64)" }
   });
 
   const RARITY_POWER = Object.freeze({ Common: 1, Uncommon: 2, Rare: 3, Epic: 4 });
   const RARITY_DAMAGE_MULT = Object.freeze({ Common: 1, Uncommon: 1.13, Rare: 1.28, Epic: 1.48 });
   const RARITY_RANGE_BONUS = Object.freeze({ Common: 0, Uncommon: 3, Rare: 7, Epic: 12 });
   const RARITY_COOLDOWN_BONUS = Object.freeze({ Common: 0, Uncommon: 1, Rare: 3, Epic: 5 });
-  const RARITY_NAMES = Object.freeze(["Common", "Uncommon", "Rare", "Epic"]);
 
   function applyDefinitions() {
     if (typeof WEAPON_DEFINITIONS === "undefined") return false;
     for (const [id, def] of Object.entries(BALANCE)) {
-      WEAPON_DEFINITIONS[id] = {
-        ...(WEAPON_DEFINITIONS[id] || {}),
-        id,
-        name: def.name,
-        damage: def.damage,
-        range: def.range,
-        cooldown: def.cooldown,
-        attackShape: { ...def.attackShape },
-        telegraphColor: def.telegraphColor,
-        feel: def.feel,
-        defenseBonus: def.defenseBonus || 0
-      };
+      WEAPON_DEFINITIONS[id] = { ...(WEAPON_DEFINITIONS[id] || {}), id, name: def.name, damage: def.damage, range: def.range, cooldown: def.cooldown, attackShape: { ...def.attackShape }, telegraphColor: def.telegraphColor, feel: def.feel, defenseBonus: def.defenseBonus || 0 };
       if (Array.isArray(WEAPON_ORDER) && !WEAPON_ORDER.includes(id)) WEAPON_ORDER.push(id);
       if (Array.isArray(LOOTABLE_WEAPON_IDS) && !LOOTABLE_WEAPON_IDS.includes(id)) LOOTABLE_WEAPON_IDS.push(id);
     }
@@ -115,10 +38,7 @@
     const rows = Object.entries(BALANCE).filter(([id]) => typeof WEAPON_DEFINITIONS === "undefined" || WEAPON_DEFINITIONS[id]);
     const total = rows.reduce((sum, [, def]) => sum + Math.max(0, def.weight || 1), 0) || rows.length || 1;
     let roll = Math.random() * total;
-    for (const [id, def] of rows) {
-      roll -= Math.max(0, def.weight || 1);
-      if (roll <= 0) return id;
-    }
+    for (const [id, def] of rows) { roll -= Math.max(0, def.weight || 1); if (roll <= 0) return id; }
     return rows[0]?.[0] || "sword";
   }
 
@@ -131,13 +51,8 @@
     return "Epic";
   }
 
-  function rarityPowerValue(rarity) {
-    return RARITY_POWER[rarity] || 1;
-  }
-
-  function randomInt(maxInclusive) {
-    return Math.floor(Math.random() * (Math.max(0, maxInclusive) + 1));
-  }
+  function rarityPowerValue(rarity) { return RARITY_POWER[rarity] || 1; }
+  function randomInt(maxInclusive) { return Math.floor(Math.random() * (Math.max(0, maxInclusive) + 1)); }
 
   function iconForWeapon(weaponId) {
     const pools = typeof RPG_WEAPON_ICONS !== "undefined" ? window.RPG_WEAPON_ICONS : null;
@@ -174,21 +89,7 @@
     const range = base.range + (shapeType === "projectile" ? rangeBonus * 2 : shapeType === "line" ? rangeBonus : Math.floor(rangeBonus * 0.65));
     const cooldown = Math.max(10, base.cooldown - (RARITY_COOLDOWN_BONUS[rarity] || 0));
     const id = typeof makeId === "function" ? makeId("weapon") : `weapon_${Date.now()}_${Math.floor(Math.random() * 999999)}`;
-    const item = {
-      id,
-      type: "weapon",
-      slot: "weapon",
-      weaponId,
-      iconId: icon?.id || null,
-      rarity,
-      name: buildWeaponName(rarity, weaponId, base, icon),
-      damage,
-      range,
-      cooldown,
-      attackShape: { ...base.attackShape },
-      telegraphColor: base.telegraphColor,
-      feel: tuned.feel || base.feel || base.name
-    };
+    const item = { id, type: "weapon", slot: "weapon", weaponId, iconId: icon?.id || null, rarity, name: buildWeaponName(rarity, weaponId, base, icon), damage, range, cooldown, attackShape: { ...base.attackShape }, telegraphColor: base.telegraphColor, feel: tuned.feel || base.feel || base.name };
     if (weaponId === "shield") item.defense = Math.max(1, (tuned.defenseBonus || 1) + Math.floor(power / 2));
     return item;
   }
@@ -239,12 +140,17 @@
   }
 
   if (!install()) {
-    const retry = setInterval(() => {
-      if (install()) clearInterval(retry);
-    }, 100);
+    const retry = setInterval(() => { if (install()) clearInterval(retry); }, 100);
     setTimeout(() => clearInterval(retry), 3000);
   }
 
   window.DCW_WEAPON_BALANCE = BALANCE;
   window.generateBalancedWeapon = makeBalancedWeapon;
+})();
+
+(function loadInventoryUiScrollPatchAfterGameScripts() {
+  if (document.querySelector('script[src="./src/inventory-ui-hardening.js"]')) return;
+  const script = document.createElement("script");
+  script.src = "./src/inventory-ui-hardening.js";
+  document.head.appendChild(script);
 })();
