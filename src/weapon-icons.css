@@ -1,0 +1,51 @@
+/* Pixel weapon icons shared by inventory slots, paper-doll slots, and corpse loot cards. */
+.weaponSpriteIcon {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  background-image: var(--rpg-weapon-atlas);
+  background-repeat: no-repeat;
+  background-size: 256px 160px;
+  background-position: var(--weapon-icon-x, 0px) var(--weapon-icon-y, 0px);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  vertical-align: middle;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,0.65));
+}
+
+.lootIcon,
+.paperSlotIcon,
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lootIcon .weaponSpriteIcon,
+.paperSlotIcon .weaponSpriteIcon,
+.itemIcon .weaponSpriteIcon {
+  margin: 0;
+}
+
+.itemDetailsHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.itemDetailsHeader .weaponSpriteIcon {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  background-size: 288px 180px;
+}
+
+@media (hover: none) and (pointer: coarse), (max-width: 900px) {
+  .weaponSpriteIcon {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+}
