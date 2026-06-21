@@ -230,10 +230,11 @@
     <div class="titleBox characterCreatorBox">
       <div class="titleEyebrow">Crawler Registry</div>
       <h1>Character Creator</h1>
-      <p>Name the crawler that other Floor 0 delvers will see above your sprite.</p>
+      <p>Name and customize the layered 64×64-frame crawler that other Floor 0 delvers will see.</p>
       <label class="creatorField" for="creatorNameInput">Player Name</label>
       <input id="creatorNameInput" class="creatorNameInput" type="text" maxlength="16" autocomplete="off" placeholder="Crawler" />
       <div class="creatorOptions" id="creatorCharacterOptions" aria-label="Character options"></div>
+      <div class="creatorCustomizeGrid" id="creatorCustomizeGrid" aria-label="Layered appearance options"></div>
       <div class="creatorPreview" aria-label="Current player sprite preview">
         <div id="creatorSpritePreview" class="creatorSpritePreview" aria-hidden="true"></div>
         <div>
@@ -242,6 +243,7 @@
         </div>
       </div>
       <div class="titleActions creatorActions">
+        <button id="randomizeCharacterBtn" type="button">Randomize</button>
         <button id="saveCharacterBtn" type="button">Save</button>
         <button id="backToTitleBtn" type="button">Back</button>
       </div>
@@ -256,6 +258,7 @@
     </div>
   </div>
 
+<script defer src="./src/character-appearance.js"></script>
 <script defer src="./src/state.js"></script>
 <script defer src="./src/input.js"></script>
 <script defer src="./src/progression.js"></script>

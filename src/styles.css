@@ -1694,3 +1694,33 @@ body.progressionOpen { overflow: hidden; }
   padding: 8px 10px;
   text-transform: uppercase;
 }
+.creatorCustomizeGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  text-align: left;
+}
+.creatorSelectField {
+  display: grid;
+  gap: 5px;
+  color: #ffd86b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.creatorSelectField select,
+.creatorSelectField input[type="color"] {
+  width: 100%;
+  min-height: 38px;
+  box-sizing: border-box;
+  border: 1px solid rgba(255,216,107,0.42);
+  border-radius: 9px;
+  background: rgba(0,0,0,.42);
+  color: #fff;
+  font-weight: 900;
+  padding: 7px 9px;
+}
+.creatorSelectField input[type="color"] { padding: 3px; }
+.creatorActions { grid-template-columns: repeat(3, minmax(100px, 1fr)); }

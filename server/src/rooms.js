@@ -59,6 +59,8 @@ class LobbyManager {
     client.profile = {
       name: client.name,
       sprite: String(profile.sprite || "default").slice(0, 32) || "default",
+      characterId: String(profile.characterId || profile.sprite || "custom_layered").slice(0, 32) || "custom_layered",
+      appearance: this.sanitizeAppearance(profile.appearance),
       color: String(profile.color || "blue").slice(0, 32) || "blue"
     };
     if (client.lobbyCode) {
@@ -454,6 +456,8 @@ class LobbyManager {
       name: player.name,
       color: player.profile?.color || sanitized.color || player.color,
       sprite: player.profile?.sprite || sanitized.sprite || "default",
+      characterId: player.profile?.characterId || sanitized.characterId || "custom_layered",
+      appearance: sanitized.appearance || player.profile?.appearance || null,
       updatedAt: Date.now()
     };
     if (player.crawlerState.status === "downed" || player.crawlerState.hp <= 0) {
@@ -509,8 +513,22 @@ class LobbyManager {
       ...(aimY === null ? {} : { aimY }),
       name: this.sanitizePlayerName(state.name),
       sprite: String(state.sprite || "default").slice(0, 32) || "default",
+      characterId: String(state.characterId || "custom_layered").slice(0, 32) || "custom_layered",
+      appearance: this.sanitizeAppearance(state.appearance),
       color: String(state.color || "blue").slice(0, 32) || "blue"
     };
+  }
+
+  sanitizeAppearance(appearance) {
+    if (!appearance || typeof appearance !== "object") return null;
+    const clean = {};
+    for (const key of ["bodyFrame", "genderPresentation", "hairStyle", "shirt", "pants", "shoes", "accessory"]) {
+      if (typeof appearance[key] === "string") clean[key] = appearance[key].slice(0, 32);
+    }
+    for (const key of ["skinTone", "eyeColor", "hairColor", "shirtColor", "pantsColor"]) {
+      if (typeof appearance[key] === "string" && /^#[0-9a-f]{6}$/i.test(appearance[key])) clean[key] = appearance[key].toLowerCase();
+    }
+    return Object.keys(clean).length ? clean : null;
   }
 
   broadcastCrawlerSnapshot(lobby, { force = false } = {}) {
@@ -845,6 +863,8 @@ class LobbyManager {
         name: player.name,
         color: player.profile?.color || player.color,
         sprite: player.profile?.sprite || "default",
+        characterId: player.profile?.characterId || "custom_layered",
+        appearance: player.profile?.appearance || null,
         joinedAt: player.joinedAt,
         partyId: player.partyId || null,
         isPartyLeader: !!player.isPartyLeader,
@@ -875,6 +895,8 @@ class LobbyManager {
       name: player.name,
       color: player.profile?.color || player.color,
       sprite: player.profile?.sprite || "default",
+      characterId: player.profile?.characterId || "custom_layered",
+      appearance: player.profile?.appearance || null,
       partyId: player.partyId || null,
       isPartyLeader: !!player.isPartyLeader,
       floor0Status: player.floor0Status || FLOOR0_ADVANCE_STATUSES.EXPLORING,
