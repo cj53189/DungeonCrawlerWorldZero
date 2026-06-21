@@ -79,13 +79,17 @@
 
   function applyTuning(){
     if(typeof player==="undefined") return;
-    player.baseSpeed=numberOr(document.getElementById("workshopSpeed")?.value,player.baseSpeed||player.speed||2.45);
-    player.speed=player.baseSpeed;
-    player.maxHp=Math.max(1,Math.round(numberOr(document.getElementById("workshopMaxHp")?.value,player.maxHp||100)));
-    player.hp=Math.min(Math.max(1,player.hp||player.maxHp),player.maxHp);
-    player.attackDamage=Math.max(0,Math.round(numberOr(document.getElementById("workshopPower")?.value,player.attackDamage||20)));
-    if(typeof floorTimeLeft!=="undefined") floorTimeLeft=Math.max(0,Math.round(numberOr(document.getElementById("workshopTimer")?.value,floorTimeLeft)));
+    const speed=numberOr(document.getElementById("workshopSpeed")?.value,player.baseSpeed||player.speed||2.45);
+    const maxHp=Math.max(1,Math.round(numberOr(document.getElementById("workshopMaxHp")?.value,player.maxHp||100)));
+    const power=Math.max(0,Math.round(numberOr(document.getElementById("workshopPower")?.value,player.attackDamage||20)));
+    const timer=Math.max(0,Math.round(numberOr(document.getElementById("workshopTimer")?.value,typeof floorTimeLeft!=="undefined"?floorTimeLeft:900)));
     if(typeof recalcEquipmentStats==="function") recalcEquipmentStats();
+    player.baseSpeed=speed;
+    player.speed=speed;
+    player.maxHp=maxHp;
+    player.hp=Math.min(Math.max(1,player.hp||maxHp),maxHp);
+    player.attackDamage=power;
+    if(typeof floorTimeLeft!=="undefined") floorTimeLeft=timer;
     if(typeof updateHUD==="function") updateHUD();
     writeLog("Workshop tuning applied.");
     syncControls();
