@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "project": "Dungeon Crawler World Zero",
+  "assetDrops": [
+    {
+      "id": "kenney_tiny_dungeon",
+      "path": "assets/tilesets/kenney/tiny-dungeon",
+      "source": "Kenney Tiny Dungeon 1.0",
+      "license": "CC0 1.0",
+      "status": "safe_for_runtime_use",
+      "dimensions": {
+        "tileSize": "16x16",
+        "tilemap": "203x186",
+        "packedTilemap": "192x176",
+        "columns": 12,
+        "rows": 11,
+        "spacing": 1,
+        "tileCount": 132
+      },
+      "runtimeAssets": [
+        "assets/tilesets/kenney/tiny-dungeon/Tilemap/tilemap.png",
+        "assets/tilesets/kenney/tiny-dungeon/Tilemap/tilemap_packed.png"
+      ],
+      "recommendedUse": [
+        "dungeon tiles",
+        "inventory icons",
+        "props",
+        "pickup icons",
+        "tiny enemy placeholders"
+      ],
+      "notes": [
+        "Can be drawn at 2x scale for the current 32px game tiles with image smoothing disabled.",
+        "This commit adds the runtime tilemaps first. Individual sliced 16x16 tile PNGs can be added later if needed.",
+        "The uploaded roguelike character atlas and male-base JPEG were not added because their source/license still needs verification."
+      ]
+    }
+  ]
+}
