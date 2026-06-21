@@ -24,3 +24,10 @@
   window.setupUiLayoutEditor=function(){if(originalSetup)originalSetup();bind();apply();showGear()};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{bind();apply();showGear()},{once:true});else{bind();apply();showGear()}
 })();
+
+(function loadDungeonWorkshopPanel(){
+  if(document.querySelector('script[src="./src/dev-workshop.js"]'))return;
+  const script=document.createElement('script');
+  script.src='./src/dev-workshop.js';
+  document.head.appendChild(script);
+})();
