@@ -2,7 +2,7 @@
   const PET_HALLWAY_RADIUS=2;
   const PET_MAX_SHARED_VISION=TILE*9;
   function inBounds(x,y){return x>=0&&y>=0&&x<MAP_COLS&&y<MAP_ROWS}
-  function entTile(e){return{x:Math.max(0,Math.min(MAP_COLS-1,Math.floor(Number(e?.x||0)/TILE))),y:Math.max(0,Math.min(MAP_ROWS-1,Math.floor(Number(e?.y||0)/TILE)))}}
+  function entTile(e){return{x:Math.max(0,Math.min(MAP_COLS-1,Math.floor(Number(e?.x||0)/TILE))),y:Math.max(0,Math.min(MAP_ROWS-1,Math.floor(Number(e?.y||0)/TILE)))} }
   function entRoom(e){if(typeof roomForTile!=='function')return null;const t=entTile(e);return roomForTile(t.x,t.y)}
   function same(a,b){return !!a&&!!b&&a.id===b.id}
   function activePet(){const p=typeof getActivePet==='function'?getActivePet():null;return p&&p.hp>0?p:null}
@@ -63,4 +63,11 @@
   }
   const base=typeof updateVisibility==='function'?updateVisibility:null;
   if(base&&!base.__petRevealFixed){updateVisibility=function(force=false){base(force);revealPetHallwayVision();trimPetReveal()};updateVisibility.__petRevealFixed=true}
+})();
+
+(function loadOptionalKenneyTinyDungeonPreview(){
+  if(document.querySelector('script[src="./src/kenney-tiny-dungeon-preview.js"]'))return;
+  const script=document.createElement('script');
+  script.src='./src/kenney-tiny-dungeon-preview.js';
+  document.head.appendChild(script);
 })();
