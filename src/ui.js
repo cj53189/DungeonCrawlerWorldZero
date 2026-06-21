@@ -818,47 +818,102 @@ function hideTitleScreen() {
 }
 
 function getSelectedCreatorCharacterId() {
-  const selected = document.querySelector('input[name="creatorCharacterId"]:checked');
-  return getCharacterDef(selected?.value || playerProfile.characterId).id;
+  return "custom_layered";
+}
+
+function getCreatorAppearanceFromControls() {
+  const appearance = { ...DEFAULT_APPEARANCE };
+  for (const key of Object.keys(DEFAULT_APPEARANCE)) {
+    const input = document.getElementById(`creator_${key}`);
+    if (input) appearance[key] = input.value;
+  }
+  return sanitizeAppearance(appearance);
+}
+
+function setCreatorAppearanceControls(appearance) {
+  const safe = sanitizeAppearance(appearance);
+  for (const [key, value] of Object.entries(safe)) {
+    const input = document.getElementById(`creator_${key}`);
+    if (input) input.value = value;
+  }
 }
 
 function updateCharacterCreatorPreview() {
   const input = document.getElementById("creatorNameInput");
   const name = sanitizePlayerName(input?.value ?? playerProfile.name);
-  const characterDef = getCharacterDef(getSelectedCreatorCharacterId());
+  const appearance = getCreatorAppearanceFromControls();
   const previewName = document.getElementById("creatorPreviewName");
   if (previewName) previewName.textContent = name;
   const previewMeta = document.getElementById("creatorPreviewMeta");
-  if (previewMeta) previewMeta.textContent = `${characterDef.label} · ${characterDef.mode} sprite`;
+  if (previewMeta) previewMeta.textContent = `${appearance.bodyFrame} body · ${appearance.hairStyle.replaceAll("_", " ")} · layered sprite`;
   const preview = document.getElementById("creatorSpritePreview");
-  if (preview && characterDef.mode === "baked") {
-    preview.style.setProperty("--creator-sprite-image", `url(${characterDef.image})`);
-    preview.style.setProperty("--creator-frame-width", `${characterDef.frameWidth}px`);
-    preview.style.setProperty("--creator-frame-height", `${characterDef.frameHeight}px`);
-    preview.style.setProperty("--creator-columns", characterDef.columns);
-    preview.style.setProperty("--creator-rows", characterDef.rows);
-    preview.style.setProperty("--creator-preview-scale", characterDef.previewScale || 2);
+  if (preview && typeof buildCharacterSpriteSheet === "function") {
+    const canvas = buildCharacterSpriteSheet(appearance);
+    preview.style.setProperty("--creator-sprite-image", `url(${canvas.toDataURL("image/png")})`);
+    preview.style.setProperty("--creator-frame-width", "64px");
+    preview.style.setProperty("--creator-frame-height", "64px");
+    preview.style.setProperty("--creator-columns", 3);
+    preview.style.setProperty("--creator-rows", 4);
+    preview.style.setProperty("--creator-preview-scale", 1);
   }
+}
+
+function renderCreatorSelect(parent, key, label, values, formatter = value => value.replaceAll("_", " ")) {
+  const wrap = document.createElement("label");
+  wrap.className = "creatorSelectField";
+  const text = document.createElement("span");
+  text.textContent = label;
+  const select = document.createElement("select");
+  select.id = `creator_${key}`;
+  select.addEventListener("change", updateCharacterCreatorPreview);
+  for (const value of values) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = formatter(value);
+    select.appendChild(option);
+  }
+  wrap.append(text, select);
+  parent.appendChild(wrap);
+}
+
+function renderCreatorColor(parent, key, label, values) {
+  const wrap = document.createElement("label");
+  wrap.className = "creatorSelectField creatorColorField";
+  const text = document.createElement("span");
+  text.textContent = label;
+  const input = document.createElement("input");
+  input.id = `creator_${key}`;
+  input.type = "color";
+  input.setAttribute("list", `${key}Palette`);
+  input.addEventListener("input", updateCharacterCreatorPreview);
+  const datalist = document.createElement("datalist");
+  datalist.id = `${key}Palette`;
+  for (const value of values) {
+    const option = document.createElement("option");
+    option.value = value;
+    datalist.appendChild(option);
+  }
+  wrap.append(text, input, datalist);
+  parent.appendChild(wrap);
 }
 
 function renderCharacterCreatorOptions() {
   const options = document.getElementById("creatorCharacterOptions");
-  if (!options) return;
-  options.innerHTML = "";
-  for (const characterDef of Object.values(CHARACTER_DEFS)) {
-    const label = document.createElement("label");
-    label.className = "creatorCharacterOption";
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = "creatorCharacterId";
-    input.value = characterDef.id;
-    input.checked = getCharacterDef(playerProfile.characterId).id === characterDef.id;
-    input.addEventListener("change", updateCharacterCreatorPreview);
-    const text = document.createElement("span");
-    text.textContent = characterDef.label;
-    label.append(input, text);
-    options.appendChild(label);
+  if (options) {
+    options.innerHTML = '<div class="creatorCharacterOption"><span>Layered paper-doll crawler · 192×256 sheet · 3×4 frames</span></div>';
   }
+  const grid = document.getElementById("creatorCustomizeGrid");
+  if (!grid) return;
+  grid.innerHTML = "";
+  renderCreatorSelect(grid, "bodyFrame", "Body Frame", CHARACTER_APPEARANCE_OPTIONS.bodyFrame);
+  renderCreatorColor(grid, "skinTone", "Skin Tone", CHARACTER_APPEARANCE_OPTIONS.skinTone);
+  renderCreatorColor(grid, "eyeColor", "Eye Color", CHARACTER_APPEARANCE_OPTIONS.eyeColor);
+  renderCreatorSelect(grid, "hairStyle", "Hair Style", CHARACTER_APPEARANCE_OPTIONS.hairStyle);
+  renderCreatorColor(grid, "hairColor", "Hair Color", CHARACTER_APPEARANCE_OPTIONS.hairColor);
+  renderCreatorSelect(grid, "shirt", "Top", CHARACTER_APPEARANCE_OPTIONS.shirt);
+  renderCreatorColor(grid, "shirtColor", "Top Color", CHARACTER_APPEARANCE_OPTIONS.shirtColor);
+  renderCreatorSelect(grid, "pants", "Bottom", CHARACTER_APPEARANCE_OPTIONS.pants);
+  renderCreatorColor(grid, "pantsColor", "Bottom Color", CHARACTER_APPEARANCE_OPTIONS.pantsColor);
 }
 
 function showCharacterCreator() {
@@ -867,6 +922,7 @@ function showCharacterCreator() {
   const input = document.getElementById("creatorNameInput");
   if (input) input.value = playerProfile.name;
   renderCharacterCreatorOptions();
+  setCreatorAppearanceControls(playerProfile.appearance || DEFAULT_APPEARANCE);
   updateCharacterCreatorPreview();
   if (title) title.style.display = "none";
   if (creator) {
@@ -876,9 +932,15 @@ function showCharacterCreator() {
   if (input) input.focus();
 }
 
+function randomizeCharacterCreator() {
+  setCreatorAppearanceControls(randomAppearance());
+  updateCharacterCreatorPreview();
+}
+
 function saveCharacterProfileFromCreator() {
   const input = document.getElementById("creatorNameInput");
-  writePlayerProfile({ name: input?.value, characterId: getSelectedCreatorCharacterId() });
+  writePlayerProfile({ name: input?.value, characterId: "custom_layered", appearance: getCreatorAppearanceFromControls() });
+  ensureLocalLobbyCrawler?.();
   updateCharacterCreatorPreview();
   if (typeof announcer === "function") announcer(`Crawler profile saved: ${playerProfile.name}.`);
   showTitleScreen();
@@ -1003,6 +1065,7 @@ function setupTitleScreenHandlers() {
   bind("pvpArenaBtn", startPvpArena);
   bind("characterCreatorBtn", showCharacterCreator);
   bind("backToTitleBtn", showTitleScreen);
+  bind("randomizeCharacterBtn", randomizeCharacterCreator);
   bind("saveCharacterBtn", saveCharacterProfileFromCreator);
   const creatorNameInput = document.getElementById("creatorNameInput");
   if (creatorNameInput) creatorNameInput.addEventListener("input", updateCharacterCreatorPreview);

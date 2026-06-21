@@ -337,8 +337,9 @@ function playerSpriteRowForAim(characterDef) {
   return getSpriteRowForAim(aimX, aimY, getCharacterDirectionRows(characterDef));
 }
 
-function getCharacterSpriteSheet(characterId) {
+function getCharacterSpriteSheet(characterId, appearance = null) {
   const def = typeof getCharacterDef === "function" ? getCharacterDef(characterId) : null;
+  if (def?.mode === "layered" && typeof buildCharacterSpriteSheet === "function") return buildCharacterSpriteSheet(appearance || getPlayerAppearance?.() || null);
   if (!def || def.mode !== "baked" || !def.image) return null;
   let sheet = CHARACTER_SPRITE_CACHE.get(def.id);
   if (!sheet) {
@@ -350,9 +351,11 @@ function getCharacterSpriteSheet(characterId) {
 }
 
 function isCharacterSpriteLoaded(def, sheet) {
-  return !!def && !!sheet && sheet.complete &&
-    sheet.naturalWidth >= def.frameWidth * def.columns &&
-    sheet.naturalHeight >= def.frameHeight * def.rows;
+  if (!def || !sheet) return false;
+  const width = sheet.naturalWidth || sheet.width || 0;
+  const height = sheet.naturalHeight || sheet.height || 0;
+  const ready = sheet instanceof HTMLCanvasElement || sheet.complete;
+  return !!ready && width >= def.frameWidth * def.columns && height >= def.frameHeight * def.rows;
 }
 
 function isPlayerSpriteLoaded(sheet = getCharacterSpriteSheet(playerProfile?.characterId), def = getCharacterDef(playerProfile?.characterId)) {
@@ -409,7 +412,7 @@ function drawPlayerSpriteStatusRing() {
 
 function drawPlayerSprite() {
   const characterDef = getCharacterDef(playerProfile?.characterId);
-  const characterSheet = getCharacterSpriteSheet(characterDef.id);
+  const characterSheet = getCharacterSpriteSheet(characterDef.id, playerProfile?.appearance);
   if (!isCharacterSpriteLoaded(characterDef, characterSheet)) {
     drawPlayerFallbackFigure();
     return;
@@ -527,10 +530,9 @@ function drawPvpKillMarker(crawler, yOffset = 55) {
 }
 
 function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
-  const hasValidCharacterId = !!crawler?.characterId && Object.prototype.hasOwnProperty.call(CHARACTER_DEFS, String(crawler.characterId));
-  const characterDef = hasValidCharacterId ? getCharacterDef(crawler.characterId) : null;
-  const characterSheet = characterDef ? getCharacterSpriteSheet(characterDef.id) : null;
-  if (characterDef?.mode === "baked" && isCharacterSpriteLoaded(characterDef, characterSheet)) {
+  const characterDef = crawler?.characterId ? getCharacterDef(crawler.characterId) : null;
+  const characterSheet = characterDef ? getCharacterSpriteSheet(characterDef.id, crawler.appearance) : null;
+  if ((characterDef?.mode === "baked" || characterDef?.mode === "layered") && isCharacterSpriteLoaded(characterDef, characterSheet)) {
     drawPlayerSpriteAt({
       ...crawler,
       characterId: characterDef.id,
@@ -586,7 +588,7 @@ function drawRemoteCrawlerSprite(crawler, alpha = 1, tint = null) {
 
 function drawPlayerSpriteAt(entity, alpha = 1, tint = null) {
   const characterDef = getCharacterDef(entity.characterId);
-  const sheet = getCharacterSpriteSheet(characterDef.id);
+  const sheet = getCharacterSpriteSheet(characterDef.id, entity.appearance);
   if (!isCharacterSpriteLoaded(characterDef, sheet)) {
     ctx.save();
     ctx.globalAlpha = alpha;

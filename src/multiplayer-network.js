@@ -469,6 +469,7 @@ function crawlerStateSignature(state) {
     state.floor0Status || "",
     state.name || "",
     state.characterId || DEFAULT_CHARACTER_ID,
+    appearanceCacheKey?.(state.appearance || DEFAULT_APPEARANCE) || "",
     state.isDodging ? "dodge" : "still",
     networkNumberSignature(state.dodgeProgress, 2),
     state.currentRoomId ?? "",
@@ -500,7 +501,8 @@ function captureLocalCrawlerNetworkState() {
     knockbackFrames: Math.max(0, Math.trunc(Number(player.knockbackFrames) || 0)),
     knockbackUntil: Number(player.knockbackUntil) || 0,
     name: playerProfile?.name || "Crawler",
-    characterId: getCharacterDef(playerProfile?.characterId).id
+    characterId: getCharacterDef(playerProfile?.characterId).id,
+    appearance: getPlayerAppearance?.(playerProfile)
   };
   if (state.status === "downed" && !multiplayerNetwork.playerCorpseLootSent) {
     state.lootSnapshot = capturePlayerCorpseLootSnapshot();
@@ -583,6 +585,7 @@ function applyServerCrawlerSnapshot(snapshot) {
       id: crawler.id,
       name: member?.name || crawler.name || "Crawler",
       characterId: getCharacterDef(crawler.characterId || member?.characterId).id,
+      appearance: sanitizeAppearance?.(crawler.appearance || member?.appearance || DEFAULT_APPEARANCE),
       x: displayX,
       y: displayY,
       r: player.r,
@@ -649,6 +652,7 @@ function applyServerLobbyUpdate(update) {
     id: player.id,
     name: player.id === multiplayer.playerId ? (playerProfile?.name || player.name || "Crawler") : (player.name || `Crawler ${index + 1}`),
     characterId: getCharacterDef(player.id === multiplayer.playerId ? playerProfile?.characterId : player.characterId).id,
+    appearance: sanitizeAppearance?.(player.id === multiplayer.playerId ? playerProfile?.appearance : player.appearance),
     leader: !!player.isPartyLeader,
     isPartyLeader: !!player.isPartyLeader,
     local: player.id === multiplayer.playerId,

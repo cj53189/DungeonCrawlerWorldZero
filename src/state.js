@@ -91,10 +91,12 @@ const CHARACTER_DEFS = Object.freeze({
 });
 const DEFAULT_PLAYER_PROFILE = Object.freeze({
   name: "Crawler",
-  characterId: DEFAULT_CHARACTER_ID
+  characterId: "custom_layered",
+  appearance: DEFAULT_APPEARANCE
 });
 
 function getCharacterDef(characterId) {
+  if (String(characterId || "") === "custom_layered" && typeof getCustomCharacterDef === "function") return getCustomCharacterDef();
   return CHARACTER_DEFS[String(characterId || DEFAULT_CHARACTER_ID)] || CHARACTER_DEFS[DEFAULT_CHARACTER_ID];
 }
 
@@ -105,10 +107,12 @@ function sanitizePlayerName(name) {
 
 function sanitizePlayerProfile(profile = {}) {
   const requestedCharacterId = profile.characterId || profile.sprite || DEFAULT_PLAYER_PROFILE.characterId;
-  const character = getCharacterDef(requestedCharacterId);
+  const layeredRequested = String(requestedCharacterId) === "custom_layered";
+  const character = layeredRequested && typeof getCustomCharacterDef === "function" ? getCustomCharacterDef() : getCharacterDef(requestedCharacterId);
   return {
     name: sanitizePlayerName(profile.name),
-    characterId: character.id
+    characterId: character.id,
+    appearance: typeof sanitizeAppearance === "function" ? sanitizeAppearance(profile.appearance || DEFAULT_APPEARANCE) : (profile.appearance || DEFAULT_APPEARANCE)
   };
 }
 
