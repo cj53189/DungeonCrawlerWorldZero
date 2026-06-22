@@ -1,6 +1,7 @@
 (function installSpawnAllocationUi() {
   if (window.__dcwSpawnAllocationUiInstalled) return;
   window.__dcwSpawnAllocationUiInstalled = true;
+  let spawnAllocationClickBound = false;
 
   function esc(value) {
     return typeof escapeHtml === "function"
@@ -219,7 +220,10 @@
   function install() {
     injectSpawnAllocationStyles();
     installSpawnAllocationHooks();
-    document.addEventListener("click", spendPointFromClick, true);
+    if (!spawnAllocationClickBound) {
+      spawnAllocationClickBound = true;
+      document.addEventListener("click", spendPointFromClick, true);
+    }
     syncClassHud();
     maybePromptSpawnAllocation();
   }
