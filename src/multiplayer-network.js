@@ -75,7 +75,7 @@ function connectMultiplayerNetwork() {
       multiplayerNetwork.lastError = null;
       multiplayer.networkStatus = "connected";
       multiplayer.networkError = null;
-      sendMultiplayerMessage("hello", { profile: playerProfile });
+      sendMultiplayerMessage("hello", { profile: playerProfile, playerId: multiplayerNetwork.playerId || multiplayer.playerId || undefined });
       if (typeof announcer === "function") announcer("Floor 0 collapse server connected.");
       if (typeof updateTesterReadinessUI === "function") updateTesterReadinessUI();
     });

@@ -359,3 +359,21 @@ test('Floor 0 world events are idempotent by eventId', () => {
 
   manager.destroyLobby(run);
 });
+
+test('player corpse and coin loot IDs are collision-resistant UUID-based IDs', () => {
+  const manager = new LobbyManager();
+  addClient(manager, 'player_a');
+  addClient(manager, 'player_b');
+  const run = manager.joinQuickMatch('player_a');
+  manager.joinQuickMatch('player_b');
+  manager.markCrawlerAtFloor0Stairs('player_a');
+  manager.markCrawlerAtFloor0Stairs('player_b');
+  manager.resolveFloor0Collapse(run.code);
+  manager.updateCrawlerState('player_a', { x: 100, y: 100, hp: 0, maxHp: 100, currentFloor: 1, status: 'downed', currentRoomId: 7, lootSnapshot: { coins: 12 } });
+  const created = last(manager.clients.get('player_b').ws, 'player_corpse_created');
+
+  assert.match(created.corpse.id, /^player_corpse_[a-f0-9]{12}$/);
+  assert.match(created.corpse.loot[0].id, /^coins_[a-f0-9]{12}$/);
+
+  manager.destroyLobby(run);
+});
