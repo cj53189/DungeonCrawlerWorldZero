@@ -46,6 +46,7 @@
       .spawnPointCard span { display:block; color:rgba(239,252,255,0.68); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
       .spawnPointCard strong { display:block; color:#ffd86b; font-size:20px; }
       .attributeRow.spendable, .skillRow.spendable, .attributeCard.spendable { border-color: rgba(255,216,107,0.44); }
+      .attributeRow.spendable, .skillRow.spendable { cursor: default; }
       .spendPointBtn {
         margin-top: 7px;
         min-height: 32px;
@@ -80,7 +81,7 @@
       const disabled = points.attributePoints <= 0;
       const button = `<button class="spendPointBtn" type="button" data-spend-attribute="${esc(attr.id)}" ${disabled ? "disabled" : ""}>+1 ${esc(attr.name)}</button>`;
       if (compact) {
-        return `<button class="attributeRow spendable" type="button" data-progression-row="attribute-${esc(attr.id || attr.name)}" aria-label="${esc(attr.name)} ${attr.value}"><div><strong>${esc(attr.name)}</strong><small>${esc(attr.effect || attr.description || "")}</small>${button}</div><span>${attr.value}</span></button>`;
+        return `<div class="attributeRow spendable" data-progression-row="attribute-${esc(attr.id || attr.name)}" aria-label="${esc(attr.name)} ${attr.value}"><div><strong>${esc(attr.name)}</strong><small>${esc(attr.effect || attr.description || "")}</small>${button}</div><span>${attr.value}</span></div>`;
       }
       return `<div class="attributeCard spendable"><div><strong>${esc(attr.name)}</strong><span>${attr.value}</span></div><p>${esc(attr.description)}</p><small>${esc(attr.effect)}</small>${button}</div>`;
     }).join("");
@@ -98,7 +99,7 @@
       const progress = typeof renderProgressBar === "function"
         ? renderProgressBar(skill.xp, skill.xpToNext, `${skill.name} XP progress`)
         : `<div class="skillProgress" aria-label="${esc(skill.name)} progress"><span style="width:${pct.toFixed(1)}%"></span></div>`;
-      return `<button class="skillRow ${compact ? "compact" : ""} spendable" type="button" data-skill-id="${esc(skill.id)}"><div class="skillRowText"><strong>${esc(skill.name)}</strong><span>${esc(bonus)}</span><small>${esc(skill.description)}</small>${spend}</div><div class="skillLevel">Lv ${skill.level}</div>${progress}<em>${skill.xp} / ${skill.xpToNext}</em></button>`;
+      return `<div class="skillRow ${compact ? "compact" : ""} spendable" data-skill-id="${esc(skill.id)}"><div class="skillRowText"><strong>${esc(skill.name)}</strong><span>${esc(bonus)}</span><small>${esc(skill.description)}</small>${spend}</div><div class="skillLevel">Lv ${skill.level}</div>${progress}<em>${skill.xp} / ${skill.xpToNext}</em></div>`;
     }).join("");
   }
 
