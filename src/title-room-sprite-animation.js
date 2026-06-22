@@ -280,27 +280,45 @@
 
   const originalDrawImage = CanvasRenderingContext2D.prototype.drawImage;
   const activeKeys = new Set();
+  const frameMetaCache = new WeakMap();
   const WALK_SEQUENCE = [0, 1, 2, 1];
-  const WALK_FRAME_MS = 115;
-  const MOVE_THRESHOLD = 0.08;
+  const MOVE_THRESHOLD_SQ = 0.08 * 0.08;
+  const POINTER_DEADZONE_SQ = 10 * 10;
+  const FRAMES_PER_WALK_STEP = 7;
+
+  let titleCanvas = null;
+  let titleVisible = false;
+  let animationTick = 0;
   let pointerId = null;
   let pointerStart = null;
-  let pointerMove = { x: 0, y: 0 };
-  let lastFacing = { x: 0, y: 1 };
+  let pointerMoveX = 0;
+  let pointerMoveY = 0;
+  let lastFacingX = 0;
+  let lastFacingY = 1;
 
-  function isTitleCanvas(ctx) {
-    return ctx?.canvas?.id === "titleRoomCanvas";
-  }
-
-  function isTitleRoomVisible() {
+  function refreshTitleRoomState() {
+    animationTick++;
+    titleCanvas = titleCanvas || document.getElementById("titleRoomCanvas");
     const titleScreen = document.getElementById("titleScreen");
-    return !!titleScreen && titleScreen.style.display !== "none" && getComputedStyle(titleScreen).display !== "none";
+    titleVisible = !!titleScreen && titleScreen.style.display !== "none" && getComputedStyle(titleScreen).display !== "none";
+    requestAnimationFrame(refreshTitleRoomState);
   }
+  requestAnimationFrame(refreshTitleRoomState);
 
-  function normalizeVector(x, y) {
-    const len = Math.hypot(x, y);
-    if (len <= MOVE_THRESHOLD) return { x: 0, y: 0, len: 0 };
-    return { x: x / len, y: y / len, len };
+  function getFrameMeta(image, frameHeight) {
+    const width = image?.naturalWidth || image?.width || 0;
+    const height = image?.naturalHeight || image?.height || 0;
+    const cached = frameMetaCache.get(image);
+    if (cached && cached.width === width && cached.height === height && cached.frameHeight === frameHeight) return cached;
+    const rowCount = Math.max(1, Math.floor(height / frameHeight));
+    const meta = {
+      width,
+      height,
+      frameHeight,
+      rows: rowCount >= 5 ? { down: 0, up: 1, left: 3, right: 4 } : { down: 0, up: 1, left: 2, right: 3 }
+    };
+    frameMetaCache.set(image, meta);
+    return meta;
   }
 
   function keyboardVector() {
@@ -313,65 +331,70 @@
 
   function gamepadVector() {
     if (!navigator.getGamepads) return { x: 0, y: 0 };
-    const pad = Array.from(navigator.getGamepads()).find(gp => gp && gp.connected !== false);
-    if (!pad) return { x: 0, y: 0 };
-    const x = Math.abs(pad.axes[0] || 0) > 0.18 ? pad.axes[0] : 0;
-    const y = Math.abs(pad.axes[1] || 0) > 0.18 ? pad.axes[1] : 0;
-    return { x, y };
+    const pads = navigator.getGamepads();
+    for (let i = 0; i < pads.length; i++) {
+      const pad = pads[i];
+      if (!pad || pad.connected === false) continue;
+      return {
+        x: Math.abs(pad.axes[0] || 0) > 0.18 ? pad.axes[0] : 0,
+        y: Math.abs(pad.axes[1] || 0) > 0.18 ? pad.axes[1] : 0
+      };
+    }
+    return { x: 0, y: 0 };
   }
 
   function currentMoveVector() {
     const keys = keyboardVector();
     const pad = gamepadVector();
-    return normalizeVector(keys.x + pad.x + pointerMove.x, keys.y + pad.y + pointerMove.y);
+    let x = keys.x + pad.x + pointerMoveX;
+    let y = keys.y + pad.y + pointerMoveY;
+    const lenSq = x * x + y * y;
+    if (lenSq <= MOVE_THRESHOLD_SQ) return { x: 0, y: 0, moving: false };
+    if (lenSq > 1) {
+      const invLen = 1 / Math.sqrt(lenSq);
+      x *= invLen;
+      y *= invLen;
+    }
+    return { x, y, moving: true };
   }
 
-  function rowsForSheet(image, frameHeight) {
-    const height = image?.naturalHeight || image?.height || 0;
-    const rowCount = Math.max(1, Math.floor(height / frameHeight));
-    if (rowCount >= 5) return { down: 0, up: 1, left: 3, right: 4 };
-    return { down: 0, up: 1, left: 2, right: 3 };
+  function rowForFacing(x, y, rows) {
+    if (Math.abs(x) > Math.abs(y)) return x < 0 ? rows.left : rows.right;
+    return y < 0 ? rows.up : rows.down;
   }
 
-  function rowForFacing(facing, rows) {
-    if (Math.abs(facing.x) > Math.abs(facing.y)) return facing.x < 0 ? rows.left : rows.right;
-    return facing.y < 0 ? rows.up : rows.down;
-  }
-
-  function looksLikeCharacterFrame(image, sx, sy, sw, sh, dx, dy, dw, dh) {
-    if (!isTitleRoomVisible()) return false;
-    if (![32, 52, 64].includes(Math.round(sw)) || ![32, 52, 64].includes(Math.round(sh))) return false;
+  function drawAnimatedTitleCharacter(ctx, image, sx, sy, sw, sh, dx, dy, dw, dh) {
+    if (!image || (typeof image !== "object" && typeof image !== "function")) return false;
     if (dw < 20 || dh < 20 || dw > 120 || dh > 120) return false;
-    const width = image?.naturalWidth || image?.width || 0;
-    const height = image?.naturalHeight || image?.height || 0;
-    if (width < sw * 3 || height < sh * 4) return false;
+    if (![32, 52, 64].includes(Math.round(sw)) || ![32, 52, 64].includes(Math.round(sh))) return false;
     if (!Number.isFinite(sx) || !Number.isFinite(sy) || !Number.isFinite(dx) || !Number.isFinite(dy)) return false;
+
+    const meta = getFrameMeta(image, sh);
+    if (meta.width < sw * 3 || meta.height < sh * 4) return false;
+
+    const move = currentMoveVector();
+    if (move.moving) {
+      lastFacingX = move.x;
+      lastFacingY = move.y;
+    }
+
+    const row = rowForFacing(lastFacingX, lastFacingY, meta.rows);
+    const frame = move.moving ? WALK_SEQUENCE[Math.floor(animationTick / FRAMES_PER_WALK_STEP) % WALK_SEQUENCE.length] : 1;
+    const nextSx = frame * sw;
+    const nextSy = row * sh;
+    if (nextSx + sw > meta.width || nextSy + sh > meta.height) return false;
+
+    originalDrawImage.call(ctx, image, nextSx, nextSy, sw, sh, dx, dy, dw, dh);
     return true;
   }
 
-  CanvasRenderingContext2D.prototype.drawImage = function patchedTitleRoomDrawImage(image, ...args) {
-    if (isTitleCanvas(this) && args.length === 8) {
-      const [sx, sy, sw, sh, dx, dy, dw, dh] = args;
-      if (looksLikeCharacterFrame(image, sx, sy, sw, sh, dx, dy, dw, dh)) {
-        const move = currentMoveVector();
-        const moving = move.len > MOVE_THRESHOLD;
-        if (moving) lastFacing = { x: move.x, y: move.y };
-
-        const rows = rowsForSheet(image, sh);
-        const row = rowForFacing(lastFacing, rows);
-        const frame = moving
-          ? WALK_SEQUENCE[Math.floor(performance.now() / WALK_FRAME_MS) % WALK_SEQUENCE.length]
-          : 1;
-        const nextSx = frame * sw;
-        const nextSy = row * sh;
-        const width = image?.naturalWidth || image?.width || 0;
-        const height = image?.naturalHeight || image?.height || 0;
-        if (nextSx + sw <= width && nextSy + sh <= height) {
-          return originalDrawImage.call(this, image, nextSx, nextSy, sw, sh, dx, dy, dw, dh);
-        }
+  CanvasRenderingContext2D.prototype.drawImage = function patchedTitleRoomDrawImage(image) {
+    if (arguments.length === 9 && this.canvas === titleCanvas && titleVisible) {
+      if (drawAnimatedTitleCharacter(this, image, arguments[1], arguments[2], arguments[3], arguments[4], arguments[5], arguments[6], arguments[7], arguments[8])) {
+        return undefined;
       }
     }
-    return originalDrawImage.call(this, image, ...args);
+    return originalDrawImage.apply(this, arguments);
   };
 
   window.addEventListener("keydown", event => {
@@ -385,27 +408,32 @@
     if (event.target?.id !== "titleRoomCanvas") return;
     pointerId = event.pointerId;
     pointerStart = { x: event.clientX, y: event.clientY };
-    pointerMove = { x: 0, y: 0 };
+    pointerMoveX = 0;
+    pointerMoveY = 0;
   }, true);
 
   window.addEventListener("pointermove", event => {
     if (event.pointerId !== pointerId || !pointerStart) return;
     const dx = event.clientX - pointerStart.x;
     const dy = event.clientY - pointerStart.y;
-    const len = Math.hypot(dx, dy);
-    if (len <= 10) {
-      pointerMove = { x: 0, y: 0 };
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq <= POINTER_DEADZONE_SQ) {
+      pointerMoveX = 0;
+      pointerMoveY = 0;
       return;
     }
+    const len = Math.sqrt(lenSq);
     const mag = Math.min(1, len / 56);
-    pointerMove = { x: (dx / len) * mag, y: (dy / len) * mag };
+    pointerMoveX = (dx / len) * mag;
+    pointerMoveY = (dy / len) * mag;
   }, true);
 
   function clearPointer(event) {
     if (event.pointerId !== pointerId) return;
     pointerId = null;
     pointerStart = null;
-    pointerMove = { x: 0, y: 0 };
+    pointerMoveX = 0;
+    pointerMoveY = 0;
   }
 
   window.addEventListener("pointerup", clearPointer, true);
