@@ -47,8 +47,18 @@ test.beforeEach(() => {
   leaderboardPostAttempts.clear();
 });
 
-test('production server requires an explicit API_CORS_ORIGIN', () => {
-  const result = spawnSync(process.execPath, ['-e', "require('./src/index')"], {
+test('production server without API_CORS_ORIGIN falls back to same-origin only', () => {
+  const script = `
+    const { validateLeaderboardRequestSource, validateWebSocketRequest, wsConnectionAttempts, wss } = require('./src/index');
+    const sameOriginReq = { headers: { host: 'dungeoncrawlerworldzero.onrender.com', origin: 'https://dungeoncrawlerworldzero.onrender.com' }, socket: { remoteAddress: '127.0.0.1' } };
+    const attackerReq = { headers: { host: 'dungeoncrawlerworldzero.onrender.com', origin: 'https://attacker.example' }, socket: { remoteAddress: '127.0.0.2' } };
+    validateLeaderboardRequestSource(sameOriginReq);
+    if (!validateWebSocketRequest(sameOriginReq)) process.exit(2);
+    wsConnectionAttempts.clear();
+    if (validateWebSocketRequest(attackerReq)) process.exit(3);
+    wss.close();
+  `;
+  const result = spawnSync(process.execPath, ['-e', script], {
     cwd: path.resolve(__dirname, '..'),
     env: {
       ...process.env,
@@ -58,8 +68,7 @@ test('production server requires an explicit API_CORS_ORIGIN', () => {
     encoding: 'utf8'
   });
 
-  assert.notEqual(result.status, 0);
-  assert.match(`${result.stderr}${result.stdout}`, /API_CORS_ORIGIN must be configured explicitly in production/);
+  assert.equal(result.status, 0, `${result.stderr}${result.stdout}`);
 });
 
 test('POST /api/leaderboard rejects disallowed origins', async () => {
