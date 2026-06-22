@@ -6,9 +6,11 @@ const { randomUUID } = require("crypto");
 const { LobbyManager } = require("./rooms");
 const { LeaderboardStore } = require("./leaderboard-store");
 const { applyQuickPartyExtension } = require("./quick-party-extension");
+const { applySharedLootExtension } = require("./shared-loot-extension");
 const { CLIENT_MESSAGES, SERVER_MESSAGES, parseClientMessage, safeSend } = require("./protocol");
 
 applyQuickPartyExtension(LobbyManager);
+applySharedLootExtension(LobbyManager);
 
 const PORT = Number(process.env.PORT || 8080);
 const CLIENT_ROOT = path.resolve(__dirname, "../..");
