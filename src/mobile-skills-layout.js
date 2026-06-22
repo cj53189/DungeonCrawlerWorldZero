@@ -16,7 +16,9 @@
       @media (hover: none) and (pointer: coarse), (max-width: 900px) {
         body.inventorySkillsMobileLayout #touchControls,
         body.inventorySkillsMobileLayout .devControls,
-        body.inventorySkillsMobileLayout #testerDebugLine {
+        body.inventorySkillsMobileLayout #testerDebugLine,
+        body.inventorySkillsMobileLayout #hud,
+        body.inventorySkillsMobileLayout #prompt {
           opacity: 0 !important;
           visibility: hidden !important;
           pointer-events: none !important;
@@ -25,7 +27,7 @@
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] {
           display: block !important;
           position: fixed !important;
-          inset: var(--dcw-safe-top, max(10px, env(safe-area-inset-top))) var(--dcw-safe-right, max(10px, env(safe-area-inset-right))) var(--dcw-safe-bottom, max(10px, env(safe-area-inset-bottom))) var(--dcw-safe-left, max(10px, env(safe-area-inset-left))) !important;
+          inset: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important;
           width: auto !important;
           height: auto !important;
           max-width: none !important;
@@ -35,29 +37,43 @@
           -webkit-overflow-scrolling: touch !important;
           overscroll-behavior: contain !important;
           touch-action: pan-y !important;
-          padding: calc(var(--dcw-touch-preferred, 56px) + 10px) 14px max(22px, env(safe-area-inset-bottom)) !important;
-          scroll-padding-top: calc(var(--dcw-touch-preferred, 56px) + 14px);
+          padding: 10px 10px max(18px, env(safe-area-inset-bottom)) !important;
+          border-radius: 12px !important;
+          scroll-padding-top: 12px !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"]::before {
+          inset: 4px !important;
+          border-radius: 10px !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .panelClose {
           position: fixed !important;
-          top: var(--dcw-safe-top, max(10px, env(safe-area-inset-top))) !important;
-          right: var(--dcw-safe-right, max(10px, env(safe-area-inset-right))) !important;
-          z-index: 350 !important;
+          top: max(12px, env(safe-area-inset-top)) !important;
+          right: max(12px, env(safe-area-inset-right)) !important;
+          z-index: 360 !important;
+          width: 42px !important;
+          height: 42px !important;
+          min-width: 42px !important;
+          min-height: 42px !important;
+          font-size: 26px !important;
+          line-height: 1 !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] h3 {
-          position: sticky !important;
-          top: 0 !important;
-          z-index: 4 !important;
-          min-height: 42px !important;
-          margin: -2px 64px 10px 0 !important;
-          padding: 4px 0 8px !important;
-          background: linear-gradient(180deg, rgba(20,13,9,0.98), rgba(20,13,9,0.88) 78%, rgba(20,13,9,0)) !important;
+          position: static !important;
+          min-height: 0 !important;
+          margin: 0 54px 8px 0 !important;
+          padding: 2px 0 4px !important;
+          font-size: 15px !important;
+          line-height: 1.05 !important;
+          letter-spacing: 0.1em !important;
+          background: transparent !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] #equipmentStats,
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] #inventoryHelp,
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .inventorySummaryCard,
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .inventoryScrollHint {
           display: none !important;
         }
@@ -72,39 +88,22 @@
           touch-action: pan-y !important;
         }
 
-        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .inventorySummaryCard {
-          display: block !important;
-          margin-bottom: 10px !important;
-        }
-
-        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .inventorySummaryStats {
-          display: grid !important;
-          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-          gap: 6px !important;
-        }
-
-        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .inventorySummaryGear {
-          display: none !important;
-        }
-
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .inventoryTabs {
-          position: sticky !important;
-          top: 42px !important;
-          z-index: 3 !important;
+          position: static !important;
           display: grid !important;
           grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
           gap: 6px !important;
-          margin: 0 0 12px !important;
-          padding: 8px 0 !important;
-          background: linear-gradient(180deg, rgba(20,13,9,0.98), rgba(20,13,9,0.92)) !important;
+          margin: 0 0 8px !important;
+          padding: 0 !important;
+          background: transparent !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .inventoryTab {
           min-width: 0 !important;
-          min-height: 46px !important;
-          padding: 6px 4px !important;
-          border-radius: 12px !important;
-          font-size: 10px !important;
+          min-height: 38px !important;
+          padding: 5px 3px !important;
+          border-radius: 10px !important;
+          font-size: 9px !important;
           line-height: 1.05 !important;
           white-space: normal !important;
         }
@@ -118,9 +117,9 @@
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .inventoryContentTitle {
-          margin: 6px 0 10px !important;
-          font-size: 14px !important;
-          letter-spacing: 0.11em !important;
+          margin: 6px 0 6px !important;
+          font-size: 12px !important;
+          letter-spacing: 0.1em !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .progressionInventory {
@@ -129,7 +128,7 @@
           max-height: none !important;
           min-height: auto !important;
           overflow: visible !important;
-          padding: 0 0 24px !important;
+          padding: 0 0 14px !important;
           touch-action: pan-y !important;
         }
 
@@ -140,47 +139,172 @@
           touch-action: pan-y !important;
         }
 
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spawnAllocationNote {
+          margin: 0 0 6px !important;
+          font-size: 10px !important;
+          line-height: 1.25 !important;
+          color: rgba(239,252,255,0.72) !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spawnAllocationHero {
+          grid-template-columns: 1fr repeat(2, 76px) !important;
+          gap: 6px !important;
+          margin: 0 0 8px !important;
+          padding: 7px !important;
+          border-radius: 10px !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spawnClassCard strong {
+          font-size: 13px !important;
+          line-height: 1.1 !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spawnClassCard span {
+          margin-top: 2px !important;
+          font-size: 9px !important;
+          line-height: 1.2 !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spawnPointCard {
+          min-height: 48px !important;
+          padding: 4px !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spawnPointCard span {
+          font-size: 7px !important;
+          line-height: 1.05 !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spawnPointCard strong {
+          font-size: 17px !important;
+          line-height: 1.05 !important;
+        }
+
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .progressionSummary,
-        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .attributeGrid,
-        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillList,
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .progressionColumns {
-          display: grid !important;
-          grid-template-columns: 1fr !important;
-          gap: 8px !important;
+          display: block !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .progressionSection {
-          margin: 0 !important;
+          margin: 0 0 8px !important;
+          padding: 7px !important;
+          border-radius: 10px !important;
         }
 
-        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .attributeRow,
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .progressionSection h4 {
+          margin: 0 0 6px !important;
+          font-size: 12px !important;
+          line-height: 1 !important;
+          letter-spacing: 0.08em !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .attributeGrid {
+          display: grid !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 6px !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillList {
+          display: grid !important;
+          grid-template-columns: 1fr !important;
+          gap: 6px !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .attributeRow {
+          display: grid !important;
+          grid-template-columns: 1fr auto !important;
+          gap: 5px !important;
+          align-items: center !important;
+          min-height: 76px !important;
+          border-radius: 9px !important;
+          padding: 8px !important;
+          text-align: left !important;
+        }
+
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillRow {
-          min-height: 68px !important;
-          border-radius: 12px !important;
-          padding: 10px !important;
+          display: grid !important;
+          grid-template-columns: 1fr auto !important;
+          gap: 4px 8px !important;
+          align-items: center !important;
+          min-height: 82px !important;
+          border-radius: 9px !important;
+          padding: 8px !important;
           text-align: left !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .attributeRow strong,
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillRow strong {
-          font-size: 16px !important;
+          font-size: 13px !important;
+          line-height: 1.1 !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .attributeRow small,
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillRow small,
-        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillRow span,
-        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .progressionHelp {
-          font-size: 12px !important;
-          line-height: 1.35 !important;
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillRow span {
+          font-size: 10px !important;
+          line-height: 1.2 !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillLevel {
+          font-size: 10px !important;
+          white-space: nowrap !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillProgress {
+          grid-column: 1 / -1 !important;
+          height: 4px !important;
+          margin: 0 !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillRow em {
+          grid-column: 1 / -1 !important;
+          font-size: 9px !important;
+          line-height: 1 !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spendPointBtn {
+          width: fit-content !important;
+          min-height: 28px !important;
+          margin-top: 5px !important;
+          padding: 4px 7px !important;
+          font-size: 10px !important;
+          line-height: 1 !important;
+          border-radius: 8px !important;
+          touch-action: manipulation !important;
         }
 
         body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .progressionHelp {
           position: static !important;
-          margin: 12px 0 4px !important;
-          padding: 8px !important;
+          margin: 8px 0 2px !important;
+          padding: 7px !important;
           border: 1px solid rgba(255,216,107,0.14) !important;
-          border-radius: 10px !important;
+          border-radius: 9px !important;
           background: rgba(0,0,0,0.22) !important;
+          font-size: 10px !important;
+          line-height: 1.25 !important;
+        }
+      }
+
+      @media (hover: none) and (pointer: coarse) and (orientation: landscape), (max-width: 900px) and (orientation: landscape) {
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] {
+          padding: 8px 10px max(12px, env(safe-area-inset-bottom)) !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spawnAllocationHero {
+          grid-template-columns: 1fr repeat(2, 70px) !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .attributeGrid {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .attributeRow {
+          min-height: 64px !important;
+          padding: 7px !important;
+        }
+
+        body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillRow {
+          min-height: 68px !important;
         }
       }
     `;
@@ -214,6 +338,8 @@
   }
 
   function bindPanelDragFallback() {
+    if (window.__dcwMobileSkillsDragFallbackBound) return;
+    window.__dcwMobileSkillsDragFallbackBound = true;
     let drag = null;
     const panelFromEvent = event => event.target?.closest?.("#inventoryPanel.open[data-inventory-category='skills']") || null;
 
