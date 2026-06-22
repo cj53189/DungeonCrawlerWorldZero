@@ -79,10 +79,11 @@
       if (markRoomDiscovered(room)) changed = true;
       if (typeof forEachRoomTile === "function") {
         forEachRoomTile(room, (x, y) => {
-          const visibleThroughObserver = shouldMakeVisible && typeof hasLineOfSight === "function"
-            ? hasLineOfSight(observer.x, observer.y, x * TILE + TILE / 2, y * TILE + TILE / 2)
-            : shouldMakeVisible;
-          if (markTileSeen(x, y, visibleThroughObserver)) changed = true;
+          // Room interiors are already floor-only regions, so avoid a per-tile
+          // Bresenham LOS sweep here. That sweep ran every frame while a room
+          // reveal was animating and could spike badly in big rooms on
+          // Chromebooks/low-end PCs. Hallway fringe tiles below still use LOS.
+          if (markTileSeen(x, y, shouldMakeVisible)) changed = true;
         });
       }
     }
@@ -90,8 +91,9 @@
     for (let y = origin.y - PARTY_REVEAL_RADIUS_TILES; y <= origin.y + PARTY_REVEAL_RADIUS_TILES; y++) {
       for (let x = origin.x - PARTY_REVEAL_RADIUS_TILES; x <= origin.x + PARTY_REVEAL_RADIUS_TILES; x++) {
         if (!inBounds(x, y)) continue;
-        const dist = Math.hypot(x - origin.x, y - origin.y);
-        if (dist > PARTY_REVEAL_RADIUS_TILES) continue;
+        const dx = x - origin.x;
+        const dy = y - origin.y;
+        if (dx * dx + dy * dy > PARTY_REVEAL_RADIUS_TILES * PARTY_REVEAL_RADIUS_TILES) continue;
         const visibleThroughObserver = shouldMakeVisible && typeof hasLineOfSight === "function"
           ? hasLineOfSight(observer.x, observer.y, x * TILE + TILE / 2, y * TILE + TILE / 2)
           : shouldMakeVisible;
@@ -121,10 +123,29 @@
     return changed;
   }
 
+  let lastSharedVisionSignature = "";
+
+  function sharedVisionSignature() {
+    const local = entityTile(player);
+    const revealKey = roomRevealState && !roomRevealState.complete
+      ? `${roomRevealState.roomId}:${Math.floor(Math.max(0, frameCount - roomRevealState.startFrame) / 4)}`
+      : "idle";
+    const observers = getSharedVisionObservers()
+      .map(observer => {
+        const tile = entityTile(observer);
+        return `${observer.__observerType || "observer"}:${observer.id || observer.name || "pet"}:${tile.x},${tile.y}`;
+      })
+      .join("|");
+    return `${currentFloor}:${local.x},${local.y}:${revealKey}:${observers}`;
+  }
+
   const baseUpdateVisibility = typeof updateVisibility === "function" ? updateVisibility : null;
   if (baseUpdateVisibility && !baseUpdateVisibility.__partySharedMapWrapped) {
     updateVisibility = function updateVisibilityWithPartySharedMap(force = false) {
       baseUpdateVisibility(force);
+      const signature = sharedVisionSignature();
+      if (!force && signature === lastSharedVisionSignature) return;
+      lastSharedVisionSignature = signature;
       applySharedPartyMapExposure();
     };
     updateVisibility.__partySharedMapWrapped = true;
