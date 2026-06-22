@@ -8,6 +8,8 @@ const { spawnSync } = require('node:child_process');
 process.env.LEADERBOARD_FILE = path.join(mkdtempSync(path.join(tmpdir(), 'dcwz-leaderboard-')), 'leaderboard.json');
 process.env.LEADERBOARD_POST_WINDOW_MS = '60000';
 process.env.LEADERBOARD_POST_LIMIT = '2';
+process.env.WS_CONNECTION_WINDOW_MS = '60000';
+process.env.WS_CONNECTION_LIMIT = '2';
 
 const { server, wss, leaderboard, leaderboardPostAttempts } = require('../src/index');
 
@@ -111,4 +113,15 @@ test('POST /api/leaderboard rejects impossible score jumps', async () => {
 
   assert.equal(response.status, 400);
   assert.match(body.error, /exceeds known game bounds/);
+});
+
+test('WebSocket upgrade validation rejects disallowed origins and rate-limits accepted clients', () => {
+  const { validateWebSocketRequest, wsConnectionAttempts } = require('../src/index');
+  wsConnectionAttempts.clear();
+  const localReq = { headers: { host: '127.0.0.1:8080', origin: 'http://localhost:8080' }, socket: { remoteAddress: '127.0.0.1' } };
+  assert.equal(validateWebSocketRequest({ headers: { host: '127.0.0.1:8080', origin: 'https://attacker.example' }, socket: { remoteAddress: '127.0.0.1' } }), false);
+  assert.equal(validateWebSocketRequest(localReq), true);
+  assert.equal(validateWebSocketRequest(localReq), true);
+  assert.equal(validateWebSocketRequest(localReq), false);
+  wsConnectionAttempts.clear();
 });

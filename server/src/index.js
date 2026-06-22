@@ -23,6 +23,9 @@ if (IS_PRODUCTION && !configuredCorsOrigin.trim()) {
 const API_CORS_ORIGIN = configuredCorsOrigin.trim() || "*";
 const LEADERBOARD_POST_WINDOW_MS = Number(process.env.LEADERBOARD_POST_WINDOW_MS || 60_000);
 const LEADERBOARD_POST_LIMIT = Number(process.env.LEADERBOARD_POST_LIMIT || 5);
+const WS_CONNECTION_WINDOW_MS = Number(process.env.WS_CONNECTION_WINDOW_MS || 60_000);
+const WS_CONNECTION_LIMIT = Number(process.env.WS_CONNECTION_LIMIT || 30);
+const wsConnectionAttempts = new Map();
 const LEADERBOARD_MAX_FLOOR = Number(process.env.LEADERBOARD_MAX_FLOOR || 100);
 const LEADERBOARD_MAX_GOLD = Number(process.env.LEADERBOARD_MAX_GOLD || 1_000_000);
 const LEADERBOARD_MAX_GOLD_PER_FLOOR = Number(process.env.LEADERBOARD_MAX_GOLD_PER_FLOOR || 50_000);
@@ -305,14 +308,37 @@ const server = http.createServer((req, res) => {
   if (handleApiRequest(req, res)) return;
   serveStaticFile(req, res);
 });
-const wss = new WebSocketServer({ server });
+function enforceWebSocketRateLimit(req) {
+  const now = Date.now();
+  const key = getClientIp(req);
+  const bucket = (wsConnectionAttempts.get(key) || []).filter(timestamp => now - timestamp < WS_CONNECTION_WINDOW_MS);
+  if (bucket.length >= WS_CONNECTION_LIMIT) {
+    wsConnectionAttempts.set(key, bucket);
+    return false;
+  }
+  bucket.push(now);
+  wsConnectionAttempts.set(key, bucket);
+  return true;
+}
+
+function validateWebSocketRequest(req) {
+  const origin = req.headers.origin;
+  if (origin && !originMatchesAllowed(origin)) return false;
+  if (!hostMatchesAllowed(req.headers.host || "")) return false;
+  return enforceWebSocketRateLimit(req);
+}
+
+const wss = new WebSocketServer({
+  server,
+  verifyClient: ({ req }) => validateWebSocketRequest(req)
+});
 
 function makePlayerId() {
   return `crawler_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
 }
 
 wss.on("connection", (ws) => {
-  const playerId = makePlayerId();
+  let playerId = makePlayerId();
   rooms.registerClient(ws, playerId);
   safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4 });
   sendLeaderboard(ws);
@@ -326,11 +352,18 @@ wss.on("connection", (ws) => {
 
     try {
       switch (message.type) {
-        case CLIENT_MESSAGES.HELLO:
+        case CLIENT_MESSAGES.HELLO: {
+          const reconnectPlayerId = typeof message.playerId === "string" ? message.playerId.trim() : "";
+          const reconnectRunId = typeof message.runId === "string" ? message.runId.trim() : "";
+          if (reconnectPlayerId && reconnectRunId && reconnectPlayerId !== playerId && rooms.reconnectClient(ws, reconnectPlayerId, reconnectRunId)) {
+            rooms.clients.delete(playerId);
+            playerId = reconnectPlayerId;
+          }
           rooms.updateClientProfile(playerId, message.profile || message);
           safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4 });
           sendLeaderboard(ws);
           break;
+        }
         case CLIENT_MESSAGES.PARTY_CREATE:
         case CLIENT_MESSAGES.CREATE_LOBBY:
           rooms.updateClientProfile(playerId, message.profile || message);
@@ -438,6 +471,9 @@ module.exports = {
   originMatchesAllowed,
   hostMatchesAllowed,
   leaderboardPostAttempts,
+  wsConnectionAttempts,
+  validateWebSocketRequest,
+  enforceWebSocketRateLimit,
   rooms,
   leaderboard,
   startServer,

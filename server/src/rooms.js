@@ -1069,10 +1069,10 @@ class LobbyManager {
     if (!world.playerCorpses) world.playerCorpses = new Map();
     const loot = [];
     const coins = Math.max(0, Math.trunc(Number(lootSnapshot.coins) || 0));
-    if (coins > 0) loot.push({ id: `coins_${player.id}_${Date.now()}`, type: "coins", amount: coins, name: `${coins} Coins`, sourcePlayerId: player.id, sourcePlayerName: player.name, originalSlot: "coins" });
+    if (coins > 0) loot.push({ id: `coins_${randomUUID().replace(/-/g, "").slice(0, 12)}`, type: "coins", amount: coins, name: `${coins} Coins`, sourcePlayerId: player.id, sourcePlayerName: player.name, originalSlot: "coins" });
     for (const item of lootSnapshot.inventory || []) { const clean = this.sanitizeCorpseLootItem(item, player, "inventory"); if (clean) loot.push(clean); }
     for (const [slot, item] of Object.entries(lootSnapshot.equipment || {})) { const clean = this.sanitizeCorpseLootItem(item, player, slot); if (clean) loot.push(clean); }
-    const id = `player_corpse_${player.id}_${Date.now()}`;
+    const id = `player_corpse_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
     const corpse = { id, kind: "player", playerCorpse: true, deadPlayerId: player.id, deadPlayerName: player.name, floor: lobby.floor, x: player.crawlerState.x, y: player.crawlerState.y, roomId: player.crawlerState.currentRoomId ?? null, r: 13, name: `${player.name}'s Corpse`, loot, looted: loot.length === 0, createdAt: Date.now() };
     player.playerCorpseId = id;
     world.playerCorpses.set(id, corpse);
