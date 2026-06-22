@@ -32,6 +32,17 @@ let hapticsEnabled = readSavedHapticsEnabled();
 let lastHapticAt = 0;
 const lastHapticByType = new Map();
 
+function isIosWebRuntime() {
+  if (typeof navigator === "undefined") return false;
+  const platform = navigator.platform || "";
+  const ua = navigator.userAgent || "";
+  return /iPad|iPhone|iPod/.test(platform) || /iPad|iPhone|iPod/.test(ua) || (platform === "MacIntel" && navigator.maxTouchPoints > 1);
+}
+
+function isHomeScreenWebApp() {
+  return typeof navigator !== "undefined" && navigator.standalone === true;
+}
+
 function isHapticsSupported() {
   return typeof navigator !== "undefined" && typeof navigator.vibrate === "function";
 }
@@ -58,8 +69,19 @@ function setHapticsEnabled(enabled, persist = true) {
 }
 
 function getHapticsLabel() {
-  if (!isHapticsSupported()) return "Unavailable";
-  return hapticsEnabled ? "On" : "Off";
+  if (isHapticsSupported()) return hapticsEnabled ? "On" : "Off";
+  if (isIosWebRuntime()) return "iOS blocked";
+  return "Unavailable";
+}
+
+function getHapticsStatusText() {
+  if (isHapticsSupported()) return "Combat, loot, danger, and big moments";
+  if (isIosWebRuntime()) {
+    return isHomeScreenWebApp()
+      ? "iPhone Home Screen web apps cannot access vibration haptics"
+      : "iPhone Safari does not expose vibration haptics to websites";
+  }
+  return "Not supported by this browser/device";
 }
 
 function updateHapticsSettingsUI() {
@@ -67,15 +89,12 @@ function updateHapticsSettingsUI() {
   const status = document.getElementById("hapticsStatusText");
   if (button) {
     button.textContent = getHapticsLabel();
+    button.title = getHapticsStatusText();
     button.setAttribute("aria-pressed", String(hapticsEnabled && isHapticsSupported()));
     button.classList.toggle("off", !hapticsEnabled || !isHapticsSupported());
     button.disabled = !isHapticsSupported();
   }
-  if (status) {
-    status.textContent = isHapticsSupported()
-      ? "Combat, loot, danger, and big moments"
-      : "Not supported by this browser/device";
-  }
+  if (status) status.textContent = getHapticsStatusText();
 }
 
 function triggerHaptic(type = "tap", options = {}) {
