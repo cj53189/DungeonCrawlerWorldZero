@@ -126,13 +126,15 @@ function wrapHapticFunction(name, wrapper) {
 }
 
 function installGameplayHapticHooks() {
-  wrapHapticFunction("triggerDodge", original => function triggerDodgeWithHaptics() {
+  let installed = 0;
+
+  installed += wrapHapticFunction("triggerDodge", original => function triggerDodgeWithHaptics() {
     const result = original.apply(this, arguments);
     if (result) triggerHaptic("dodge");
     return result;
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("damageEnemy", original => function damageEnemyWithHaptics(enemy, damage, sourceWeapon, attacker) {
+  installed += wrapHapticFunction("damageEnemy", original => function damageEnemyWithHaptics(enemy, damage, sourceWeapon, attacker) {
     const wasAlive = !!enemy && Number(enemy.hp) > 0;
     const wasBoss = !!enemy?.boss;
     const beforeHp = Number(enemy?.hp) || 0;
@@ -145,63 +147,76 @@ function installGameplayHapticHooks() {
       else triggerHaptic("hit");
     }
     return result;
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("damageCrawlerFromEnemy", original => function damageCrawlerFromEnemyWithHaptics(crawler, enemy) {
+  installed += wrapHapticFunction("damageCrawlerFromEnemy", original => function damageCrawlerFromEnemyWithHaptics(crawler, enemy) {
     const beforeHp = crawler === player ? Number(player.hp) || 0 : null;
     const result = original.apply(this, arguments);
     if (result && crawler === player && Number(player.hp) < beforeHp) {
       triggerHaptic(Number(player.hp) <= 0 ? "death" : "damage");
     }
     return result;
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("loseGame", original => function loseGameWithHaptics() {
+  installed += wrapHapticFunction("loseGame", original => function loseGameWithHaptics() {
     triggerHaptic("death", { force: true });
     return original.apply(this, arguments);
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("rewardChestLoot", original => function rewardChestLootWithHaptics() {
+  installed += wrapHapticFunction("rewardChestLoot", original => function rewardChestLootWithHaptics() {
     const result = original.apply(this, arguments);
     triggerHaptic("loot");
     return result;
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("lootCorpse", original => function lootCorpseWithHaptics(corpse) {
+  installed += wrapHapticFunction("lootCorpse", original => function lootCorpseWithHaptics(corpse) {
     const result = original.apply(this, arguments);
     if (corpse && !corpse.looted) triggerHaptic(corpse.boss ? "boss" : "loot");
     return result;
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("openLootBox", original => function openLootBoxWithHaptics() {
+  installed += wrapHapticFunction("openLootBox", original => function openLootBoxWithHaptics() {
     const beforeOpened = Number(stats?.lootBoxesOpened) || 0;
     const result = original.apply(this, arguments);
     if ((Number(stats?.lootBoxesOpened) || 0) > beforeOpened) triggerHaptic("success");
     return result;
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("equipItem", original => function equipItemWithHaptics() {
+  installed += wrapHapticFunction("equipItem", original => function equipItemWithHaptics() {
     const result = original.apply(this, arguments);
     triggerHaptic("ui");
     return result;
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("advanceToNextFloor", original => function advanceToNextFloorWithHaptics() {
+  installed += wrapHapticFunction("advanceToNextFloor", original => function advanceToNextFloorWithHaptics() {
     triggerHaptic("success", { force: true });
     return original.apply(this, arguments);
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("floorCollapseDeath", original => function floorCollapseDeathWithHaptics() {
+  installed += wrapHapticFunction("floorCollapseDeath", original => function floorCollapseDeathWithHaptics() {
     triggerHaptic("death", { force: true });
     return original.apply(this, arguments);
-  });
+  }) ? 1 : 0;
 
-  wrapHapticFunction("triggerBossAggro", original => function triggerBossAggroWithHaptics() {
+  installed += wrapHapticFunction("triggerBossAggro", original => function triggerBossAggroWithHaptics() {
     const wasAggroed = !!bossAggroed;
     const result = original.apply(this, arguments);
     if (!wasAggroed && bossAggroed) triggerHaptic("warning");
     return result;
-  });
+  }) ? 1 : 0;
+
+  return installed;
+}
+
+function scheduleHapticHookRetries() {
+  let attempts = 0;
+  const retry = () => {
+    attempts++;
+    installGameplayHapticHooks();
+    if (attempts < 12) setTimeout(retry, 250);
+  };
+  retry();
+  window.addEventListener("load", installGameplayHapticHooks, { once: true });
 }
 
 window.triggerHaptic = triggerHaptic;
@@ -218,4 +233,4 @@ if (document.readyState === "loading") {
   updateHapticsSettingsUI();
 }
 
-installGameplayHapticHooks();
+scheduleHapticHookRetries();
