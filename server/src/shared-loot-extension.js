@@ -1,4 +1,5 @@
 const { randomUUID } = require("crypto");
+const { applyEnemyAuthorityExtension } = require("./enemy-authority-extension");
 
 function clonePlain(value, fallback = null) {
   if (value === undefined) return fallback;
@@ -129,6 +130,8 @@ function applySharedLootExtension(LobbyManager) {
     }
     return normalized;
   };
+
+  applyEnemyAuthorityExtension(LobbyManager);
 }
 
 module.exports = { applySharedLootExtension };
