@@ -16,6 +16,7 @@ const PORT = Number(process.env.PORT || 8080);
 const CLIENT_ROOT = path.resolve(__dirname, "../..");
 const LEADERBOARD_FILE = process.env.LEADERBOARD_FILE || path.resolve(__dirname, "../data/leaderboard.json");
 const API_CORS_ORIGIN = process.env.API_CORS_ORIGIN || "*";
+const WS_MAX_CONNECTIONS_PER_IP = Number(process.env.WS_MAX_CONNECTIONS_PER_IP || 20);
 const rooms = new LobbyManager();
 const leaderboard = new LeaderboardStore({ filePath: LEADERBOARD_FILE, maxEntries: 50 });
 
@@ -197,9 +198,76 @@ const server = http.createServer((req, res) => {
   if (handleApiRequest(req, res)) return;
   serveStaticFile(req, res);
 });
-const wss = new WebSocketServer({ server });
+const wss = new WebSocketServer({ noServer: true });
+const wsConnectionsByIp = new Map();
 
 rooms.startCleanup();
+
+function parseAllowedOrigins(originConfig = API_CORS_ORIGIN) {
+  return String(originConfig)
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+function isAllowedOrigin(origin, originConfig = API_CORS_ORIGIN) {
+  const allowedOrigins = parseAllowedOrigins(originConfig);
+  if (allowedOrigins.includes("*")) return true;
+  if (!origin) return false;
+  return allowedOrigins.includes(origin);
+}
+
+function getRequestIp(req) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+  if (typeof forwardedFor === "string" && forwardedFor.trim()) return forwardedFor.split(",")[0].trim();
+  return req.socket.remoteAddress || "unknown";
+}
+
+function rejectWebSocketUpgrade(socket, statusCode, reason) {
+  const statusText = http.STATUS_CODES[statusCode] || "Rejected";
+  socket.write([
+    `HTTP/1.1 ${statusCode} ${statusText}`,
+    "Connection: close",
+    "Content-Type: text/plain; charset=utf-8",
+    `Content-Length: ${Buffer.byteLength(reason)}`,
+    "",
+    reason
+  ].join("\r\n"));
+  socket.destroy();
+}
+
+function canAcceptIpConnection(ip) {
+  return (wsConnectionsByIp.get(ip) || 0) < WS_MAX_CONNECTIONS_PER_IP;
+}
+
+function trackIpConnection(ip, ws) {
+  wsConnectionsByIp.set(ip, (wsConnectionsByIp.get(ip) || 0) + 1);
+  ws.once("close", () => {
+    const remaining = (wsConnectionsByIp.get(ip) || 1) - 1;
+    if (remaining > 0) wsConnectionsByIp.set(ip, remaining);
+    else wsConnectionsByIp.delete(ip);
+  });
+}
+
+server.on("upgrade", (req, socket, head) => {
+  socket.on("error", () => {});
+
+  if (!isAllowedOrigin(req.headers.origin)) {
+    rejectWebSocketUpgrade(socket, 403, "WebSocket origin is not allowed.");
+    return;
+  }
+
+  const ip = getRequestIp(req);
+  if (!canAcceptIpConnection(ip)) {
+    rejectWebSocketUpgrade(socket, 429, "Too many WebSocket connections from this IP.");
+    return;
+  }
+
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    trackIpConnection(ip, ws);
+    wss.emit("connection", ws, req);
+  });
+});
 
 function makePlayerId() {
   return `crawler_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
