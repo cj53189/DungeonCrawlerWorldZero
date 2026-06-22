@@ -15,7 +15,18 @@ applySharedLootExtension(LobbyManager);
 const PORT = Number(process.env.PORT || 8080);
 const CLIENT_ROOT = path.resolve(__dirname, "../..");
 const LEADERBOARD_FILE = process.env.LEADERBOARD_FILE || path.resolve(__dirname, "../data/leaderboard.json");
-const API_CORS_ORIGIN = process.env.API_CORS_ORIGIN || "*";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const configuredCorsOrigin = process.env.API_CORS_ORIGIN || "";
+if (IS_PRODUCTION && !configuredCorsOrigin.trim()) {
+  throw new Error("API_CORS_ORIGIN must be configured explicitly in production.");
+}
+const API_CORS_ORIGIN = configuredCorsOrigin.trim() || "*";
+const LEADERBOARD_POST_WINDOW_MS = Number(process.env.LEADERBOARD_POST_WINDOW_MS || 60_000);
+const LEADERBOARD_POST_LIMIT = Number(process.env.LEADERBOARD_POST_LIMIT || 5);
+const LEADERBOARD_MAX_FLOOR = Number(process.env.LEADERBOARD_MAX_FLOOR || 100);
+const LEADERBOARD_MAX_GOLD = Number(process.env.LEADERBOARD_MAX_GOLD || 1_000_000);
+const LEADERBOARD_MAX_GOLD_PER_FLOOR = Number(process.env.LEADERBOARD_MAX_GOLD_PER_FLOOR || 50_000);
+const leaderboardPostAttempts = new Map();
 const rooms = new LobbyManager();
 const leaderboard = new LeaderboardStore({ filePath: LEADERBOARD_FILE, maxEntries: 50 });
 
@@ -42,6 +53,100 @@ const API_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type, Accept",
   "Cache-Control": "no-store"
 };
+
+
+function parseAllowedOrigins() {
+  const configured = configuredCorsOrigin
+    .split(",")
+    .map(origin => origin.trim())
+    .filter(Boolean);
+  if (configured.length) return configured;
+  return IS_PRODUCTION ? [] : ["http://localhost", "http://127.0.0.1", "http://[::1]"];
+}
+
+function isLocalHostName(hostname) {
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
+}
+
+function originMatchesAllowed(origin, allowedOrigins = parseAllowedOrigins()) {
+  if (!origin) return false;
+  let parsed;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    return false;
+  }
+  return allowedOrigins.some(allowed => {
+    if (allowed === "*") return !IS_PRODUCTION;
+    let parsedAllowed;
+    try {
+      parsedAllowed = new URL(allowed);
+    } catch {
+      return false;
+    }
+    if (parsedAllowed.origin === parsed.origin) return true;
+    return !IS_PRODUCTION && isLocalHostName(parsed.hostname) && isLocalHostName(parsedAllowed.hostname);
+  });
+}
+
+function hostMatchesAllowed(host, allowedOrigins = parseAllowedOrigins()) {
+  if (!host) return false;
+  let hostname;
+  try {
+    hostname = new URL(`http://${host}`).hostname;
+  } catch {
+    return false;
+  }
+  if (!IS_PRODUCTION && isLocalHostName(hostname)) return true;
+  return allowedOrigins.some(allowed => {
+    if (allowed === "*") return !IS_PRODUCTION;
+    try {
+      return new URL(allowed).hostname === hostname;
+    } catch {
+      return false;
+    }
+  });
+}
+
+function validateLeaderboardRequestSource(req) {
+  const origin = req.headers.origin;
+  if (origin && !originMatchesAllowed(origin)) {
+    throw Object.assign(new Error("Origin is not allowed to submit leaderboard scores."), { statusCode: 403 });
+  }
+  if (!hostMatchesAllowed(req.headers.host || "")) {
+    throw Object.assign(new Error("Host is not allowed to submit leaderboard scores."), { statusCode: 403 });
+  }
+}
+
+function getClientIp(req) {
+  const forwarded = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim();
+  return forwarded || req.socket?.remoteAddress || "unknown";
+}
+
+function enforceLeaderboardRateLimit(req, playerId) {
+  const now = Date.now();
+  const key = `${getClientIp(req)}:${String(playerId || "anonymous").slice(0, 64)}`;
+  const bucket = (leaderboardPostAttempts.get(key) || []).filter(timestamp => now - timestamp < LEADERBOARD_POST_WINDOW_MS);
+  if (bucket.length >= LEADERBOARD_POST_LIMIT) {
+    throw Object.assign(new Error("Too many leaderboard submissions. Please try again later."), { statusCode: 429 });
+  }
+  bucket.push(now);
+  leaderboardPostAttempts.set(key, bucket);
+}
+
+function validateLeaderboardScoreBounds(score = {}) {
+  const highestFloor = Number(score.highestFloor ?? score.floor ?? 0);
+  const highestGold = Number(score.highestGold ?? score.gold ?? score.coins ?? 0);
+  if (!Number.isFinite(highestFloor) || !Number.isFinite(highestGold) || highestFloor < 0 || highestGold < 0) {
+    throw Object.assign(new Error("Leaderboard score must include finite, non-negative progress."), { statusCode: 400 });
+  }
+  const floor = Math.floor(highestFloor);
+  const gold = Math.floor(highestGold);
+  const floorGoldCap = Math.max(LEADERBOARD_MAX_GOLD_PER_FLOOR, (floor + 1) * LEADERBOARD_MAX_GOLD_PER_FLOOR);
+  if (floor > LEADERBOARD_MAX_FLOOR || gold > LEADERBOARD_MAX_GOLD || gold > floorGoldCap) {
+    throw Object.assign(new Error("Leaderboard score exceeds known game bounds."), { statusCode: 400 });
+  }
+}
 
 function sendResponse(res, statusCode, body, headers = {}) {
   res.writeHead(statusCode, headers);
@@ -96,10 +201,13 @@ function readJsonBody(req, maxBytes = 16 * 1024) {
 
 async function handleLeaderboardPost(req, res) {
   try {
+    validateLeaderboardRequestSource(req);
     const body = await readJsonBody(req);
     const score = body.score || body;
     const profile = body.profile || {};
     const playerId = body.playerId || `http_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
+    enforceLeaderboardRateLimit(req, playerId);
+    validateLeaderboardScoreBounds(score);
     const result = leaderboard.submitScore(playerId, score, profile);
     if (result.changed) broadcastLeaderboard();
     sendJson(res, 200, { ...leaderboardPayload(), changed: result.changed, entry: result.entry });
@@ -198,8 +306,6 @@ const server = http.createServer((req, res) => {
   serveStaticFile(req, res);
 });
 const wss = new WebSocketServer({ server });
-
-rooms.startCleanup();
 
 function makePlayerId() {
   return `crawler_${randomUUID().replace(/-/g, "").slice(0, 12)}`;
@@ -302,14 +408,38 @@ wss.on("connection", (ws) => {
   ws.on("error", () => rooms.unregisterClient(playerId));
 });
 
-server.listen(PORT, () => {
-  console.log(`Dungeon Crawler World client and Floor 0 collapse WebSocket server listening on http://localhost:${PORT}`);
-  console.log(`Leaderboard storage: ${LEADERBOARD_FILE}`);
-});
+function startServer() {
+  rooms.startCleanup();
+  server.listen(PORT, () => {
+    console.log(`Dungeon Crawler World client and Floor 0 collapse WebSocket server listening on http://localhost:${PORT}`);
+    console.log(`Leaderboard storage: ${LEADERBOARD_FILE}`);
+  });
+}
 
 function shutdown() {
   server.close(() => process.exit(0));
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+if (require.main === module) {
+  startServer();
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
+module.exports = {
+  server,
+  wss,
+  handleApiRequest,
+  handleLeaderboardPost,
+  validateLeaderboardRequestSource,
+  validateLeaderboardScoreBounds,
+  enforceLeaderboardRateLimit,
+  parseAllowedOrigins,
+  originMatchesAllowed,
+  hostMatchesAllowed,
+  leaderboardPostAttempts,
+  rooms,
+  leaderboard,
+  startServer,
+  shutdown
+};
