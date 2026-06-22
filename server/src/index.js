@@ -214,7 +214,7 @@ function readJsonBody(req, maxBytes = 16 * 1024) {
       try {
         resolve(JSON.parse(body));
       } catch {
-        reject(Object.assign(new Error("Invalid JSON body."), { statusCode: 400 });
+        reject(Object.assign(new Error("Invalid JSON body."), { statusCode: 400 }));
       }
     });
     req.on("error", reject);
