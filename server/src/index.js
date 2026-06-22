@@ -17,10 +17,7 @@ const CLIENT_ROOT = path.resolve(__dirname, "../..");
 const LEADERBOARD_FILE = process.env.LEADERBOARD_FILE || path.resolve(__dirname, "../data/leaderboard.json");
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const configuredCorsOrigin = process.env.API_CORS_ORIGIN || "";
-if (IS_PRODUCTION && !configuredCorsOrigin.trim()) {
-  throw new Error("API_CORS_ORIGIN must be configured explicitly in production.");
-}
-const API_CORS_ORIGIN = configuredCorsOrigin.trim() || "*";
+const API_CORS_ORIGIN = configuredCorsOrigin.trim() || (IS_PRODUCTION ? "" : "*");
 const LEADERBOARD_POST_WINDOW_MS = Number(process.env.LEADERBOARD_POST_WINDOW_MS || 60_000);
 const LEADERBOARD_POST_LIMIT = Number(process.env.LEADERBOARD_POST_LIMIT || 5);
 const WS_CONNECTION_WINDOW_MS = Number(process.env.WS_CONNECTION_WINDOW_MS || 60_000);
@@ -51,7 +48,7 @@ const MIME_TYPES = {
 };
 
 const API_HEADERS = {
-  "Access-Control-Allow-Origin": API_CORS_ORIGIN,
+  ...(API_CORS_ORIGIN ? { "Access-Control-Allow-Origin": API_CORS_ORIGIN } : {}),
   "Access-Control-Allow-Methods": "GET, HEAD, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Accept",
   "Cache-Control": "no-store"
@@ -69,6 +66,24 @@ function parseAllowedOrigins() {
 
 function isLocalHostName(hostname) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
+}
+
+function getHostName(host) {
+  if (!host) return "";
+  try {
+    return new URL(`http://${host}`).hostname;
+  } catch {
+    return "";
+  }
+}
+
+function originMatchesRequestHost(origin, host) {
+  if (!origin || !host) return false;
+  try {
+    return new URL(origin).hostname === getHostName(host);
+  } catch {
+    return false;
+  }
 }
 
 function originMatchesAllowed(origin, allowedOrigins = parseAllowedOrigins()) {
@@ -93,14 +108,10 @@ function originMatchesAllowed(origin, allowedOrigins = parseAllowedOrigins()) {
 }
 
 function hostMatchesAllowed(host, allowedOrigins = parseAllowedOrigins()) {
-  if (!host) return false;
-  let hostname;
-  try {
-    hostname = new URL(`http://${host}`).hostname;
-  } catch {
-    return false;
-  }
+  const hostname = getHostName(host);
+  if (!hostname) return false;
   if (!IS_PRODUCTION && isLocalHostName(hostname)) return true;
+  if (IS_PRODUCTION && !allowedOrigins.length) return true;
   return allowedOrigins.some(allowed => {
     if (allowed === "*") return !IS_PRODUCTION;
     try {
@@ -111,9 +122,17 @@ function hostMatchesAllowed(host, allowedOrigins = parseAllowedOrigins()) {
   });
 }
 
-function validateLeaderboardRequestSource(req) {
+function requestOriginAllowed(req) {
   const origin = req.headers.origin;
-  if (origin && !originMatchesAllowed(origin)) {
+  const host = req.headers.host || "";
+  const allowedOrigins = parseAllowedOrigins();
+  if (!origin) return true;
+  if (originMatchesAllowed(origin, allowedOrigins)) return true;
+  return IS_PRODUCTION && !allowedOrigins.length && originMatchesRequestHost(origin, host);
+}
+
+function validateLeaderboardRequestSource(req) {
+  if (!requestOriginAllowed(req)) {
     throw Object.assign(new Error("Origin is not allowed to submit leaderboard scores."), { statusCode: 403 });
   }
   if (!hostMatchesAllowed(req.headers.host || "")) {
@@ -195,7 +214,7 @@ function readJsonBody(req, maxBytes = 16 * 1024) {
       try {
         resolve(JSON.parse(body));
       } catch {
-        reject(Object.assign(new Error("Invalid JSON body."), { statusCode: 400 }));
+        reject(Object.assign(new Error("Invalid JSON body."), { statusCode: 400 });
       }
     });
     req.on("error", reject);
@@ -322,8 +341,7 @@ function enforceWebSocketRateLimit(req) {
 }
 
 function validateWebSocketRequest(req) {
-  const origin = req.headers.origin;
-  if (origin && !originMatchesAllowed(origin)) return false;
+  if (!requestOriginAllowed(req)) return false;
   if (!hostMatchesAllowed(req.headers.host || "")) return false;
   return enforceWebSocketRateLimit(req);
 }
