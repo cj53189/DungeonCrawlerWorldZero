@@ -18,12 +18,20 @@
       };
   }
 
-  function currentClassName() {
-    return typeof getTemporaryClass === "function" ? getTemporaryClass() : (player?.progression?.temporaryClass || "Fresh Crawler");
+  function currentOriginName() {
+    if (typeof getOriginProfile === "function") return getOriginProfile();
+    return typeof getTemporaryClass === "function" ? getTemporaryClass() : (player?.progression?.originProfile || player?.progression?.temporaryClass || "Unsorted Crawler");
   }
 
-  function currentClassDescription() {
-    return typeof getTemporaryClassDescription === "function" ? getTemporaryClassDescription() : (player?.progression?.temporaryClassDescription || "Opening build pending.");
+  function currentOriginDescription() {
+    if (typeof getOriginProfileDescription === "function") return getOriginProfileDescription();
+    return typeof getTemporaryClassDescription === "function" ? getTemporaryClassDescription() : (player?.progression?.originProfileDescription || player?.progression?.temporaryClassDescription || "The crawl has not formed a strong opinion yet.");
+  }
+
+  function canSpendAttr(attr) {
+    if (!attr) return false;
+    if (typeof canSpendAttributePoint === "function") return canSpendAttributePoint(attr.id);
+    return pointSummary().attributePoints > 0;
   }
 
   function injectSpawnAllocationStyles() {
@@ -41,6 +49,7 @@
         border-radius: 12px;
         background: linear-gradient(135deg, rgba(28,36,60,0.92), rgba(20,20,30,0.92));
       }
+      .spawnClassCard small { display:block; margin-bottom:3px; color:rgba(255,216,107,0.86); font-size:10px; text-transform:uppercase; letter-spacing:.08em; }
       .spawnClassCard strong { display:block; font-size: 16px; color: #effcff; }
       .spawnClassCard span { display:block; margin-top: 3px; color: rgba(239,252,255,0.72); font-size: 11px; line-height: 1.35; }
       .spawnPointCard { text-align:center; align-self:stretch; display:grid; align-content:center; border-radius:10px; background:rgba(255,255,255,0.055); }
@@ -59,7 +68,6 @@
       }
       .spendPointBtn:disabled { opacity: .42; filter: grayscale(0.5); }
       .spawnAllocationNote { color: rgba(239,252,255,0.7); font-size: 11px; line-height: 1.35; margin-top: 8px; }
-      #classHud { margin-top: 4px; font-size: 11px; color: rgba(239,252,255,0.82); }
       @media (max-width: 760px), (hover:none) and (pointer:coarse) {
         .spawnAllocationHero { grid-template-columns: 1fr 1fr; }
         .spawnClassCard { grid-column: 1 / -1; }
@@ -70,21 +78,24 @@
 
   function renderSpawnHero() {
     if (typeof initProgression === "function") initProgression({ skipLoad: true });
-    if (typeof updateTemporaryClass === "function") updateTemporaryClass();
+    if (typeof updateOriginProfile === "function") updateOriginProfile();
+    else if (typeof updateTemporaryClass === "function") updateTemporaryClass();
     const points = pointSummary();
-    return `<div class="spawnAllocationHero"><div class="spawnClassCard"><strong>${esc(currentClassName())}</strong><span>${esc(currentClassDescription())}</span></div><div class="spawnPointCard"><span>Attribute Points</span><strong>${points.attributePoints}</strong></div><div class="spawnPointCard"><span>Skill Points</span><strong>${points.skillPoints}</strong></div></div>`;
+    return `<div class="spawnAllocationHero"><div class="spawnClassCard"><small>Origin Read</small><strong>${esc(currentOriginName())}</strong><span>${esc(currentOriginDescription())}</span></div><div class="spawnPointCard"><span>Attribute Points</span><strong>${points.attributePoints}</strong></div><div class="spawnPointCard"><span>Skill Points</span><strong>${points.skillPoints}</strong></div></div>`;
   }
 
   function renderSpawnAttributeRows(compact = true) {
-    const points = pointSummary();
     const attrs = Object.values(player.progression?.attributes || {});
+    const cap = typeof getStartingAttributeCap === "function" ? getStartingAttributeCap() : null;
     return attrs.map(attr => {
-      const disabled = points.attributePoints <= 0;
+      const disabled = !canSpendAttr(attr);
+      const value = Math.max(1, Number(attr.value) || attr.baseValue || 8);
+      const capNote = cap && value >= cap ? ` · opening cap ${cap}` : "";
       const button = `<button class="spendPointBtn" type="button" data-spend-attribute="${esc(attr.id)}" ${disabled ? "disabled" : ""}>+1 ${esc(attr.name)}</button>`;
       if (compact) {
-        return `<div class="attributeRow spendable" data-progression-row="attribute-${esc(attr.id || attr.name)}" aria-label="${esc(attr.name)} ${attr.value}"><div><strong>${esc(attr.name)}</strong><small>${esc(attr.effect || attr.description || "")}</small>${button}</div><span>${attr.value}</span></div>`;
+        return `<div class="attributeRow spendable" data-progression-row="attribute-${esc(attr.id || attr.name)}" aria-label="${esc(attr.name)} ${value}"><div><strong>${esc(attr.name)}</strong><small>${esc(attr.effect || attr.description || "")}${esc(capNote)}</small>${button}</div><span>${value}</span></div>`;
       }
-      return `<div class="attributeCard spendable"><div><strong>${esc(attr.name)}</strong><span>${attr.value}</span></div><p>${esc(attr.description)}</p><small>${esc(attr.effect)}</small>${button}</div>`;
+      return `<div class="attributeCard spendable"><div><strong>${esc(attr.name)}</strong><span>${value}</span></div><p>${esc(attr.description)}</p><small>${esc(attr.effect)}${esc(capNote)}</small>${button}</div>`;
     }).join("");
   }
 
@@ -109,19 +120,20 @@
     const hero = renderSpawnHero();
     const attrRows = renderSpawnAttributeRows(true);
     const skillRows = renderSpawnSkillRows(true);
-    return `<div class="progressionInventory" role="region" aria-label="Skills and attributes"><div class="spawnAllocationNote">Starting allocation is intentionally tiny: 3 attribute points and 1 skill point. Your temporary class updates from the stat spread.</div>${hero}<div class="progressionColumns"><section class="progressionSection attributesSection"><h4>Attributes</h4><div class="attributeGrid compact">${attrRows}</div></section><section class="progressionSection skillSection"><h4>Skills</h4><div class="skillList compact">${skillRows}</div></section></div><div class="progressionHelp">Spend points now or hold them. D-pad / left stick navigates · right stick scrolls · A / Enter selects · B / Escape backs out</div></div>`;
+    return `<div class="progressionInventory" role="region" aria-label="Skills and attributes"><div class="spawnAllocationNote">Spend opening points to shape who you were before the crawl. Race and class come later; the dungeon is merely taking notes, like a creep with funding.</div>${hero}<div class="progressionColumns"><section class="progressionSection attributesSection"><h4>Attributes</h4><div class="attributeGrid compact">${attrRows}</div></section><section class="progressionSection skillSection"><h4>Skills</h4><div class="skillList compact">${skillRows}</div></section></div><div class="progressionHelp">Spend points now or hold them. D-pad / left stick navigates · right stick scrolls · A / Enter selects · B / Escape backs out</div></div>`;
   }
 
   function renderSpawnProgressionPanel() {
     const panel = document.getElementById("progressionPanel");
     if (!panel) return;
     if (typeof initProgression === "function") initProgression({ skipLoad: true });
-    panel.innerHTML = `<button id="closeProgressionBtn" class="panelClose" type="button" aria-label="Close skills">×</button><h3>Skills / Attributes</h3>${renderSpawnHero()}<section class="progressionSection"><h4>Attributes</h4><div class="attributeGrid">${renderSpawnAttributeRows(false)}</div></section><section class="progressionSection skillSection"><h4>Skills</h4><div class="skillList">${renderSpawnSkillRows(false)}</div></section><div class="progressionHelp">Spend your opening points to define a temporary class. You can keep points unspent if you want to decide later.</div>`;
+    panel.innerHTML = `<button id="closeProgressionBtn" class="panelClose" type="button" aria-label="Close skills">×</button><h3>Skills / Attributes</h3>${renderSpawnHero()}<section class="progressionSection"><h4>Attributes</h4><div class="attributeGrid">${renderSpawnAttributeRows(false)}</div></section><section class="progressionSection skillSection"><h4>Skills</h4><div class="skillList">${renderSpawnSkillRows(false)}</div></section><div class="progressionHelp">Opening points shape your origin read. Race and class are not assigned yet.</div>`;
     document.getElementById("closeProgressionBtn")?.addEventListener("click", closeProgressionPanel);
   }
 
   function refreshProgressionViews() {
-    if (typeof updateTemporaryClass === "function") updateTemporaryClass();
+    if (typeof updateOriginProfile === "function") updateOriginProfile();
+    else if (typeof updateTemporaryClass === "function") updateTemporaryClass();
     if (typeof updateInventoryUI === "function") updateInventoryUI();
     const panel = document.getElementById("progressionPanel");
     if (panel?.classList.contains("open") || panel?.style.display === "block") renderSpawnProgressionPanel();
@@ -141,20 +153,13 @@
     if (!spent) return;
 
     if (typeof triggerHaptic === "function") triggerHaptic("success");
-    if (typeof announcer === "function") announcer(`Crawler Intake updated. Temporary class: ${currentClassName()}.`);
+    if (typeof announcer === "function") announcer(`Crawler intake updated. Current origin read: ${currentOriginName()}.`);
     refreshProgressionViews();
   }
 
   function syncClassHud() {
-    const hudWeapon = document.querySelector(".hudWeapon");
-    if (!hudWeapon) return;
-    let classHud = document.getElementById("classHud");
-    if (!classHud) {
-      classHud = document.createElement("div");
-      classHud.id = "classHud";
-      hudWeapon.insertAdjacentElement("afterend", classHud);
-    }
-    classHud.textContent = `Class ${currentClassName()}`;
+    const existing = document.getElementById("classHud");
+    if (existing) existing.remove();
   }
 
   function openSpawnAllocationPanel() {
@@ -175,7 +180,7 @@
     if (points.attributePoints + points.skillPoints <= 0) return;
     player.progression.spawnAllocationPrompted = true;
     setTimeout(() => {
-      if (typeof announcer === "function") announcer(`Crawler Intake: assign ${points.attributePoints} attribute points and ${points.skillPoints} skill point to define your temporary class.`);
+      if (typeof announcer === "function") announcer(`Crawler intake: assign ${points.attributePoints} attribute points and ${points.skillPoints} skill points to shape your opening build.`);
       openSpawnAllocationPanel();
     }, 650);
   }
@@ -204,7 +209,7 @@
       renderProgressionPanel.__spawnAllocationWrapped = true;
     }
 
-    wrapSpawnAllocationFunction("updateHUD", original => function updateHudWithTemporaryClass() {
+    wrapSpawnAllocationFunction("updateHUD", original => function updateHudWithoutPreFloorClass() {
       const result = original.apply(this, arguments);
       syncClassHud();
       return result;
