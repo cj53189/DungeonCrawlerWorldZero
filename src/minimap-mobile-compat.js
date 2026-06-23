@@ -18,6 +18,15 @@ drawDynamicMarkers = true;
   document.head.appendChild(script);
 })();
 
+(function loadFloor3OfferGeneratorModule() {
+  if (document.querySelector('script[src="./src/floor3-offers.js"]')) return;
+  const script = document.createElement("script");
+  script.src = "./src/floor3-offers.js";
+  script.async = false;
+  script.defer = true;
+  document.head.appendChild(script);
+})();
+
 (function loadOriginProfileHooksModule() {
   if (document.querySelector('script[src="./src/origin-profile-hooks.js"]')) return;
   const script = document.createElement("script");
