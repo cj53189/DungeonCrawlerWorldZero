@@ -53,109 +53,29 @@
   };
 
   const ORIGIN_OFFER_RULES = {
-    securityContractor: {
-      races: ["humanVariant", "ironblood", "stoneblood"],
-      classes: ["bulwark", "doorKicker", "bladeSentinel"],
-      line: "Your pre-crawl profile suggests structured violence and familiarity with bad rooms."
-    },
-    bouncer: {
-      races: ["halfGiant", "stoneblood", "ironblood"],
-      classes: ["bruiser", "painSponge", "doorKicker"],
-      line: "Your pre-crawl profile suggests crowd control, poor lighting, and excellent forearms."
-    },
-    scout: {
-      races: ["humanVariant", "ratkin", "mothkin"],
-      classes: ["ranger", "trapwright", "cartographer"],
-      line: "Your pre-crawl profile suggests distance, routes, and not volunteering to be bitten."
-    },
-    grifter: {
-      races: ["goblin", "ratkin", "shadowling"],
-      classes: ["grifter", "lootguard", "hypeConduit"],
-      line: "Your pre-crawl profile suggests flexible ethics and marketable survival instincts."
-    },
-    urbanExplorer: {
-      races: ["ratkin", "goblin", "mothkin"],
-      classes: ["trapwright", "survivalist", "cartographer"],
-      line: "Your pre-crawl profile suggests comfort in places with warning signs and tetanus opportunities."
-    },
-    prizeIdiot: {
-      races: ["halfGiant", "goblin", "humanVariant"],
-      classes: ["brawler", "hypeConduit", "painSponge"],
-      line: "Your pre-crawl profile suggests camera-friendly confidence and unclear long-term planning."
-    },
-    survivalist: {
-      races: ["humanVariant", "ratkin", "stoneblood"],
-      classes: ["survivalist", "junkArtificer", "bulwark"],
-      line: "Your pre-crawl profile suggests you can make trash, hunger, and fear last longer than expected."
-    },
-    analyst: {
-      races: ["constructTouched", "mothkin", "humanVariant"],
-      classes: ["cartographer", "tactician", "trapwright"],
-      line: "Your pre-crawl profile suggests pattern recognition, preparation, and dangerous amounts of thinking."
-    },
-    knifeProblem: {
-      races: ["shadowling", "serpentkin", "goblin"],
-      classes: ["knifeDancer", "toxicologist", "grifter"],
-      line: "Your pre-crawl profile suggests edges, movement, and a pending discussion with legal."
-    },
-    unsortedCrawler: {
-      races: ["humanVariant", "goblin", "ratkin"],
-      classes: ["survivalist", "brawler", "luckyBastard"],
-      line: "Your pre-crawl profile remains annoyingly broad. The dungeon has improvised, which is never comforting."
-    }
+    securityContractor: { races: ["humanVariant", "ironblood", "stoneblood"], classes: ["bulwark", "doorKicker", "bladeSentinel"], line: "Your pre-crawl profile suggests structured violence and familiarity with bad rooms." },
+    bouncer: { races: ["halfGiant", "stoneblood", "ironblood"], classes: ["bruiser", "painSponge", "doorKicker"], line: "Your pre-crawl profile suggests crowd control, poor lighting, and excellent forearms." },
+    scout: { races: ["humanVariant", "ratkin", "mothkin"], classes: ["ranger", "trapwright", "cartographer"], line: "Your pre-crawl profile suggests distance, routes, and not volunteering to be bitten." },
+    grifter: { races: ["goblin", "ratkin", "shadowling"], classes: ["grifter", "lootguard", "hypeConduit"], line: "Your pre-crawl profile suggests flexible ethics and marketable survival instincts." },
+    urbanExplorer: { races: ["ratkin", "goblin", "mothkin"], classes: ["trapwright", "survivalist", "cartographer"], line: "Your pre-crawl profile suggests comfort in places with warning signs and tetanus opportunities." },
+    prizeIdiot: { races: ["halfGiant", "goblin", "humanVariant"], classes: ["brawler", "hypeConduit", "painSponge"], line: "Your pre-crawl profile suggests camera-friendly confidence and unclear long-term planning." },
+    survivalist: { races: ["humanVariant", "ratkin", "stoneblood"], classes: ["survivalist", "junkArtificer", "bulwark"], line: "Your pre-crawl profile suggests you can make trash, hunger, and fear last longer than expected." },
+    analyst: { races: ["constructTouched", "mothkin", "humanVariant"], classes: ["cartographer", "tactician", "trapwright"], line: "Your pre-crawl profile suggests pattern recognition, preparation, and dangerous amounts of thinking." },
+    knifeProblem: { races: ["shadowling", "serpentkin", "goblin"], classes: ["knifeDancer", "toxicologist", "grifter"], line: "Your pre-crawl profile suggests edges, movement, and a pending discussion with legal." },
+    unsortedCrawler: { races: ["humanVariant", "goblin", "ratkin"], classes: ["survivalist", "brawler", "luckyBastard"], line: "Your pre-crawl profile remains annoyingly broad. The dungeon has improvised, which is never comforting." }
   };
 
   const BEHAVIOR_OFFER_RULES = {
-    pain_sponge: {
-      races: ["stoneblood", "halfGiant", "ironblood"],
-      classes: ["painSponge", "bulwark"],
-      line: "Damage records indicate a concerning willingness to receive enemy feedback directly."
-    },
-    air_murderer: {
-      races: ["goblin", "mothkin", "humanVariant"],
-      classes: ["wildShot", "brawler"],
-      line: "Combat logs show repeated hostility toward empty space. Empty space has declined to comment."
-    },
-    wall_scholar: {
-      races: ["stoneblood", "halfGiant", "constructTouched"],
-      classes: ["wallScholar", "doorKicker"],
-      line: "Navigation records show extended academic engagement with walls."
-    },
-    loot_goblin: {
-      races: ["goblin", "ratkin", "constructTouched"],
-      classes: ["lootguard", "grifter", "junkArtificer"],
-      line: "Container interaction records indicate treasure-adjacent moral flexibility."
-    },
-    door_problem: {
-      races: ["halfGiant", "stoneblood", "goblin"],
-      classes: ["doorKicker", "trapwright"],
-      line: "Door interaction records suggest confidence around suspicious hinges."
-    },
-    violent_solutionist: {
-      races: ["ironblood", "halfGiant", "serpentkin"],
-      classes: ["violentSolutionist", "bladeSentinel", "bruiser"],
-      line: "Hostile depreciation records indicate a strong preference for reducing monster inventory."
-    },
-    nothing_whisperer: {
-      races: ["shadowling", "mothkin", "slimeTouched"],
-      classes: ["omenListener", "chaosAccountant"],
-      line: "Interaction logs show repeated attempts to communicate with nothing. Something may have answered."
-    },
-    cautious_or_lost: {
-      races: ["ratkin", "mothkin", "cockroachkin"],
-      classes: ["escapeArtist", "survivalist"],
-      line: "Safe-room records suggest caution, confusion, or an impressive relationship with doors."
-    },
-    risk_tolerant: {
-      races: ["humanVariant", "ironblood", "cockroachkin"],
-      classes: ["daredevil", "ranger", "luckyBastard"],
-      line: "Exposure records suggest you spend a lot of time outside safety, for bravery or because nobody stopped you."
-    },
-    gear_magpie: {
-      races: ["goblin", "constructTouched", "ratkin"],
-      classes: ["junkArtificer", "lootguard"],
-      line: "Equipment records suggest a shiny-object survival strategy. Honestly, not the worst one."
-    }
+    pain_sponge: { races: ["stoneblood", "halfGiant", "ironblood"], classes: ["painSponge", "bulwark"], line: "Damage records indicate a concerning willingness to receive enemy feedback directly." },
+    air_murderer: { races: ["goblin", "mothkin", "humanVariant"], classes: ["wildShot", "brawler"], line: "Combat logs show repeated hostility toward empty space. Empty space has declined to comment." },
+    wall_scholar: { races: ["stoneblood", "halfGiant", "constructTouched"], classes: ["wallScholar", "doorKicker"], line: "Navigation records show extended academic engagement with walls." },
+    loot_goblin: { races: ["goblin", "ratkin", "constructTouched"], classes: ["lootguard", "grifter", "junkArtificer"], line: "Container interaction records indicate treasure-adjacent moral flexibility." },
+    door_problem: { races: ["halfGiant", "stoneblood", "goblin"], classes: ["doorKicker", "trapwright"], line: "Door interaction records suggest confidence around suspicious hinges." },
+    violent_solutionist: { races: ["ironblood", "halfGiant", "serpentkin"], classes: ["violentSolutionist", "bladeSentinel", "bruiser"], line: "Hostile depreciation records indicate a strong preference for reducing monster inventory." },
+    nothing_whisperer: { races: ["shadowling", "mothkin", "slimeTouched"], classes: ["omenListener", "chaosAccountant"], line: "Interaction logs show repeated attempts to communicate with nothing. Something may have answered." },
+    cautious_or_lost: { races: ["ratkin", "mothkin", "cockroachkin"], classes: ["escapeArtist", "survivalist"], line: "Safe-room records suggest caution, confusion, or an impressive relationship with doors." },
+    risk_tolerant: { races: ["humanVariant", "ironblood", "cockroachkin"], classes: ["daredevil", "ranger", "luckyBastard"], line: "Exposure records suggest you spend a lot of time outside safety, for bravery or because nobody stopped you." },
+    gear_magpie: { races: ["goblin", "constructTouched", "ratkin"], classes: ["junkArtificer", "lootguard"], line: "Equipment records suggest a shiny-object survival strategy. Honestly, not the worst one." }
   };
 
   const FALLBACK_RACES = ["humanVariant", "goblin", "ratkin", "stoneblood", "mothkin"];
@@ -163,12 +83,13 @@
   const WILDCARD_RACES = ["cockroachkin", "slimeTouched", "plagueTouched", "shadowling", "constructTouched"];
   const WILDCARD_CLASSES = ["luckyBastard", "backAlleyAlchemist", "chaosAccountant", "omenListener", "daredevil"];
 
+  function activeStats() { return typeof stats !== "undefined" ? stats : {}; }
+  function activeFloor() { return typeof currentFloor !== "undefined" ? Number(currentFloor) : 0; }
+  function activeProgression() { return typeof player !== "undefined" ? player?.progression : null; }
+
   function hashString(text) {
     let hash = 2166136261;
-    for (let i = 0; i < text.length; i++) {
-      hash ^= text.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
+    for (let i = 0; i < text.length; i++) { hash ^= text.charCodeAt(i); hash = Math.imul(hash, 16777619); }
     return Math.abs(hash >>> 0);
   }
 
@@ -179,9 +100,7 @@
   }
 
   function cleanTagIds(tags) {
-    return (Array.isArray(tags) ? tags : [])
-      .map(tag => typeof tag === "string" ? tag : tag?.id)
-      .filter(Boolean);
+    return (Array.isArray(tags) ? tags : []).map(tag => typeof tag === "string" ? tag : tag?.id).filter(Boolean);
   }
 
   function addOffer(target, definitions, id, source, reason) {
@@ -219,12 +138,13 @@
   }
 
   function buildFloor3OfferSet(options = {}) {
-    const progression = options.progression || player?.progression || {};
+    const progression = options.progression || activeProgression() || {};
     const behavior = options.behaviorProfile || progression.behaviorProfile || (typeof getBehaviorProfile === "function" ? getBehaviorProfile() : { tags: [] });
     const originId = currentOriginId(progression);
     const originRule = ORIGIN_OFFER_RULES[originId] || ORIGIN_OFFER_RULES.unsortedCrawler;
     const tagIds = cleanTagIds(behavior.tags);
-    const seedInput = [originId, tagIds.join("|"), stats?.damageTaken || 0, stats?.enemiesKilled || 0, stats?.chestsOpened || 0, stats?.doorsOpened || 0].join("::");
+    const statsSource = activeStats();
+    const seedInput = [originId, tagIds.join("|"), statsSource.damageTaken || 0, statsSource.enemiesKilled || 0, statsSource.chestsOpened || 0, statsSource.doorsOpened || 0].join("::");
     const seed = hashString(seedInput);
 
     const races = [];
@@ -248,14 +168,13 @@
 
     addOffers(races, RACE_DEFINITIONS, rotate(WILDCARD_RACES, seed), "wildcard", "The dungeon reserved one option for statistical nonsense.", 1);
     addOffers(classes, CLASS_DEFINITIONS, rotate(WILDCARD_CLASSES, seed + 7), "wildcard", "The dungeon reserved one option for statistical nonsense.", 1);
-
     fillOffers(races, RACE_DEFINITIONS, FALLBACK_RACES, "fallback", "Fallback offer added to preserve choice count.");
     fillOffers(classes, CLASS_DEFINITIONS, FALLBACK_CLASSES, "fallback", "Fallback offer added to preserve choice count.");
 
     return {
       floor: FLOOR3_OFFER_FLOOR,
       version: 1,
-      generatedAtFloor: Number.isFinite(Number(currentFloor)) ? Number(currentFloor) : null,
+      generatedAtFloor: Number.isFinite(activeFloor()) ? activeFloor() : null,
       originId,
       originName: progression.originProfile || progression.temporaryClass || "Unsorted Crawler",
       behaviorTagIds: tagIds,
@@ -267,28 +186,28 @@
   }
 
   function ensureFloor3OfferSet(options = {}) {
-    if (!player?.progression) return null;
+    const progression = activeProgression();
+    if (!progression) return null;
     if (typeof updateBehaviorProfile === "function") updateBehaviorProfile();
-    const current = player.progression.floor3Offers;
+    const current = progression.floor3Offers;
     const shouldGenerate = options.force || !current || current.version !== 1;
-    if (shouldGenerate) player.progression.floor3Offers = buildFloor3OfferSet(options);
-    return player.progression.floor3Offers;
+    if (shouldGenerate) progression.floor3Offers = buildFloor3OfferSet(options);
+    return progression.floor3Offers;
   }
 
   function maybeGenerateFloor3Offers() {
-    if (!player?.progression) return null;
-    const floor = Number(currentFloor);
-    if (!Number.isFinite(floor) || floor < FLOOR3_OFFER_FLOOR) return null;
+    const progression = activeProgression();
+    if (!progression || activeFloor() < FLOOR3_OFFER_FLOOR) return null;
     const offers = ensureFloor3OfferSet();
-    if (offers && !player.progression.floor3OfferNoticeShown) {
-      player.progression.floor3OfferNoticeShown = true;
+    if (offers && !progression.floor3OfferNoticeShown) {
+      progression.floor3OfferNoticeShown = true;
       console.info("Floor 3 offers generated", offers);
     }
     return offers;
   }
 
   function getFloor3OfferSet(options = {}) {
-    return options.force ? ensureFloor3OfferSet({ force: true }) : (player?.progression?.floor3Offers || maybeGenerateFloor3Offers());
+    return options.force ? ensureFloor3OfferSet({ force: true }) : (activeProgression()?.floor3Offers || maybeGenerateFloor3Offers());
   }
 
   function summarizeFloor3Offers(offers = getFloor3OfferSet()) {
@@ -313,12 +232,10 @@
       maybeGenerateFloor3Offers();
       return result;
     });
-
     wrap("showSafeRoomRecap", original => function showSafeRoomRecapWithFloor3Offers() {
       maybeGenerateFloor3Offers();
       return original.apply(this, arguments);
     });
-
     maybeGenerateFloor3Offers();
   }
 
