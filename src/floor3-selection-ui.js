@@ -30,11 +30,38 @@
     return !!getFloor3OfferSet({ force: !p.floor3Offers });
   }
 
+  function sourceLabel(source) {
+    return ({ origin: "Origin", behavior: "Behavior", wildcard: "Wildcard", fallback: "Fallback" }[source] || "Offer");
+  }
+
+  function toTitleCase(id) {
+    return String(id || "")
+      .replace(/[_-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/\b\w/g, ch => ch.toUpperCase());
+  }
+
+  function behaviorLabel(id) {
+    const tags = progression()?.behaviorProfile?.tags || [];
+    const match = tags.find(tag => (typeof tag === "string" ? tag : tag?.id) === id);
+    if (match && typeof match !== "string" && match.label) return match.label;
+    return toTitleCase(id);
+  }
+
+  function behaviorSummary(offers) {
+    const labels = (offers?.behaviorTagIds || []).map(behaviorLabel).filter(Boolean);
+    return labels.length ? labels.join(", ") : "Insufficient Evidence";
+  }
+
   function injectStyles() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
+      body.floor3SelectionOpen {
+        overflow: hidden !important;
+      }
       body.floor3SelectionOpen #touchControls,
       body.floor3SelectionOpen #prompt {
         opacity: 0 !important;
@@ -46,195 +73,60 @@
         inset: 0;
         z-index: 420;
         display: none;
-        align-items: center;
-        justify-content: center;
-        padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+        padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
         background: radial-gradient(circle at 50% 18%, rgba(124,247,255,0.16), rgba(0,0,0,0.84) 48%, rgba(0,0,0,0.92));
         backdrop-filter: blur(3px);
         color: #f8f1df;
         pointer-events: auto;
       }
-      #floor3SelectionOverlay.open { display: flex; }
+      #floor3SelectionOverlay.open {
+        display: block;
+      }
       .floor3Panel {
         width: min(1080px, calc(100vw - 28px));
-        max-height: min(88vh, 820px);
-        overflow-y: auto;
-        -webkit-overflow-scrolling: touch;
+        max-height: none;
+        margin: 0 auto;
         border: 2px solid rgba(255,216,107,0.72);
         border-radius: 20px;
         background: linear-gradient(145deg, rgba(14,10,8,0.98), rgba(33,22,14,0.98) 52%, rgba(10,9,12,0.98));
         box-shadow: 0 0 0 1px rgba(255,244,170,0.12) inset, 0 28px 80px rgba(0,0,0,0.75), 0 0 36px rgba(124,247,255,0.18);
         padding: 18px;
       }
-      .floor3Eyebrow {
-        color: #7cf7ff;
-        font-size: 11px;
-        font-weight: 900;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        margin-bottom: 5px;
-      }
-      .floor3Header {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 16px;
-        align-items: start;
-        padding-bottom: 12px;
-        margin-bottom: 12px;
-        border-bottom: 1px solid rgba(255,216,107,0.22);
-      }
-      .floor3Header h2 {
-        margin: 0;
-        color: #ffd86b;
-        font-size: clamp(24px, 4vw, 42px);
-        line-height: 0.95;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-      }
-      .floor3Header p {
-        margin: 8px 0 0;
-        max-width: 780px;
-        color: rgba(248,241,223,0.78);
-        line-height: 1.38;
-        font-size: 13px;
-      }
-      .floor3StatusCard {
-        min-width: 220px;
-        border-radius: 14px;
-        border: 1px solid rgba(124,247,255,0.24);
-        background: rgba(124,247,255,0.07);
-        padding: 10px 12px;
-        text-align: right;
-      }
-      .floor3StatusCard span {
-        display: block;
-        color: rgba(248,241,223,0.6);
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.12em;
-      }
-      .floor3StatusCard strong {
-        display: block;
-        margin-top: 3px;
-        color: #effcff;
-        font-size: 16px;
-      }
-      .floor3JudgmentLines {
-        display: grid;
-        gap: 6px;
-        margin: 0 0 12px;
-      }
-      .floor3JudgmentLine {
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 10px;
-        background: rgba(0,0,0,0.18);
-        padding: 8px 10px;
-        color: rgba(248,241,223,0.76);
-        font-size: 12px;
-        line-height: 1.3;
-      }
-      .floor3ChoiceGrid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 14px;
-      }
-      .floor3ChoiceColumn {
-        min-width: 0;
-        border: 1px solid rgba(255,216,107,0.22);
-        border-radius: 16px;
-        background: rgba(0,0,0,0.20);
-        padding: 12px;
-      }
-      .floor3ChoiceColumn h3 {
-        margin: 0 0 10px;
-        color: #ffdf91;
-        font-size: 14px;
-        text-transform: uppercase;
-        letter-spacing: 0.14em;
-      }
-      .floor3OptionList {
-        display: grid;
-        gap: 9px;
-      }
-      .floor3Option {
-        width: 100%;
-        min-height: 82px;
-        text-align: left;
-        border-radius: 13px;
-        border: 1px solid rgba(255,255,255,0.14);
-        background: linear-gradient(135deg, rgba(255,255,255,0.065), rgba(0,0,0,0.18));
-        color: #f8f1df;
-        padding: 10px;
-        cursor: pointer;
-        box-shadow: inset 0 0 20px rgba(0,0,0,0.22);
-      }
+      .floor3Eyebrow { color: #7cf7ff; font-size: 11px; font-weight: 900; letter-spacing: 0.18em; text-transform: uppercase; margin-bottom: 5px; }
+      .floor3Header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,216,107,0.22); }
+      .floor3Header h2 { margin: 0; color: #ffd86b; font-size: clamp(24px, 4vw, 42px); line-height: 0.95; letter-spacing: 0.04em; text-transform: uppercase; }
+      .floor3Header p { margin: 8px 0 0; max-width: 780px; color: rgba(248,241,223,0.78); line-height: 1.38; font-size: 13px; }
+      .floor3StatusCard { min-width: 220px; border-radius: 14px; border: 1px solid rgba(124,247,255,0.24); background: rgba(124,247,255,0.07); padding: 10px 12px; text-align: right; }
+      .floor3StatusCard span { display: block; color: rgba(248,241,223,0.6); font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; }
+      .floor3StatusCard strong { display: block; margin-top: 3px; color: #effcff; font-size: 16px; }
+      .floor3JudgmentLines { display: grid; gap: 6px; margin: 0 0 12px; }
+      .floor3JudgmentLine { border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; background: rgba(0,0,0,0.18); padding: 8px 10px; color: rgba(248,241,223,0.76); font-size: 12px; line-height: 1.3; }
+      .floor3ChoiceGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .floor3ChoiceColumn { min-width: 0; border: 1px solid rgba(255,216,107,0.22); border-radius: 16px; background: rgba(0,0,0,0.20); padding: 12px; }
+      .floor3ChoiceColumn h3 { margin: 0 0 10px; color: #ffdf91; font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; }
+      .floor3OptionList { display: grid; gap: 9px; }
+      .floor3Option { width: 100%; min-height: 82px; text-align: left; border-radius: 13px; border: 1px solid rgba(255,255,255,0.14); background: linear-gradient(135deg, rgba(255,255,255,0.065), rgba(0,0,0,0.18)); color: #f8f1df; padding: 10px; cursor: pointer; box-shadow: inset 0 0 20px rgba(0,0,0,0.22); }
       .floor3Option:hover { filter: brightness(1.14); }
-      .floor3Option.selected {
-        border-color: rgba(124,247,255,0.9);
-        box-shadow: 0 0 0 2px rgba(124,247,255,0.14), 0 0 20px rgba(124,247,255,0.2), inset 0 0 20px rgba(124,247,255,0.08);
-        background: linear-gradient(135deg, rgba(124,247,255,0.16), rgba(255,216,107,0.10));
-      }
-      .floor3OptionTop {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 10px;
-      }
-      .floor3Option strong {
-        color: #fff3c4;
-        font-size: 15px;
-        line-height: 1.1;
-      }
-      .floor3Source {
-        flex: 0 0 auto;
-        color: #7cf7ff;
-        border: 1px solid rgba(124,247,255,0.26);
-        border-radius: 999px;
-        padding: 3px 7px;
-        font-size: 9px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        background: rgba(124,247,255,0.07);
-      }
-      .floor3Option p {
-        margin: 7px 0 0;
-        color: rgba(248,241,223,0.72);
-        font-size: 12px;
-        line-height: 1.28;
-      }
-      .floor3Footer {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        margin-top: 14px;
-        padding-top: 12px;
-        border-top: 1px solid rgba(255,216,107,0.22);
-      }
-      .floor3SelectionSummary {
-        color: rgba(248,241,223,0.76);
-        font-size: 12px;
-        line-height: 1.35;
-      }
-      .floor3ConfirmBtn {
-        min-width: 210px;
-        min-height: 46px;
-        border: 1px solid rgba(255,244,170,0.88);
-        border-radius: 999px;
-        background: linear-gradient(135deg, #ffd86b, #f0a645);
-        color: #201306;
-        font-weight: 950;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        cursor: pointer;
-      }
-      .floor3ConfirmBtn:disabled {
-        cursor: not-allowed;
-        opacity: 0.48;
-        filter: grayscale(0.6);
+      .floor3Option.selected { border-color: rgba(124,247,255,0.9); box-shadow: 0 0 0 2px rgba(124,247,255,0.14), 0 0 20px rgba(124,247,255,0.2), inset 0 0 20px rgba(124,247,255,0.08); background: linear-gradient(135deg, rgba(124,247,255,0.16), rgba(255,216,107,0.10)); }
+      .floor3OptionTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .floor3Option strong { color: #fff3c4; font-size: 15px; line-height: 1.1; }
+      .floor3Source { flex: 0 0 auto; color: #7cf7ff; border: 1px solid rgba(124,247,255,0.26); border-radius: 999px; padding: 3px 7px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; background: rgba(124,247,255,0.07); }
+      .floor3Option p { margin: 7px 0 0; color: rgba(248,241,223,0.72); font-size: 12px; line-height: 1.28; }
+      .floor3Footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,216,107,0.22); }
+      .floor3SelectionSummary { color: rgba(248,241,223,0.76); font-size: 12px; line-height: 1.35; }
+      .floor3ConfirmBtn { min-width: 210px; min-height: 46px; border: 1px solid rgba(255,244,170,0.88); border-radius: 999px; background: linear-gradient(135deg, #ffd86b, #f0a645); color: #201306; font-weight: 950; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+      .floor3ConfirmBtn:disabled { cursor: not-allowed; opacity: 0.48; filter: grayscale(0.6); }
+      @media (min-width: 821px) and (hover: hover) {
+        #floor3SelectionOverlay.open { display: flex; align-items: center; justify-content: center; }
+        .floor3Panel { max-height: min(88vh, 820px); overflow-y: auto; }
       }
       @media (max-width: 820px), (hover:none) and (pointer:coarse) {
-        .floor3Panel { padding: 12px; max-height: 92vh; border-radius: 15px; }
+        #floor3SelectionOverlay { height: 100dvh; padding: 12px 10px 22px; }
+        .floor3Panel { width: 100%; margin: 0 auto 18px; padding: 12px; border-radius: 15px; }
         .floor3Header { grid-template-columns: 1fr; gap: 8px; }
         .floor3StatusCard { text-align: left; min-width: 0; }
         .floor3ChoiceGrid { grid-template-columns: 1fr; gap: 10px; }
@@ -244,10 +136,6 @@
       }
     `;
     document.head.appendChild(style);
-  }
-
-  function sourceLabel(source) {
-    return ({ origin: "Origin", behavior: "Behavior", wildcard: "Wildcard", fallback: "Fallback" }[source] || "Offer");
   }
 
   function renderOptions(kind, offers) {
@@ -266,7 +154,7 @@
     const selectedRace = findOffer(offers.races, selectedRaceId);
     const selectedClass = findOffer(offers.classes, selectedClassId);
     const lines = (offers.lines || []).slice(0, 3).map(line => `<div class="floor3JudgmentLine">${esc(line)}</div>`).join("");
-    overlay.innerHTML = `<div class="floor3Panel" role="dialog" aria-modal="true" aria-labelledby="floor3SelectionTitle"><div class="floor3Header"><div><div class="floor3Eyebrow">System Classification</div><h2 id="floor3SelectionTitle">Your application has been reviewed.</h2><p>The crawl has observed your origin, your behavior, and a few choices we are legally not calling mistakes. Choose one race and one class. This is where your build becomes official.</p></div><div class="floor3StatusCard"><span>Origin Read</span><strong>${esc(offers.originName || "Unsorted Crawler")}</strong><span style="margin-top:8px">Behavior</span><strong>${esc((offers.behaviorTagIds || []).join(", ") || "Insufficient Evidence")}</strong></div></div><div class="floor3JudgmentLines">${lines}</div><div class="floor3ChoiceGrid"><section class="floor3ChoiceColumn"><h3>Choose Race</h3><div class="floor3OptionList">${renderOptions("race", offers.races)}</div></section><section class="floor3ChoiceColumn"><h3>Choose Class</h3><div class="floor3OptionList">${renderOptions("class", offers.classes)}</div></section></div><div class="floor3Footer"><div class="floor3SelectionSummary"><strong>Selected:</strong> ${esc(selectedRace?.name || "No race")} / ${esc(selectedClass?.name || "No class")}<br><span>Actual stat effects come next. This shell only saves the selection.</span></div><button class="floor3ConfirmBtn" type="button" data-floor3-confirm ${selectedRace && selectedClass ? "" : "disabled"}>Confirm Classification</button></div></div>`;
+    overlay.innerHTML = `<div class="floor3Panel" role="dialog" aria-modal="true" aria-labelledby="floor3SelectionTitle"><div class="floor3Header"><div><div class="floor3Eyebrow">System Classification</div><h2 id="floor3SelectionTitle">Your application has been reviewed.</h2><p>The crawl has observed your origin, your behavior, and a few choices we are legally not calling mistakes. Choose one race and one class. This is where your build becomes official.</p></div><div class="floor3StatusCard"><span>Origin Read</span><strong>${esc(offers.originName || "Unsorted Crawler")}</strong><span style="margin-top:8px">Behavior</span><strong>${esc(behaviorSummary(offers))}</strong></div></div><div class="floor3JudgmentLines">${lines}</div><div class="floor3ChoiceGrid"><section class="floor3ChoiceColumn"><h3>Choose Race</h3><div class="floor3OptionList">${renderOptions("race", offers.races)}</div></section><section class="floor3ChoiceColumn"><h3>Choose Class</h3><div class="floor3OptionList">${renderOptions("class", offers.classes)}</div></section></div><div class="floor3Footer"><div class="floor3SelectionSummary"><strong>Selected:</strong> ${esc(selectedRace?.name || "No race")} / ${esc(selectedClass?.name || "No class")}<br><span>Actual stat effects come next. This shell only saves the selection.</span></div><button class="floor3ConfirmBtn" type="button" data-floor3-confirm ${selectedRace && selectedClass ? "" : "disabled"}>Confirm Classification</button></div></div>`;
   }
 
   function ensureModal() {
@@ -303,10 +191,11 @@
     renderModal();
     const overlay = ensureModal();
     overlay.classList.add("open");
+    overlay.scrollTop = 0;
     modalOpen = true;
     document.body.classList.add("floor3SelectionOpen");
     if (typeof resetTransientInputState === "function") resetTransientInputState();
-    setTimeout(() => overlay.querySelector(".floor3Option")?.focus?.(), 0);
+    setTimeout(() => overlay.querySelector(".floor3Option")?.focus?.({ preventScroll: true }), 0);
     return true;
   }
 
