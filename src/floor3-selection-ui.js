@@ -61,6 +61,7 @@
     style.textContent = `
       body.floor3SelectionOpen {
         overflow: hidden !important;
+        touch-action: pan-y !important;
       }
       body.floor3SelectionOpen #touchControls,
       body.floor3SelectionOpen #prompt {
@@ -73,10 +74,16 @@
         inset: 0;
         z-index: 420;
         display: none;
+        width: 100%;
+        max-width: 100vw;
+        height: 100dvh;
+        max-height: 100dvh;
+        overflow-x: hidden;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
+        overscroll-behavior-y: contain;
         touch-action: pan-y;
+        box-sizing: border-box;
         padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
         background: radial-gradient(circle at 50% 18%, rgba(124,247,255,0.16), rgba(0,0,0,0.84) 48%, rgba(0,0,0,0.92));
         backdrop-filter: blur(3px);
@@ -86,10 +93,16 @@
       #floor3SelectionOverlay.open {
         display: block;
       }
+      #floor3SelectionOverlay,
+      #floor3SelectionOverlay * {
+        box-sizing: border-box;
+      }
       .floor3Panel {
         width: min(1080px, calc(100vw - 28px));
         max-height: none;
+        min-width: 0;
         margin: 0 auto;
+        overflow-x: hidden;
         border: 2px solid rgba(255,216,107,0.72);
         border-radius: 20px;
         background: linear-gradient(145deg, rgba(14,10,8,0.98), rgba(33,22,14,0.98) 52%, rgba(10,9,12,0.98));
@@ -109,7 +122,7 @@
       .floor3ChoiceColumn { min-width: 0; border: 1px solid rgba(255,216,107,0.22); border-radius: 16px; background: rgba(0,0,0,0.20); padding: 12px; }
       .floor3ChoiceColumn h3 { margin: 0 0 10px; color: #ffdf91; font-size: 14px; text-transform: uppercase; letter-spacing: 0.14em; }
       .floor3OptionList { display: grid; gap: 9px; }
-      .floor3Option { width: 100%; min-height: 82px; text-align: left; border-radius: 13px; border: 1px solid rgba(255,255,255,0.14); background: linear-gradient(135deg, rgba(255,255,255,0.065), rgba(0,0,0,0.18)); color: #f8f1df; padding: 10px; cursor: pointer; box-shadow: inset 0 0 20px rgba(0,0,0,0.22); }
+      .floor3Option { width: 100%; min-height: 82px; text-align: left; border-radius: 13px; border: 1px solid rgba(255,255,255,0.14); background: linear-gradient(135deg, rgba(255,255,255,0.065), rgba(0,0,0,0.18)); color: #f8f1df; padding: 10px; cursor: pointer; box-shadow: inset 0 0 20px rgba(0,0,0,0.22); touch-action: manipulation; }
       .floor3Option:hover { filter: brightness(1.14); }
       .floor3Option.selected { border-color: rgba(124,247,255,0.9); box-shadow: 0 0 0 2px rgba(124,247,255,0.14), 0 0 20px rgba(124,247,255,0.2), inset 0 0 20px rgba(124,247,255,0.08); background: linear-gradient(135deg, rgba(124,247,255,0.16), rgba(255,216,107,0.10)); }
       .floor3OptionTop { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -118,21 +131,57 @@
       .floor3Option p { margin: 7px 0 0; color: rgba(248,241,223,0.72); font-size: 12px; line-height: 1.28; }
       .floor3Footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,216,107,0.22); }
       .floor3SelectionSummary { color: rgba(248,241,223,0.76); font-size: 12px; line-height: 1.35; }
-      .floor3ConfirmBtn { min-width: 210px; min-height: 46px; border: 1px solid rgba(255,244,170,0.88); border-radius: 999px; background: linear-gradient(135deg, #ffd86b, #f0a645); color: #201306; font-weight: 950; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+      .floor3ConfirmBtn { min-width: 210px; min-height: 46px; border: 1px solid rgba(255,244,170,0.88); border-radius: 999px; background: linear-gradient(135deg, #ffd86b, #f0a645); color: #201306; font-weight: 950; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; touch-action: manipulation; }
       .floor3ConfirmBtn:disabled { cursor: not-allowed; opacity: 0.48; filter: grayscale(0.6); }
       @media (min-width: 821px) and (hover: hover) {
         #floor3SelectionOverlay.open { display: flex; align-items: center; justify-content: center; }
         .floor3Panel { max-height: min(88vh, 820px); overflow-y: auto; }
       }
       @media (max-width: 820px), (hover:none) and (pointer:coarse) {
-        #floor3SelectionOverlay { height: 100dvh; padding: 12px 10px 22px; }
-        .floor3Panel { width: 100%; margin: 0 auto 18px; padding: 12px; border-radius: 15px; }
-        .floor3Header { grid-template-columns: 1fr; gap: 8px; }
-        .floor3StatusCard { text-align: left; min-width: 0; }
+        #floor3SelectionOverlay {
+          height: 100dvh;
+          max-height: 100dvh;
+          padding:
+            calc(8px + env(safe-area-inset-top))
+            calc(8px + env(safe-area-inset-right))
+            calc(22px + env(safe-area-inset-bottom))
+            calc(8px + env(safe-area-inset-left));
+        }
+        .floor3Panel {
+          width: min(100%, 430px);
+          max-width: calc(100dvw - 16px);
+          margin: 0 auto 18px;
+          padding: 10px;
+          border-radius: 14px;
+        }
+        .floor3Eyebrow { font-size: 10px; letter-spacing: 0.14em; margin-bottom: 4px; }
+        .floor3Header { grid-template-columns: 1fr; gap: 7px; padding-bottom: 8px; margin-bottom: 8px; }
+        .floor3Header h2 { font-size: clamp(23px, 7.1vw, 31px); line-height: 1; letter-spacing: 0.025em; }
+        .floor3Header p { margin-top: 6px; font-size: 12px; line-height: 1.32; }
+        .floor3StatusCard { text-align: left; min-width: 0; padding: 8px 10px; border-radius: 12px; }
+        .floor3StatusCard span { font-size: 9px; letter-spacing: 0.11em; }
+        .floor3StatusCard strong { font-size: 14px; line-height: 1.15; }
+        .floor3JudgmentLines { gap: 6px; margin-bottom: 10px; }
+        .floor3JudgmentLine { padding: 7px 8px; font-size: 11px; line-height: 1.25; }
         .floor3ChoiceGrid { grid-template-columns: 1fr; gap: 10px; }
-        .floor3Option { min-height: 74px; }
-        .floor3Footer { flex-direction: column; align-items: stretch; }
-        .floor3ConfirmBtn { width: 100%; }
+        .floor3ChoiceColumn { padding: 10px; border-radius: 14px; }
+        .floor3ChoiceColumn h3 { margin-bottom: 8px; font-size: 13px; letter-spacing: 0.12em; }
+        .floor3OptionList { gap: 8px; }
+        .floor3Option { min-height: 68px; padding: 9px; border-radius: 12px; }
+        .floor3Option strong { font-size: 14px; }
+        .floor3Option p { margin-top: 6px; font-size: 11px; line-height: 1.25; }
+        .floor3Source { padding: 3px 6px; font-size: 8px; letter-spacing: 0.07em; }
+        .floor3Footer { flex-direction: column; align-items: stretch; gap: 9px; margin-top: 10px; padding-top: 10px; }
+        .floor3SelectionSummary { font-size: 11px; }
+        .floor3ConfirmBtn { width: 100%; min-width: 0; min-height: 44px; font-size: 12px; }
+      }
+      @media (max-width: 390px) {
+        .floor3Panel { padding: 9px; }
+        .floor3Header h2 { font-size: clamp(21px, 6.9vw, 28px); }
+        .floor3Header p,
+        .floor3Option p,
+        .floor3JudgmentLine { font-size: 10px; }
+        .floor3Option { min-height: 62px; }
       }
     `;
     document.head.appendChild(style);
@@ -172,6 +221,14 @@
         if (classButton) { selectedClassId = classButton.dataset.floor3Class; renderModal(); return; }
         if (confirmButton && !confirmButton.disabled) confirmFloor3Selection();
       });
+      overlay.addEventListener("touchmove", event => {
+        // The mobile input layer prevents page touchmove by default.
+        // Keep the event inside this overlay so iOS can scroll the classification panel.
+        event.stopPropagation();
+      }, { passive: true });
+      overlay.addEventListener("wheel", event => {
+        event.stopPropagation();
+      }, { passive: true });
       overlay.addEventListener("keydown", event => {
         if (event.key === "Escape") {
           event.preventDefault();
