@@ -4,15 +4,18 @@
   if (window.__dcwBugReporterInstalled) return;
   window.__dcwBugReporterInstalled = true;
 
-  const REPORT_VERSION = 1;
+  const REPORT_VERSION = 2;
   const STYLE_ID = "dcwBugReportStyles";
   const STORAGE_KEY = "dcw.bugReport.latest";
-  const MAX_LOGS = 140;
-  const MAX_EVENTS = 80;
+  const MAX_LOGS = 160;
+  const MAX_EVENTS = 140;
   const logs = [];
   const events = [];
   let lastPersistAt = 0;
   let lastInputSnapshot = null;
+  let previousGamepadButtons = new Map();
+  let domControlsReady = false;
+  let earlyHandlersInstalled = false;
 
   function nowIso() {
     return new Date().toISOString();
@@ -28,11 +31,14 @@
     if (value === null || typeof value === "undefined") return value;
     if (["string", "number", "boolean"].includes(typeof value)) return clampText(value, 1200);
     if (typeof value === "function") return `[Function ${value.name || "anonymous"}]`;
+    if (value instanceof Set) return { type: "Set", size: value.size, values: Array.from(value).slice(0, 20).map(item => summarizeArg(item, depth + 1)) };
+    if (value instanceof Map) return { type: "Map", size: value.size, entries: Array.from(value.entries()).slice(0, 20).map(([key, val]) => [summarizeArg(key, depth + 1), summarizeArg(val, depth + 1)]) };
+    if (value instanceof HTMLElement) return { tag: value.tagName, id: value.id || null, className: value.className || null, text: clampText(value.textContent?.trim?.() || "", 180) };
     if (depth >= 2) return Array.isArray(value) ? `[Array ${value.length}]` : "[Object]";
     try {
       if (Array.isArray(value)) return value.slice(0, 12).map(item => summarizeArg(item, depth + 1));
       const out = {};
-      for (const key of Object.keys(value).slice(0, 18)) out[key] = summarizeArg(value[key], depth + 1);
+      for (const key of Object.keys(value).slice(0, 20)) out[key] = summarizeArg(value[key], depth + 1);
       return out;
     } catch {
       return Object.prototype.toString.call(value);
@@ -48,12 +54,20 @@
   }
 
   function safeClone(value, fallback = null) {
-    try { return JSON.parse(JSON.stringify(value)); } catch { return fallback; }
+    try { return JSON.parse(JSON.stringify(value)); } catch { return summarizeArg(value) ?? fallback; }
   }
 
   function pushCapped(list, item, max) {
     list.push(item);
     while (list.length > max) list.shift();
+  }
+
+  function storageSet(key, value) {
+    try { localStorage.setItem(key, value); } catch {}
+  }
+
+  function storageGet(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
   }
 
   function recordEvent(type, details = {}) {
@@ -66,20 +80,16 @@
     persistLatestReport(`console:${level}`);
   }
 
-  function storageSet(key, value) {
-    try { localStorage.setItem(key, value); } catch {}
-  }
-
-  function storageGet(key) {
-    try { return localStorage.getItem(key); } catch { return null; }
-  }
-
   function persistLatestReport(trigger = "snapshot") {
     const now = Date.now();
-    if (now - lastPersistAt < 800 && !String(trigger).includes("error") && !String(trigger).includes("crash")) return;
+    if (now - lastPersistAt < 800 && !String(trigger).includes("error") && !String(trigger).includes("crash") && !String(trigger).includes("rejection")) return;
     lastPersistAt = now;
-    const report = buildBugReport(trigger, { includeStoredPrevious: false });
-    storageSet(STORAGE_KEY, JSON.stringify(report));
+    try {
+      const report = buildBugReport(trigger, { includeStoredPrevious: false });
+      storageSet(STORAGE_KEY, JSON.stringify(report));
+    } catch (error) {
+      try { storageSet(STORAGE_KEY, JSON.stringify({ reportVersion: REPORT_VERSION, trigger, timestamp: nowIso(), reporterFailure: summarizeArg(error) })); } catch {}
+    }
   }
 
   function patchConsole() {
@@ -93,6 +103,29 @@
       wrapped.__dcwBugReporterWrapped = true;
       console[level] = wrapped;
     }
+  }
+
+  function installErrorHandlers() {
+    if (earlyHandlersInstalled) return;
+    earlyHandlersInstalled = true;
+    window.addEventListener("error", event => {
+      const error = event.error;
+      recordLog("error", [error || event.message || "window error"]);
+      recordEvent("window-error", { message: event.message, source: event.filename, line: event.lineno, column: event.colno, stack: error?.stack });
+      showCrashButton();
+      persistLatestReport("window-error");
+    }, true);
+
+    window.addEventListener("unhandledrejection", event => {
+      recordLog("unhandledrejection", [event.reason || "Unhandled promise rejection"]);
+      recordEvent("unhandled-rejection", { reason: summarizeArg(event.reason) });
+      showCrashButton();
+      persistLatestReport("unhandled-rejection");
+    }, true);
+
+    window.addEventListener("gamepadconnected", event => recordEvent("gamepad-connected", { id: event.gamepad?.id, index: event.gamepad?.index }));
+    window.addEventListener("gamepaddisconnected", event => recordEvent("gamepad-disconnected", { id: event.gamepad?.id, index: event.gamepad?.index }));
+    window.addEventListener("visibilitychange", () => recordEvent("visibility-change", { hidden: document.hidden }));
   }
 
   function basicDeviceSnapshot() {
@@ -129,6 +162,22 @@
     }));
   }
 
+  function buttonLabel(index) {
+    return ["A/Cross", "B/Circle", "X/Square", "Y/Triangle", "L1", "R1", "L2", "R2", "Menu/Select", "Start/Options", "L3", "R3", "DPadUp", "DPadDown", "DPadLeft", "DPadRight", "Home"][index] || `Button${index}`;
+  }
+
+  function trackGamepadButtonTransitions() {
+    for (const pad of gamepadSnapshot()) {
+      const previous = previousGamepadButtons.get(pad.index) || [];
+      const current = pad.buttons.map(button => button.pressed || button.value > 0.45);
+      current.forEach((pressed, index) => {
+        if (pressed && !previous[index]) recordEvent("gamepad-button-down", { gamepad: pad.id, index, label: buttonLabel(index), openPanels: visiblePanelIds() });
+        else if (!pressed && previous[index]) recordEvent("gamepad-button-up", { gamepad: pad.id, index, label: buttonLabel(index), openPanels: visiblePanelIds() });
+      });
+      previousGamepadButtons.set(pad.index, current);
+    }
+  }
+
   function selectedWeaponSnapshot() {
     try {
       const weapon = typeof getCurrentWeapon === "function" ? getCurrentWeapon() : null;
@@ -156,18 +205,28 @@
         hp: player.hp,
         maxHp: player.maxHp,
         safe: player.safe,
+        wasSafe: player.wasSafe,
         level: player.level,
         xp: player.xp,
         xpToNext: player.xpToNext,
         coins: player.coins,
         inventoryCount: Array.isArray(player.inventory) ? player.inventory.length : null,
+        equipmentKeys: player.equipment ? Object.keys(player.equipment).filter(key => player.equipment[key]) : [],
         currentWeaponId: player.currentWeaponId,
+        aimX: Number((player.aimX || 0).toFixed ? player.aimX.toFixed(3) : player.aimX || 0),
+        aimY: Number((player.aimY || 0).toFixed ? player.aimY.toFixed(3) : player.aimY || 0),
+        dodgeCooldown: player.dodgeCooldown,
+        attackCooldown: player.attackCooldown,
         weapon: selectedWeaponSnapshot(),
         pet: activePetSnapshot()
       };
     } catch (error) {
       return { error: `${error.name}: ${error.message}` };
     }
+  }
+
+  function visiblePanelIds() {
+    return openPanelSnapshot().filter(panel => panel.display !== "none" && panel.visibility !== "hidden" && panel.opacity !== "0").map(panel => panel.id);
   }
 
   function openPanelSnapshot() {
@@ -182,38 +241,74 @@
       return {
         selector,
         id: el.id,
-        className: el.className,
+        className: String(el.className || ""),
         display: style.display,
         visibility: style.visibility,
         opacity: style.opacity,
         openClass: el.classList.contains("open"),
         ariaHidden: el.getAttribute("aria-hidden"),
-        focusedInside: el.contains(document.activeElement)
+        focusedInside: el.contains(document.activeElement),
+        focusedElement: el.contains(document.activeElement) ? { id: document.activeElement.id || null, text: clampText(document.activeElement.textContent?.trim?.() || "", 120) } : null
       };
     }).filter(Boolean);
   }
 
+  function domText(id) {
+    return document.getElementById(id)?.textContent?.trim?.() || null;
+  }
+
+  function multiplayerSnapshot() {
+    try {
+      if (typeof multiplayer === "undefined" || !multiplayer) return null;
+      return {
+        enabled: multiplayer.enabled,
+        status: multiplayer.status,
+        networkStatus: multiplayer.networkStatus,
+        networkError: multiplayer.networkError,
+        mode: multiplayer.mode,
+        pvpEnabled: multiplayer.pvpEnabled,
+        partyCode: multiplayer.partyCode,
+        lobbyCode: multiplayer.lobbyCode,
+        roomId: multiplayer.roomId,
+        partyMembers: Array.isArray(multiplayer.partyMembers) ? multiplayer.partyMembers.length : null,
+        lobbyMembers: Array.isArray(multiplayer.lobbyMembers) ? multiplayer.lobbyMembers.length : null,
+        remotePlayers: multiplayer.remotePlayers instanceof Map ? multiplayer.remotePlayers.size : null,
+        localFloor0Status: multiplayer.localFloor0Status,
+        currentJoinState: multiplayer.currentJoinState
+      };
+    } catch (error) { return { error: `${error.name}: ${error.message}` }; }
+  }
+
+  function scriptScopedGameState() {
+    const out = {};
+    try { if (typeof gameMode !== "undefined") out.gameMode = gameMode; } catch {}
+    try { if (typeof currentFloor !== "undefined") out.currentFloor = currentFloor; } catch {}
+    try { if (typeof currentRoomName !== "undefined") out.currentRoomName = currentRoomName; } catch {}
+    try { if (typeof currentRoomSubtitle !== "undefined") out.currentRoomSubtitle = currentRoomSubtitle; } catch {}
+    try { if (typeof roomsSeen !== "undefined") out.roomsSeen = roomsSeen; } catch {}
+    try { if (typeof floorTimeLeft !== "undefined") out.floorTimeLeft = floorTimeLeft; } catch {}
+    try { if (typeof gameWon !== "undefined") out.gameWon = gameWon; } catch {}
+    try { if (typeof gameLost !== "undefined") out.gameLost = gameLost; } catch {}
+    try { if (typeof pendingFloorAdvance !== "undefined") out.pendingFloorAdvance = pendingFloorAdvance; } catch {}
+    try { if (typeof stairwellFound !== "undefined") out.stairwellFound = stairwellFound; } catch {}
+    try { if (typeof audienceScore !== "undefined") out.audienceScore = audienceScore; } catch {}
+    try { if (typeof inputState !== "undefined") out.inputState = safeClone(inputState, null); } catch {}
+    try { if (typeof gamepadState !== "undefined") out.gamepadState = safeClone(gamepadState, null); } catch {}
+    try { if (typeof touchState !== "undefined") out.touchState = safeClone(touchState, null); } catch {}
+    try { if (typeof stats !== "undefined") out.stats = safeClone(stats, null); } catch {}
+    return out;
+  }
+
   function gameStateSnapshot() {
-    const getGlobal = name => {
-      try { return window[name]; } catch { return undefined; }
-    };
+    const scoped = scriptScopedGameState();
     return {
-      gameMode: getGlobal("gameMode"),
-      currentFloor: getGlobal("currentFloor"),
-      currentRoomName: getGlobal("currentRoomName"),
-      currentRoomSubtitle: getGlobal("currentRoomSubtitle"),
-      roomsSeen: getGlobal("roomsSeen"),
-      floorTimeLeft: getGlobal("floorTimeLeft"),
-      gameWon: getGlobal("gameWon"),
-      gameLost: getGlobal("gameLost"),
-      pendingFloorAdvance: getGlobal("pendingFloorAdvance"),
-      stairwellFound: getGlobal("stairwellFound"),
-      audienceScore: getGlobal("audienceScore"),
+      ...scoped,
+      hudRoomName: domText("currentRoomName"),
+      hudRoomSubtitle: domText("currentRoomSubtitle"),
+      hudFloorNumber: domText("floorNumber"),
+      hudTimer: domText("timer"),
       player: playerSnapshot(),
-      multiplayer: safeClone(getGlobal("multiplayer"), null),
-      inputState: safeClone(getGlobal("inputState"), null),
-      gamepadState: safeClone(getGlobal("gamepadState"), null),
-      touchState: safeClone(getGlobal("touchState"), null),
+      multiplayer: multiplayerSnapshot(),
       openPanels: openPanelSnapshot(),
       bodyClasses: document.body ? Array.from(document.body.classList) : []
     };
@@ -224,7 +319,7 @@
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw);
-      return { trigger: parsed.trigger, timestamp: parsed.timestamp, latestError: parsed.latestError || null, game: parsed.game || null, logs: parsed.logs || [] };
+      return { trigger: parsed.trigger, timestamp: parsed.timestamp, latestError: parsed.latestError || null, game: parsed.game || null, recentEvents: parsed.recentEvents || [], logs: parsed.logs || [] };
     } catch {
       return { raw: clampText(raw, 4000) };
     }
@@ -289,7 +384,7 @@
   }
 
   function injectStyles() {
-    if (document.getElementById(STYLE_ID)) return;
+    if (!document.head || document.getElementById(STYLE_ID)) return;
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
@@ -369,6 +464,7 @@
 
   function showToast(message) {
     injectStyles();
+    if (!document.body) return;
     let toast = document.getElementById("dcwBugReportToast");
     if (!toast) {
       toast = document.createElement("div");
@@ -383,6 +479,7 @@
 
   function showCrashButton() {
     injectStyles();
+    if (!document.body) return;
     let button = document.getElementById("dcwCrashReportButton");
     if (!button) {
       button = document.createElement("button");
@@ -397,6 +494,7 @@
 
   function showReportOverlay(text) {
     injectStyles();
+    if (!document.body) return;
     document.getElementById("dcwBugReportOverlay")?.remove();
     const overlay = document.createElement("div");
     overlay.id = "dcwBugReportOverlay";
@@ -419,8 +517,9 @@
   }
 
   function injectSettingsControls() {
+    if (domControlsReady) return;
     injectStyles();
-    if (document.getElementById("copyBugReportBtn")) return;
+    if (document.getElementById("copyBugReportBtn")) { domControlsReady = true; return; }
     const settingsBody = document.querySelector("#settingsPanel .settingsBody");
     if (!settingsBody) return;
     const section = document.createElement("section");
@@ -436,56 +535,41 @@
     settingsBody.appendChild(section);
     document.getElementById("copyBugReportBtn")?.addEventListener("click", () => copyBugReport("settings-copy"));
     document.getElementById("downloadBugReportBtn")?.addEventListener("click", () => downloadBugReport("settings-download"));
+    domControlsReady = true;
   }
 
   function captureInputSnapshot() {
     try {
       lastInputSnapshot = {
         t: nowIso(),
-        lastActiveInputMethod: inputState?.lastActiveInputMethod,
-        gamepadConnected: gamepadState?.connected,
-        gamepadName: gamepadState?.name,
-        gamepads: gamepadSnapshot().map(pad => ({ id: pad.id, axes: pad.axes, pressedButtons: pad.buttons.filter(button => button.pressed).map(button => button.index) })),
-        openPanelIds: openPanelSnapshot().filter(panel => panel.display !== "none" && panel.visibility !== "hidden").map(panel => panel.id)
+        lastActiveInputMethod: typeof inputState !== "undefined" ? inputState?.lastActiveInputMethod : null,
+        touchControlsEnabled: typeof inputState !== "undefined" ? inputState?.touchControlsEnabled : null,
+        gamepadConnected: typeof gamepadState !== "undefined" ? gamepadState?.connected : null,
+        gamepadName: typeof gamepadState !== "undefined" ? gamepadState?.name : null,
+        gamepadMove: typeof gamepadState !== "undefined" ? { x: gamepadState.moveX, y: gamepadState.moveY, aimX: gamepadState.aimX, aimY: gamepadState.aimY, hasAimInput: gamepadState.hasAimInput } : null,
+        touchMove: typeof touchState !== "undefined" ? { x: touchState.moveX, y: touchState.moveY, attackActive: touchState.attackActive, attackX: touchState.attackX, attackY: touchState.attackY } : null,
+        gamepads: gamepadSnapshot().map(pad => ({ id: pad.id, axes: pad.axes, pressedButtons: pad.buttons.filter(button => button.pressed || button.value > 0.45).map(button => ({ index: button.index, label: buttonLabel(button.index), value: button.value })) })),
+        openPanelIds: visiblePanelIds()
       };
     } catch {}
   }
 
-  function installErrorHandlers() {
-    window.addEventListener("error", event => {
-      const error = event.error;
-      recordLog("error", [error || event.message || "window error"]);
-      recordEvent("window-error", { message: event.message, source: event.filename, line: event.lineno, column: event.colno, stack: error?.stack });
-      showCrashButton();
-      persistLatestReport("window-error");
-    }, true);
-
-    window.addEventListener("unhandledrejection", event => {
-      recordLog("unhandledrejection", [event.reason || "Unhandled promise rejection"]);
-      recordEvent("unhandled-rejection", { reason: summarizeArg(event.reason) });
-      showCrashButton();
-      persistLatestReport("unhandled-rejection");
-    }, true);
-
-    window.addEventListener("gamepadconnected", event => recordEvent("gamepad-connected", { id: event.gamepad?.id, index: event.gamepad?.index }));
-    window.addEventListener("gamepaddisconnected", event => recordEvent("gamepad-disconnected", { id: event.gamepad?.id, index: event.gamepad?.index }));
-    window.addEventListener("visibilitychange", () => recordEvent("visibility-change", { hidden: document.hidden }));
-  }
-
-  function install() {
-    patchConsole();
-    installErrorHandlers();
+  function installDomControls() {
     injectSettingsControls();
     captureInputSnapshot();
     persistLatestReport("install");
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
-  else install();
+  patchConsole();
+  installErrorHandlers();
+  persistLatestReport("early-install");
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", installDomControls, { once: true });
+  else installDomControls();
 
   const retry = setInterval(injectSettingsControls, 500);
   setTimeout(() => clearInterval(retry), 10000);
-  setInterval(captureInputSnapshot, 1000);
+  setInterval(() => { captureInputSnapshot(); trackGamepadButtonTransitions(); }, 250);
   setInterval(() => persistLatestReport("interval"), 5000);
 
   window.buildDcwBugReport = buildBugReport;
