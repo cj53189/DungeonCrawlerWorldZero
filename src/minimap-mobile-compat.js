@@ -62,3 +62,12 @@ drawDynamicMarkers = true;
   script.defer = true;
   document.head.appendChild(script);
 })();
+
+(function loadMobileInventoryPortraitFixModule() {
+  if (document.querySelector('script[src="./src/mobile-inventory-portrait-fix.js"]')) return;
+  const script = document.createElement("script");
+  script.src = "./src/mobile-inventory-portrait-fix.js";
+  script.async = false;
+  script.defer = true;
+  document.head.appendChild(script);
+})();
