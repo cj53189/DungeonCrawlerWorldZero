@@ -4,15 +4,16 @@
   if (window.__dcwBugReporterInstalled) return;
   window.__dcwBugReporterInstalled = true;
 
-  const REPORT_VERSION = 1;
+  const REPORT_VERSION = 2;
   const STYLE_ID = "dcwBugReportStyles";
   const STORAGE_KEY = "dcw.bugReport.latest";
   const MAX_LOGS = 140;
-  const MAX_EVENTS = 80;
+  const MAX_EVENTS = 100;
   const logs = [];
   const events = [];
   let lastPersistAt = 0;
   let lastInputSnapshot = null;
+  let lastGamepadInputSignature = "";
 
   function nowIso() {
     return new Date().toISOString();
@@ -23,11 +24,23 @@
     return text.length > max ? `${text.slice(0, max)}…` : text;
   }
 
+  function readRuntimeValue(reader, fallback = null) {
+    try {
+      const value = reader();
+      return typeof value === "undefined" ? fallback : value;
+    } catch {
+      return fallback;
+    }
+  }
+
   function summarizeArg(value, depth = 0) {
     if (value instanceof Error) return { name: value.name, message: value.message, stack: clampText(value.stack, 2400) };
     if (value === null || typeof value === "undefined") return value;
     if (["string", "number", "boolean"].includes(typeof value)) return clampText(value, 1200);
     if (typeof value === "function") return `[Function ${value.name || "anonymous"}]`;
+    if (value instanceof Element) return { tag: value.tagName, id: value.id || null, className: value.className || null, text: clampText(value.textContent || "", 180) };
+    if (value instanceof Set) return { type: "Set", size: value.size, values: Array.from(value).slice(0, 20).map(item => summarizeArg(item, depth + 1)) };
+    if (value instanceof Map) return { type: "Map", size: value.size, entries: Array.from(value.entries()).slice(0, 20).map(([key, item]) => [summarizeArg(key, depth + 1), summarizeArg(item, depth + 1)]) };
     if (depth >= 2) return Array.isArray(value) ? `[Array ${value.length}]` : "[Object]";
     try {
       if (Array.isArray(value)) return value.slice(0, 12).map(item => summarizeArg(item, depth + 1));
@@ -96,7 +109,7 @@
   }
 
   function basicDeviceSnapshot() {
-    const nav = navigator || {};
+    const nav = typeof navigator !== "undefined" ? navigator : {};
     const screenObj = window.screen || {};
     return {
       url: location.href,
@@ -133,13 +146,14 @@
     try {
       const weapon = typeof getCurrentWeapon === "function" ? getCurrentWeapon() : null;
       if (!weapon) return null;
-      return { id: weapon.id, name: weapon.name, type: weapon.type, damage: weapon.damage, range: weapon.range, rarity: weapon.rarity };
+      return { id: weapon.id, name: weapon.name, type: weapon.type, damage: weapon.damage, range: weapon.range, cooldown: weapon.cooldown, rarity: weapon.rarity };
     } catch { return null; }
   }
 
   function activePetSnapshot() {
     try {
-      const pet = typeof getActivePet === "function" ? getActivePet() : player?.pet;
+      const currentPlayer = readRuntimeValue(() => player, null);
+      const pet = typeof getActivePet === "function" ? getActivePet() : currentPlayer?.pet;
       if (!pet) return null;
       return { type: pet.type, name: pet.name, displayName: pet.displayName, hp: pet.hp, maxHp: pet.maxHp, level: pet.level, status: pet.status, down: pet.down, x: pet.x, y: pet.y };
     } catch { return null; }
@@ -147,21 +161,28 @@
 
   function playerSnapshot() {
     try {
-      if (typeof player === "undefined" || !player) return null;
+      const currentPlayer = readRuntimeValue(() => player, null);
+      if (!currentPlayer) return null;
+      const tileSize = readRuntimeValue(() => TILE, 32) || 32;
       return {
-        x: Math.round(Number(player.x) || 0),
-        y: Math.round(Number(player.y) || 0),
-        tileX: typeof TILE !== "undefined" ? Math.floor(player.x / TILE) : null,
-        tileY: typeof TILE !== "undefined" ? Math.floor(player.y / TILE) : null,
-        hp: player.hp,
-        maxHp: player.maxHp,
-        safe: player.safe,
-        level: player.level,
-        xp: player.xp,
-        xpToNext: player.xpToNext,
-        coins: player.coins,
-        inventoryCount: Array.isArray(player.inventory) ? player.inventory.length : null,
-        currentWeaponId: player.currentWeaponId,
+        x: Math.round(Number(currentPlayer.x) || 0),
+        y: Math.round(Number(currentPlayer.y) || 0),
+        tileX: Math.floor((Number(currentPlayer.x) || 0) / tileSize),
+        tileY: Math.floor((Number(currentPlayer.y) || 0) / tileSize),
+        hp: currentPlayer.hp,
+        maxHp: currentPlayer.maxHp,
+        safe: currentPlayer.safe,
+        level: currentPlayer.level,
+        xp: currentPlayer.xp,
+        xpToNext: currentPlayer.xpToNext,
+        coins: currentPlayer.coins,
+        inventoryCount: Array.isArray(currentPlayer.inventory) ? currentPlayer.inventory.length : null,
+        equipment: summarizeArg(currentPlayer.equipment, 1),
+        currentWeaponId: currentPlayer.currentWeaponId,
+        aimX: Number((currentPlayer.aimX || 0).toFixed ? currentPlayer.aimX.toFixed(3) : currentPlayer.aimX || 0),
+        aimY: Number((currentPlayer.aimY || 0).toFixed ? currentPlayer.aimY.toFixed(3) : currentPlayer.aimY || 0),
+        attackCooldown: currentPlayer.attackCooldown,
+        dodgeCooldown: currentPlayer.dodgeCooldown,
         weapon: selectedWeaponSnapshot(),
         pet: activePetSnapshot()
       };
@@ -193,27 +214,90 @@
     }).filter(Boolean);
   }
 
-  function gameStateSnapshot() {
-    const getGlobal = name => {
-      try { return window[name]; } catch { return undefined; }
-    };
+  function inputStateSnapshot() {
+    const input = readRuntimeValue(() => inputState, null);
+    if (!input) return null;
+    return safeClone(input, summarizeArg(input));
+  }
+
+  function gamepadStateSnapshot() {
+    const state = readRuntimeValue(() => gamepadState, null);
+    if (!state) return null;
+    return safeClone(state, summarizeArg(state));
+  }
+
+  function touchStateSnapshot() {
+    const state = readRuntimeValue(() => touchState, null);
+    if (!state) return null;
+    return safeClone(state, summarizeArg(state));
+  }
+
+  function multiplayerSnapshot() {
+    const mp = readRuntimeValue(() => multiplayer, null);
+    if (!mp) return null;
     return {
-      gameMode: getGlobal("gameMode"),
-      currentFloor: getGlobal("currentFloor"),
-      currentRoomName: getGlobal("currentRoomName"),
-      currentRoomSubtitle: getGlobal("currentRoomSubtitle"),
-      roomsSeen: getGlobal("roomsSeen"),
-      floorTimeLeft: getGlobal("floorTimeLeft"),
-      gameWon: getGlobal("gameWon"),
-      gameLost: getGlobal("gameLost"),
-      pendingFloorAdvance: getGlobal("pendingFloorAdvance"),
-      stairwellFound: getGlobal("stairwellFound"),
-      audienceScore: getGlobal("audienceScore"),
+      enabled: mp.enabled,
+      status: mp.status,
+      mode: mp.mode,
+      playerId: mp.playerId,
+      lobbyCode: mp.lobbyCode,
+      partyCode: mp.partyCode,
+      roomId: mp.roomId,
+      partyId: mp.partyId,
+      pvpEnabled: mp.pvpEnabled,
+      usingServer: mp.usingServer,
+      networkStatus: mp.networkStatus,
+      networkError: mp.networkError,
+      localFloor0Status: mp.localFloor0Status,
+      isPartyLeader: mp.isPartyLeader,
+      lobbyMemberCount: Array.isArray(mp.lobbyMembers) ? mp.lobbyMembers.length : null,
+      partyMemberCount: Array.isArray(mp.partyMembers) ? mp.partyMembers.length : null,
+      remotePlayerCount: mp.remotePlayers instanceof Map ? mp.remotePlayers.size : null,
+      remotePlayers: mp.remotePlayers instanceof Map ? Array.from(mp.remotePlayers.values()).slice(0, 8).map(remote => summarizeArg(remote, 1)) : null,
+      floor0WorldState: mp.floor0WorldState ? {
+        openedDoorCount: mp.floor0WorldState.openedDoorIds instanceof Set ? mp.floor0WorldState.openedDoorIds.size : null,
+        openedChestCount: mp.floor0WorldState.openedChestIds instanceof Set ? mp.floor0WorldState.openedChestIds.size : null,
+        takenLootCount: mp.floor0WorldState.takenLootIds instanceof Set ? mp.floor0WorldState.takenLootIds.size : null,
+        enemyStateCount: mp.floor0WorldState.enemyStates instanceof Map ? mp.floor0WorldState.enemyStates.size : null
+      } : null
+    };
+  }
+
+  function mapSnapshot() {
+    const mapValue = readRuntimeValue(() => map, null);
+    const roomsValue = readRuntimeValue(() => rooms, null);
+    const enemiesValue = readRuntimeValue(() => enemies, null);
+    const corpsesValue = readRuntimeValue(() => corpses, null);
+    const chestsValue = readRuntimeValue(() => openedChests, null);
+    return {
+      mapRows: Array.isArray(mapValue) ? mapValue.length : null,
+      mapCols: Array.isArray(mapValue?.[0]) ? mapValue[0].length : null,
+      roomsCount: Array.isArray(roomsValue) ? roomsValue.length : null,
+      enemiesCount: Array.isArray(enemiesValue) ? enemiesValue.length : null,
+      corpsesCount: Array.isArray(corpsesValue) ? corpsesValue.length : null,
+      openedChestsCount: chestsValue instanceof Set ? chestsValue.size : (Array.isArray(chestsValue) ? chestsValue.length : null)
+    };
+  }
+
+  function gameStateSnapshot() {
+    return {
+      gameMode: readRuntimeValue(() => gameMode, null),
+      currentFloor: readRuntimeValue(() => currentFloor, null),
+      currentRoomName: readRuntimeValue(() => currentRoomName, null),
+      currentRoomSubtitle: readRuntimeValue(() => currentRoomSubtitle, null),
+      roomsSeen: readRuntimeValue(() => roomsSeen, null),
+      floorTimeLeft: readRuntimeValue(() => floorTimeLeft, null),
+      gameWon: readRuntimeValue(() => gameWon, null),
+      gameLost: readRuntimeValue(() => gameLost, null),
+      pendingFloorAdvance: readRuntimeValue(() => pendingFloorAdvance, null),
+      stairwellFound: readRuntimeValue(() => stairwellFound, null),
+      audienceScore: readRuntimeValue(() => audienceScore, null),
       player: playerSnapshot(),
-      multiplayer: safeClone(getGlobal("multiplayer"), null),
-      inputState: safeClone(getGlobal("inputState"), null),
-      gamepadState: safeClone(getGlobal("gamepadState"), null),
-      touchState: safeClone(getGlobal("touchState"), null),
+      multiplayer: multiplayerSnapshot(),
+      inputState: inputStateSnapshot(),
+      gamepadState: gamepadStateSnapshot(),
+      touchState: touchStateSnapshot(),
+      map: mapSnapshot(),
       openPanels: openPanelSnapshot(),
       bodyClasses: document.body ? Array.from(document.body.classList) : []
     };
@@ -440,14 +524,32 @@
 
   function captureInputSnapshot() {
     try {
+      const input = inputStateSnapshot();
+      const gpState = gamepadStateSnapshot();
+      const touch = touchStateSnapshot();
+      const pads = gamepadSnapshot().map(pad => ({
+        id: pad.id,
+        axes: pad.axes,
+        pressedButtons: pad.buttons.filter(button => button.pressed).map(button => button.index)
+      }));
       lastInputSnapshot = {
         t: nowIso(),
-        lastActiveInputMethod: inputState?.lastActiveInputMethod,
-        gamepadConnected: gamepadState?.connected,
-        gamepadName: gamepadState?.name,
-        gamepads: gamepadSnapshot().map(pad => ({ id: pad.id, axes: pad.axes, pressedButtons: pad.buttons.filter(button => button.pressed).map(button => button.index) })),
+        lastActiveInputMethod: input?.lastActiveInputMethod || null,
+        touchControlsEnabled: input?.touchControlsEnabled ?? null,
+        gamepadConnected: gpState?.connected ?? null,
+        gamepadName: gpState?.name || pads[0]?.id || null,
+        gamepadMove: gpState ? { x: gpState.moveX, y: gpState.moveY, aimX: gpState.aimX, aimY: gpState.aimY, hasAimInput: gpState.hasAimInput } : null,
+        touchMove: touch ? { x: touch.moveX, y: touch.moveY, attackActive: touch.attackActive, attackX: touch.attackX, attackY: touch.attackY } : null,
+        gamepads: pads,
         openPanelIds: openPanelSnapshot().filter(panel => panel.display !== "none" && panel.visibility !== "hidden").map(panel => panel.id)
       };
+      const inputSignature = JSON.stringify(pads.map(pad => ({ id: pad.id, buttons: pad.pressedButtons, axes: pad.axes })));
+      if (inputSignature !== lastGamepadInputSignature) {
+        lastGamepadInputSignature = inputSignature;
+        if (pads.some(pad => pad.pressedButtons.length > 0 || pad.axes.some(axis => Math.abs(axis) > 0.22))) {
+          recordEvent("gamepad-input", { pads });
+        }
+      }
     } catch {}
   }
 
