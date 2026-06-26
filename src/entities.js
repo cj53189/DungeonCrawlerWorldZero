@@ -149,6 +149,10 @@ function rollEnemyLoot(enemy) {
   const loot = [];
   const coins = (enemy.boss ? 18 : 2) + Math.floor(Math.random() * (enemy.boss ? 24 : 7)) + Math.floor((enemy.level || 1) * (enemy.boss ? 3 : 1.2));
   if (coins > 0) loot.push({ type: "coins", amount: coins, name: `${coins} Coins` });
+  if (enemy.roamingBoss) {
+    const bonusCoins = 45 + Math.floor(Math.random() * 35) + Math.floor((enemy.level || 1) * 4);
+    loot.push({ type: "coins", amount: bonusCoins, name: `${bonusCoins} Roaming Boss Bounty Coins` });
+  }
 
   const gearChance = enemy.boss ? 0.85 : 0.09 + Math.min(0.12, (enemy.level || 1) * 0.01);
   const weaponChance = enemy.boss ? 1 : 0.16 + Math.min(0.18, (enemy.level || 1) * 0.012) + Math.min(0.10, currentFloor * 0.015);
