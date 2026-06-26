@@ -1230,16 +1230,21 @@ function triggerBossAggro(reason = "seen") {
   if (!bossEnemy || bossEnemy.hp <= 0 || bossAggroed) return;
 
   bossAggroed = true;
-  lockBossDoors(bossRoom);
+  const roamingBoss = !!bossEnemy.roamingBoss;
+  if (!roamingBoss) lockBossDoors(bossRoom);
 
   if (typeof setMusicState === "function") setMusicState(MUSIC_STATES.BOSS);
 
   achievement(
-    "BOSS AGGRO",
-    reason === "attack"
-      ? "You attacked the boss. The exits seal. This is what scholars call commitment."
-      : "The boss has noticed you. The exits seal. Running is now a historical concept.",
-    `bossAggro_${currentFloor}`
+    roamingBoss ? "ROAMING BOSS AGGRO" : "BOSS AGGRO",
+    roamingBoss
+      ? (reason === "attack"
+        ? "You attacked the roaming boss. It is angry, mobile, and taking that personally."
+        : "The roaming boss has noticed you. It has chosen you as today's moving target.")
+      : (reason === "attack"
+        ? "You attacked the boss. The exits seal. This is what scholars call commitment."
+        : "The boss has noticed you. The exits seal. Running is now a historical concept."),
+    `${roamingBoss ? "roamingBossAggro" : "bossAggro"}_${currentFloor}`
   );
 }
 
@@ -1301,13 +1306,45 @@ function unlockBossDoors(room){
   }
 }
 
+function isFloor2RoamingBossFloor() {
+  return currentFloor === 2;
+}
+
+function isRoamingBossExcludedRoom(room, spawnRoom) {
+  return !room || room.type === "safe" || room === spawnRoom || room === bossRoom;
+}
+
+function isValidRoamingBossTile(tx, ty, spawnRoom) {
+  if (tx < 1 || ty < 1 || tx >= MAP_COLS - 1 || ty >= MAP_ROWS - 1) return false;
+  if (map[ty]?.[tx] !== ".") return false;
+  if (Math.hypot(tx - Math.floor(player.x / TILE), ty - Math.floor(player.y / TILE)) < 10) return false;
+  if (Number.isFinite(stairwellX) && Number.isFinite(stairwellY) && Math.hypot(tx - stairwellX, ty - stairwellY) < 10) return false;
+  const room = roomForTile(tx, ty);
+  if (isRoamingBossExcludedRoom(room, spawnRoom)) return false;
+  return true;
+}
+
+function findRoamingBossSpawnTile(spawnRoom) {
+  const candidates = [];
+  for (let y = 1; y < MAP_ROWS - 1; y++) {
+    for (let x = 1; x < MAP_COLS - 1; x++) {
+      if (isValidRoamingBossTile(x, y, spawnRoom)) candidates.push({ x, y });
+    }
+  }
+  if (candidates.length) return choose(candidates);
+  return { x: bossRoom?.cx || Math.floor(player.x / TILE) + 12, y: bossRoom?.cy || Math.floor(player.y / TILE) + 12 };
+}
+
 function placeBossEnemy(){
   if(!bossRoom)return;
   const lvl=Math.max(3, player.level + 2 + Math.floor(currentFloor * 1.25));
   const hp=120+lvl*32;
+  const spawnRoom = roomForTile(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
+  const roamingBoss = isFloor2RoamingBossFloor();
+  const spawnTile = roamingBoss ? findRoamingBossSpawnTile(spawnRoom) : { x: bossRoom.cx, y: bossRoom.cy };
   bossEnemy={
-    x:bossRoom.cx*TILE+TILE/2,
-    y:bossRoom.cy*TILE+TILE/2,
+    x:spawnTile.x*TILE+TILE/2,
+    y:spawnTile.y*TILE+TILE/2,
     r:20,
     level:lvl,
     boss:true,
@@ -1316,13 +1353,18 @@ function placeBossEnemy(){
     hp:Math.max(300, hp),
     maxHp:Math.max(300, hp),
     damage:Math.max(22, Math.round((10+lvl*4)*1.1)),
-    xpReward:150+lvl*36,
+    xpReward:(150+lvl*36) + (roamingBoss ? 90 + lvl * 12 : 0),
     speed:(.62+lvl*.025)*0.85,
     aggroRange:300,
     attackReach:8,
     behaviorTag:"boss_skeleton",
     ...enemySpriteMetadataForKey("skeletonboss"),
-    roomId:bossRoom.id,
+    roomId:roamingBoss ? roomForTile(spawnTile.x, spawnTile.y)?.id : bossRoom.id,
+    roamingBoss,
+    canUpdateUnseen: roamingBoss,
+    roamingTarget: null,
+    roamingStuckFrames: 0,
+    roamingWarningCooldown: 0,
     damageCooldown:0,
     wanderAngle:Math.random()*Math.PI*2
   };
@@ -1333,6 +1375,13 @@ function completeBossEncounter(enemy){
   bossDoorsLocked = false;
   pendingBossLocks = [];
   clearBossLocks();
+  if (enemy?.roamingBoss) {
+    stats.bossesDefeated++;
+    changeAudience(20);
+    achievement("ROAMING BOSS SLAIN", `You defeated ${enemy.name || "the roaming boss"}. The stairwell was always optional. The violence was extra credit.`, `roamingBossDefeated_${currentFloor}`);
+    if (typeof syncMusicToGameState === "function") syncMusicToGameState();
+    return;
+  }
   if(!bossRoom||bossRoom.cleared)return;
   bossRoom.cleared=true;
   bossRoom.locked=false;

@@ -442,6 +442,50 @@ function updateSpiderLungeState(enemy, targetCrawler, dist, canSeeTarget, tag) {
   return null;
 }
 
+function isRoamingBossAvoidTile(tx, ty) {
+  if (map[ty]?.[tx] !== ".") return true;
+  if (Number.isFinite(stairwellX) && Number.isFinite(stairwellY) && Math.hypot(tx - stairwellX, ty - stairwellY) < 8) return true;
+  const room = typeof roomForTile === "function" ? roomForTile(tx, ty) : null;
+  if (room?.type === "safe") return true;
+  if (room && room.id === player.currentRoomId && player.safe) return true;
+  return false;
+}
+
+function chooseRoamingBossTarget(enemy) {
+  const candidates = [];
+  for (const room of rooms || []) {
+    if (!room || room.type === "safe") continue;
+    if (Number.isFinite(stairwellX) && Number.isFinite(stairwellY) && Math.hypot(room.cx - stairwellX, room.cy - stairwellY) < 8) continue;
+    if (map[room.cy]?.[room.cx] === ".") candidates.push({ x: room.cx * TILE + TILE / 2, y: room.cy * TILE + TILE / 2 });
+  }
+  for (let i = 0; i < 80; i++) {
+    const tx = 1 + Math.floor(Math.random() * (MAP_COLS - 2));
+    const ty = 1 + Math.floor(Math.random() * (MAP_ROWS - 2));
+    if (!isRoamingBossAvoidTile(tx, ty)) candidates.push({ x: tx * TILE + TILE / 2, y: ty * TILE + TILE / 2 });
+  }
+  enemy.roamingTarget = candidates.length ? choose(candidates) : { x: enemy.x, y: enemy.y };
+  enemy.roamingStuckFrames = 0;
+  return enemy.roamingTarget;
+}
+
+function updateRoamingBossWarning(enemy, visibleToPlayer) {
+  enemy.roamingWarningCooldown = Math.max(0, (enemy.roamingWarningCooldown || 0) - 1);
+  if (visibleToPlayer || enemy.roamingWarningCooldown > 0 || player.safe) return;
+  const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+  if (dist > TILE * 9) return;
+  enemy.roamingWarningCooldown = 60 * 8;
+  announcer("Heavy bone-footsteps echo nearby. The roaming Skeleton Boss is close, but not in sight.");
+  addFloatingFeedbackText("THUD... THUD...", player.x, player.y - player.r - 18, { color: "#ff5c8a", size: 18 });
+}
+
+function calculateRoamingBossMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist) {
+  if (targetCrawler && (canSeeTarget || bossCanAlwaysTrack)) return null;
+  let target = enemy.roamingTarget;
+  if (!target || Math.hypot(target.x - enemy.x, target.y - enemy.y) < TILE * 0.75) target = chooseRoamingBossTarget(enemy);
+  const dir = normalizeVector(target.x - enemy.x, target.y - enemy.y);
+  return { dx: dir.x * enemy.speed * 0.62, dy: dir.y * enemy.speed * 0.62 };
+}
+
 function calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist) {
   const tag = enemy.behaviorTag || "";
   const state = enemy.behaviorState || (enemy.behaviorState = {});
@@ -590,7 +634,10 @@ function updateEnemies() {
     }
 
     const exTile = Math.floor(enemy.x / TILE), eyTile = Math.floor(enemy.y / TILE);
-    if (!seen[eyTile]?.[exTile] && !collapseStarted) continue;
+    const enemySeen = !!seen[eyTile]?.[exTile];
+    const enemyVisible = !!visible[eyTile]?.[exTile];
+    if (!enemySeen && !collapseStarted && !(enemy.roamingBoss && enemy.canUpdateUnseen)) continue;
+    if (enemy.roamingBoss) updateRoamingBossWarning(enemy, enemyVisible);
 
     const remoteSynced = typeof updateFloor0EnemySyncInterpolation === "function" && updateFloor0EnemySyncInterpolation(enemy);
 
@@ -601,13 +648,20 @@ function updateEnemies() {
       const targetCrawler = targetInfo?.crawler || null;
       const dist = targetInfo?.dist ?? Infinity;
       const canSeeTarget = !!visibleTarget;
-      if (enemy.boss && !bossAggroed && canSeeTarget) {
+      if (enemy.boss && !bossAggroed && canSeeTarget && !enemy.roamingBoss) {
         triggerBossAggro("seen");
       }
       const bossCanAlwaysTrack = enemy.boss && bossAggroed;
-      const movement = calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist);
+      const roamingMovement = enemy.roamingBoss ? calculateRoamingBossMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist) : null;
+      const movement = roamingMovement || calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist);
+      const beforeX = enemy.x, beforeY = enemy.y;
       updateEnemyFacing(enemy, movement.dx, movement.dy);
       moveEntity(enemy, movement.dx, movement.dy);
+      if (enemy.roamingBoss) {
+        const moved = Math.hypot(enemy.x - beforeX, enemy.y - beforeY);
+        enemy.roamingStuckFrames = moved < 0.08 ? (enemy.roamingStuckFrames || 0) + 1 : 0;
+        if (enemy.roamingStuckFrames > 90) chooseRoamingBossTarget(enemy);
+      }
     }
     if (typeof floor0EnemyRoomId === "function") {
       const roomId = floor0EnemyRoomId(enemy);
