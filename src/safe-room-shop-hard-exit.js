@@ -207,3 +207,15 @@
   const retry = setInterval(install, 200);
   setTimeout(() => clearInterval(retry), 8000);
 })();
+
+// Source-style floor pressure loop loader.
+(function loadFloorPressureLoop() {
+  if (window.__dcwFloorPressureLoopScriptRequested) return;
+  window.__dcwFloorPressureLoopScriptRequested = true;
+  const existing = document.querySelector('script[src="./src/floor-pressure-loop.js"]');
+  if (existing) return;
+  const script = document.createElement("script");
+  script.src = "./src/floor-pressure-loop.js";
+  script.defer = true;
+  document.head.appendChild(script);
+})();
