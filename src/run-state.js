@@ -56,6 +56,11 @@ function resetRunProgress() {
   pendingFloorAdvance = false;
 }
 
+function ensureStatsShape() {
+  if (!stats || typeof stats !== "object") return;
+  if (!Number.isFinite(stats.namedRoomsEntered)) stats.namedRoomsEntered = 0;
+}
+
 
 function resetState(options = {}) {
   if (typeof resetTransientInputState === "function") resetTransientInputState();
@@ -138,6 +143,7 @@ function resetState(options = {}) {
   player.safe = true;
   player.wasSafe = true;
 
+  ensureStatsShape();
   if (!preserveRun) for (const key of Object.keys(stats)) stats[key] = 0;
 
   document.getElementById("announcer").innerHTML = "";
@@ -160,5 +166,3 @@ function resetState(options = {}) {
 
   achievement(`NEW FLOOR: ${getFloorLabel()}`, `This floor contains ${rooms.length} rooms. The dungeon has provided a generous supply of places to make mistakes.`, `startFloor${currentFloor}`);
 }
-
-
