@@ -4,7 +4,6 @@
   if (window.__dcwFloorPressureLoopInstalled) return;
   window.__dcwFloorPressureLoopInstalled = true;
 
-  const DAY_SECONDS = 120;
   const MAX_BOSS_WEAKENS = 3;
   let floorLoopState = null;
 
@@ -56,13 +55,17 @@
     return Math.max(0, floorLimit() - safeNumber(floorTimeLeft, 0));
   }
 
+  function dungeonDaySeconds() {
+    return typeof getDungeonDaySeconds === "function" ? getDungeonDaySeconds() : 24 * 60 * 60;
+  }
+
   function currentDungeonDay() {
-    return Math.max(1, Math.floor(elapsedSeconds() / DAY_SECONDS) + 1);
+    return Math.max(1, Math.floor(elapsedSeconds() / dungeonDaySeconds()) + 1);
   }
 
   function stairwellPopulateDelay() {
     const limit = floorLimit();
-    return Math.min(DAY_SECONDS, Math.max(45, Math.floor(limit * 0.22)));
+    return Math.min(dungeonDaySeconds(), Math.max(45, Math.floor(limit * 0.22)));
   }
 
   function isStairwellPopulatedNow() {
@@ -83,7 +86,13 @@
       activeChallenge: null,
       usedEventTypes: new Set(),
       bossWeakens: 0,
-      hazardLevel: 0
+      hazardLevel: 0,
+      director: {
+        profile: "unread",
+        lastDecision: "The Dungeon AI is gathering evidence.",
+        decisions: 0,
+        baseline: captureDirectorMetrics()
+      }
     };
     window.floorLoopState = floorLoopState;
     return floorLoopState;
@@ -99,6 +108,49 @@
   function addFloorMessage(title, body, id) {
     if (typeof achievement === "function") achievement(title, body, id);
     else if (typeof announcer === "function") announcer(`${title}: ${body}`);
+  }
+
+  function captureDirectorMetrics() {
+    return {
+      kills: safeNumber(stats?.enemiesKilled, 0),
+      rooms: safeNumber(roomsSeen, 0),
+      damage: safeNumber(stats?.damageTaken, 0),
+      safeFrames: safeNumber(stats?.timeInSafeRoomFrames, 0),
+      outsideFrames: safeNumber(stats?.timeOutsideSafeRoomFrames, 0),
+      misses: safeNumber(stats?.missedAttacks, 0),
+      bumps: safeNumber(stats?.wallBumps, 0)
+    };
+  }
+
+  function directorRead() {
+    const st = state();
+    const now = captureDirectorMetrics();
+    const base = st.director?.baseline || now;
+    const delta = Object.fromEntries(Object.keys(now).map(key => [key, Math.max(0, now[key] - safeNumber(base[key], 0))]));
+    const safeShare = delta.safeFrames / Math.max(1, delta.safeFrames + delta.outsideFrames);
+    if (safeShare > 0.58) return { profile: "safe-room camper", event: escalateFloorHazard, reason: "You have been using safety like the dungeon cannot see you." };
+    if (delta.rooms <= 2 && elapsedSeconds() > dungeonDaySeconds() * 0.35) return { profile: "tunnel-vision speedrunner", event: placeSponsorCache, reason: "Your route is efficient, repetitive, and bad television." };
+    if (delta.damage >= Math.max(40, safeNumber(player?.maxHp, 100) * 0.75)) return { profile: "bloodied underdog", event: placeSponsorCache, reason: "The audience has mistaken ongoing blood loss for a character arc." };
+    if (delta.kills >= 8) return { profile: "combat addict", event: startAudienceChallenge, reason: "You keep solving problems with violence. The viewers would like measurable results." };
+    if (delta.misses + delta.bumps >= 12) return { profile: "chaos gremlin", event: spawnBountyElite, reason: "Your lack of precision has been upgraded into a programming decision." };
+    return { profile: "cautious explorer", event: spawnBountyElite, reason: "You appear comfortable. Management has corrected the oversight." };
+  }
+
+  function triggerDirectorEvent(day) {
+    const st = state();
+    const read = directorRead();
+    const candidates = [read.event, placeSponsorCache, spawnBountyElite, startAudienceChallenge, escalateFloorHazard];
+    for (const eventFn of candidates) {
+      if (eventFn(day)) {
+        st.director.profile = read.profile;
+        st.director.lastDecision = read.reason;
+        st.director.decisions++;
+        st.director.baseline = captureDirectorMetrics();
+        addFloorMessage("DUNGEON AI · BEHAVIORAL ADJUSTMENT", `${read.reason} Profile assigned: ${read.profile}.`, `director_${currentFloor}_${day}`);
+        return true;
+      }
+    }
+    return false;
   }
 
   function visibleStairwellSeen() {
@@ -260,19 +312,41 @@
 
   function triggerDailyEvent(day) {
     if (day <= 1 || gameWon || gameLost || collapseStarted) return;
-    const st = state();
-    const eventFns = [placeSponsorCache, spawnBountyElite, startAudienceChallenge, escalateFloorHazard];
-    for (let i = 0; i < eventFns.length; i++) {
-      const fn = eventFns[(day + currentFloor + i) % eventFns.length];
-      const type = fn.name;
-      if (st.usedEventTypes.has(`${type}_${day}`)) continue;
-      if (fn(day)) {
-        st.usedEventTypes.add(`${type}_${day}`);
-        return;
-      }
-    }
+    if (triggerDirectorEvent(day)) return;
     if (typeof announcer === "function") announcer(`Day ${day} has begun. No sponsored event fired. This is either mercy or a setup.`);
   }
+
+  function serializeFloorPressureState() {
+    const st = state();
+    return {
+      ...st,
+      usedEventTypes: Array.from(st.usedEventTypes || []),
+      eventCaches: (st.eventCaches || []).map(cache => ({ ...cache }))
+    };
+  }
+
+  function restoreFloorPressureState(saved) {
+    if (!saved || safeNumber(saved.floor, -1) !== safeNumber(currentFloor, 0)) return false;
+    const fresh = resetFloorPressureState();
+    floorLoopState = {
+      ...fresh,
+      ...saved,
+      floor: safeNumber(currentFloor, 0),
+      floorLimit: floorLimit(),
+      lastElapsedSecond: -1,
+      usedEventTypes: new Set(saved.usedEventTypes || []),
+      eventCaches: Array.isArray(saved.eventCaches) ? saved.eventCaches.map(cache => ({ ...cache })) : [],
+      director: { ...fresh.director, ...(saved.director || {}) }
+    };
+    for (const cache of floorLoopState.eventCaches) {
+      if (!cache.opened && map?.[cache.y]?.[cache.x] === ".") map[cache.y][cache.x] = "C";
+    }
+    window.floorLoopState = floorLoopState;
+    return true;
+  }
+
+  window.captureFloorPressureState = serializeFloorPressureState;
+  window.restoreFloorPressureState = restoreFloorPressureState;
 
   function rewardChallenge(challenge) {
     if (!challenge || challenge.rewarded) return;
@@ -514,7 +588,9 @@
         `<div class=\"recapLine\"><span>Dungeon Day</span><span>${currentDungeonDay()}</span></div>`,
         `<div class=\"recapLine\"><span>Stairs</span><span>${esc(isStairwellPopulatedNow() ? (stairwellFound ? "Marked" : "Populated") : "Dormant")}</span></div>`,
         `<div class=\"recapLine\"><span>Floor Event</span><span>${esc(eventText)}</span></div>`,
-        `<div class=\"recapLine\"><span>Boss Weakens</span><span>${st.bossWeakens}/${MAX_BOSS_WEAKENS}</span></div>`
+        `<div class=\"recapLine\"><span>Boss Weakens</span><span>${st.bossWeakens}/${MAX_BOSS_WEAKENS}</span></div>`,
+        `<div class=\"recapLine\"><span>Audience Profile</span><span>${esc(st.director?.profile || "unread")}</span></div>`,
+        `<div class=\"recapLine\"><span>AI Read</span><span>${esc(st.director?.lastDecision || "Still watching")}</span></div>`
       ].join(""));
       return result;
     };
