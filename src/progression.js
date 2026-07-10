@@ -112,6 +112,17 @@ function makeDefaultProgression() {
     originProfileId: ORIGIN_DEFINITIONS.unsortedCrawler.id,
     originProfileDescription: ORIGIN_DEFINITIONS.unsortedCrawler.description,
     behaviorProfile: { tags: [], updatedAtFloor: 0 },
+    floor3Offers: null,
+    floor3OfferNoticeShown: false,
+    raceId: null,
+    raceName: null,
+    raceTone: null,
+    classId: null,
+    className: null,
+    classTone: null,
+    floor3ChoiceComplete: false,
+    floor3ChoiceSelectedAtFloor: null,
+    floor3ChoiceSelectedAt: null,
     // Backward-compatible aliases. Race/class proper arrives later on Floor 3.
     temporaryClass: ORIGIN_DEFINITIONS.unsortedCrawler.name,
     temporaryClassDescription: ORIGIN_DEFINITIONS.unsortedCrawler.description
@@ -144,6 +155,9 @@ function mergeProgression(saved, defaults = makeDefaultProgression()) {
     tags: Array.isArray(saved?.behaviorProfile?.tags) ? saved.behaviorProfile.tags.slice(0, 12) : [],
     updatedAtFloor: Math.max(0, Math.trunc(Number(saved?.behaviorProfile?.updatedAtFloor) || 0))
   };
+  for (const key of ["floor3Offers", "floor3OfferNoticeShown", "raceId", "raceName", "raceTone", "classId", "className", "classTone", "floor3ChoiceComplete", "floor3ChoiceSelectedAtFloor", "floor3ChoiceSelectedAt"]) {
+    if (saved && Object.prototype.hasOwnProperty.call(saved, key)) merged[key] = saved[key];
+  }
   merged.temporaryClass = merged.originProfile;
   merged.temporaryClassDescription = merged.originProfileDescription;
   return merged;
@@ -162,11 +176,42 @@ function progressionBonusPct(level, perLevel = 0.01) { return Math.max(0, (getSk
 function getAttributeOffset(attributeId) { return Math.max(0, getAttributeValue(attributeId) - (ATTRIBUTE_DEFINITIONS[attributeId]?.baseValue || 8)); }
 function getSkillOffset(skillId) { return Math.max(0, getSkillLevel(skillId) - 1); }
 function getSkillXpMultiplier() { return 1 + getAttributeOffset("intellect") * 0.01; }
-function getMeleeDamageMultiplier() { return 1 + getAttributeOffset("strength") * 0.01; }
-function getProgressionMaxHpBonus() { return getAttributeOffset("endurance") * 3; }
-function getProgressionSpeedMultiplier() { return 1 + getAttributeOffset("agility") * 0.006; }
-function getProgressionAudienceMultiplier() { return 1 + getAttributeOffset("audienceAppeal") * 0.01; }
-function getProgressionCritChance() { return Math.min(0.08, getAttributeOffset("perception") * 0.002); }
+const CLASSIFICATION_RACE_EFFECTS = {
+  halfGiant: { maxHp: 16, melee: 0.04, speed: -0.02 }, stoneblood: { maxHp: 14, melee: 0.03 }, ironblood: { maxHp: 10, melee: 0.04 },
+  goblin: { speed: 0.025, audience: 0.05 }, ratkin: { speed: 0.04, crit: 0.01 }, shadowling: { speed: 0.035, crit: 0.015 },
+  mothkin: { speed: 0.03, crit: 0.012 }, serpentkin: { melee: 0.035, crit: 0.01 }, constructTouched: { maxHp: 12, melee: 0.025 },
+  cockroachkin: { maxHp: 18 }, slimeTouched: { maxHp: 8, speed: 0.02 }, plagueTouched: { melee: 0.05, maxHp: 6 }, humanVariant: { maxHp: 6, speed: 0.01, audience: 0.02 }
+};
+const CLASSIFICATION_CLASS_EFFECTS = {
+  bulwark: { maxHp: 18 }, doorKicker: { melee: 0.08 }, bladeSentinel: { melee: 0.06, crit: 0.01 }, bruiser: { melee: 0.09 }, painSponge: { maxHp: 22 },
+  ranger: { crit: 0.035, speed: 0.015 }, trapwright: { crit: 0.02 }, cartographer: { speed: 0.025 }, grifter: { audience: 0.1, speed: 0.015 }, lootguard: { maxHp: 8, audience: 0.07 },
+  hypeConduit: { audience: 0.14 }, survivalist: { maxHp: 12, speed: 0.01 }, junkArtificer: { maxHp: 9, melee: 0.03 }, brawler: { melee: 0.1 }, knifeDancer: { melee: 0.07, speed: 0.025 },
+  toxicologist: { crit: 0.025, melee: 0.03 }, tactician: { crit: 0.03 }, escapeArtist: { speed: 0.05 }, wildShot: { crit: 0.04 }, wallScholar: { maxHp: 10 },
+  violentSolutionist: { melee: 0.11 }, omenListener: { crit: 0.025, audience: 0.05 }, daredevil: { speed: 0.03, audience: 0.08 }, luckyBastard: { crit: 0.05 },
+  backAlleyAlchemist: { melee: 0.04, maxHp: 7 }, chaosAccountant: { crit: 0.02, audience: 0.08 }
+};
+function getClassificationEffects() {
+  const effects = { maxHp: 0, melee: 0, speed: 0, audience: 0, crit: 0 };
+  for (const source of [CLASSIFICATION_RACE_EFFECTS[player.progression?.raceId], CLASSIFICATION_CLASS_EFFECTS[player.progression?.classId]]) {
+    for (const key of Object.keys(effects)) effects[key] += Number(source?.[key]) || 0;
+  }
+  return effects;
+}
+function describeClassificationEffects() {
+  const e = getClassificationEffects();
+  const parts = [];
+  if (e.maxHp) parts.push(`${e.maxHp > 0 ? "+" : ""}${e.maxHp} max HP`);
+  if (e.melee) parts.push(`${Math.round(e.melee * 100)}% melee damage`);
+  if (e.speed) parts.push(`${Math.round(e.speed * 100)}% speed`);
+  if (e.crit) parts.push(`${Math.round(e.crit * 100)}% critical chance`);
+  if (e.audience) parts.push(`${Math.round(e.audience * 100)}% audience rewards`);
+  return parts.join(", ") || "No classification modifiers";
+}
+function getMeleeDamageMultiplier() { return 1 + getAttributeOffset("strength") * 0.01 + getClassificationEffects().melee; }
+function getProgressionMaxHpBonus() { return getAttributeOffset("endurance") * 3 + getClassificationEffects().maxHp; }
+function getProgressionSpeedMultiplier() { return 1 + getAttributeOffset("agility") * 0.006 + getClassificationEffects().speed; }
+function getProgressionAudienceMultiplier() { return 1 + getAttributeOffset("audienceAppeal") * 0.01 + getClassificationEffects().audience; }
+function getProgressionCritChance() { return Math.min(0.2, getAttributeOffset("perception") * 0.002 + getClassificationEffects().crit); }
 function getWeaponSkillForItem(item) {
   const weaponId = item?.weaponId || item?.id || player.currentWeaponId || "fists";
   const name = `${item?.name || weaponId}`.toLowerCase();
@@ -246,6 +291,8 @@ function getCrawlerBehaviorTags(statsSource = (typeof stats !== "undefined" ? st
   if ((statsSource.safeRoomEntries || 0) >= 3) push("cautious_or_lost", "Cautious or Lost", "Returned to safety often enough for the dungeon to start a folder.");
   if ((statsSource.timeOutsideSafeRoomFrames || 0) > 3600 && (statsSource.timeOutsideSafeRoomFrames || 0) > (statsSource.timeInSafeRoomFrames || 0) * 2) push("risk_tolerant", "Risk Tolerant", "Spent a long time outside safe rooms, for bravery or poor planning.");
   if ((statsSource.gearFound || 0) >= 5) push("gear_magpie", "Gear Magpie", "Collected shiny survival-adjacent objects with purpose-ish energy.");
+  if ((statsSource.corpsesConsumed || 0) >= 3) push("ecology_feeder", "Ecology Feeder", "Allowed the corpse cycle to convert several problems into winged problems.");
+  if ((statsSource.vespasEmerged || 0) >= 2) push("vespa_midwife", "Vespa Midwife", "Presided over multiple janitor-mob transformations, intentionally or otherwise.");
   return tags.slice(0, 5);
 }
 function updateBehaviorProfile() {

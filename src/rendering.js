@@ -1202,6 +1202,13 @@ function drawVisualDecal(decal, isVisible) {
     ctx.moveTo(0, -10 * s);
     ctx.lineTo(0, 10 * s);
     ctx.stroke();
+  } else if (decal.type === "lichen") {
+    ctx.fillStyle = "rgba(235,119,28,0.48)";
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.arc(((i * 7) % 19 - 9) * s, (((i * 11) % 17) - 8) * s, (2 + (i % 3)) * s, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.restore();

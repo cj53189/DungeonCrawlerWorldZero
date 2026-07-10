@@ -8,7 +8,9 @@ const ENEMY_BEHAVIOR_TAGS = {
   GUARD_BRUISER: "guard_bruiser",
   DRONE_SKIRMISHER: "drone_skirmisher",
   BOSS_GATEKEEPER: "boss_gatekeeper",
-  BOSS_SKELETON: "boss_skeleton"
+  BOSS_SKELETON: "boss_skeleton",
+  BRINDLE_GRUB: "brindle_grub",
+  BRINDLED_VESPA: "brindled_vespa"
 };
 
 const ENEMY_SPRITE_DEFINITIONS = {
@@ -61,6 +63,11 @@ const ENEMY_IDENTITY_BY_NAME = {
   "Janitor Bot": { behaviorTag: ENEMY_BEHAVIOR_TAGS.BOT_PATROL, spriteKey: "janitor_bot" },
   "Maintenance Guard": { behaviorTag: ENEMY_BEHAVIOR_TAGS.GUARD_BRUISER, spriteKey: "maintenance_guard" },
   "Security Drone": { behaviorTag: ENEMY_BEHAVIOR_TAGS.DRONE_SKIRMISHER, spriteKey: "security_drone" }
+  ,"Brindle Grub": { behaviorTag: ENEMY_BEHAVIOR_TAGS.BRINDLE_GRUB, spriteKey: "rat" }
+  ,"Brindled Vespa": { behaviorTag: ENEMY_BEHAVIOR_TAGS.BRINDLED_VESPA, spriteKey: "security_drone" }
+  ,"Danger Dingo": { behaviorTag: ENEMY_BEHAVIOR_TAGS.SPIDER_LUNGE, spriteKey: "rat" }
+  ,"Kobold Rider": { behaviorTag: ENEMY_BEHAVIOR_TAGS.DRONE_SKIRMISHER, spriteKey: "security_drone" }
+  ,"Mind Horror": { behaviorTag: ENEMY_BEHAVIOR_TAGS.GUARD_BRUISER, spriteKey: "maintenance_guard" }
 };
 
 function enemyIdentityForName(name) {
@@ -180,7 +187,13 @@ function createCorpse(enemy) {
     loot: rollEnemyLoot(enemy),
     looted: false
   };
+  corpse.createdAt = Date.now();
+  corpse.createdOnFloor = currentFloor;
+  corpse.ecologyProcessed = false;
+  corpse.consumedByGrubs = false;
+  corpse.nutritionValue = enemy.boss ? 4 : Math.max(1, Math.ceil((enemy.level || 1) / 3));
   corpses.push(corpse);
+  if (typeof onCorpseCreatedForFloorEcology === "function") onCorpseCreatedForFloorEcology(corpse, enemy);
   return corpse;
 }
 

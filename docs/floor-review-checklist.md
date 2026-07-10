@@ -168,25 +168,25 @@ If the player ignores the companion merchant, the AI starts offering backhanded 
 **Mechanical hooks:**
 Pet merchant already exists for Floor 1. This floor should get companion-themed daily events and at least one event that rewards protecting or using the companion well.
 
-## Floor 2: The Parking Garage Kingdom
+## Floor 2: The Final Tutorial
 
 **Stay reason:**
-Cars, trunks, batteries, alarms, fuel, scrap, radios, and emergency bags create a loot-rich scavenging floor.
+Floor 2 is the last tutorial floor: a huge quadrant network of cinderblock corridors, white-painted rooms, tutorial signage, loot caches, and increasingly dangerous corpse ecology.
 
 **Only-here event:**
-The Car Alarm Chorus: one triggered alarm spreads to others, pulling enemies toward noise and turning the floor into a moving threat map.
+Brindle Grubs hatch around fresh corpses, feed, pupate on a real clock, and emerge as Brindled Vespas if crawlers fail to control the cleanup cycle.
 
 **Core decision:**
-Move quietly and loot slowly, or intentionally use alarms to drag enemies away from valuable rooms.
+Loot corpses immediately, abandon them to the grubs, or spend time suppressing the janitor mobs before they transform.
 
 **Environmental story:**
-Crashed barricades, handprints inside windows, abandoned bags, and surrounded vehicles show failed escape attempts.
+Orange lichen, quadrant markings, abandoned staging areas, tutorial infrastructure, and corpse-fed infestations show a system built to teach crawlers by escalating preventable mistakes.
 
 **Dungeon AI interference:**
-The AI plays fake footsteps, cries for help, or player noises through car speakers.
+The AI announces ecology milestones and frames delayed cleanup as a crawler-created content opportunity.
 
 **Mechanical hooks:**
-Can be built with room theme variants, sound-triggered enemy attraction, timed event messages, and floor-specific cache labels.
+Uses existing corpse, enemy, room-theme, save, timer, boss, and Floor 3 offer systems. The existing skeleton art is a temporary visual fallback for the Krakaren Clone encounter.
 
 ## Floor 3: The Identity Floor
 

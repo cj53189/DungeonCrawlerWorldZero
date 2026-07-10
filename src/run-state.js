@@ -1,8 +1,44 @@
 
-function getFloorTimeLimit() {
-  // Prototype timing. Later floors get shorter, matching the book's pressure curve.
-  if (currentFloor === 0) return 15 * 60;
-  return Math.max(300, 600 - currentFloor * 60);
+const DUNGEON_DAY_SECONDS = 24 * 60 * 60;
+const FINAL_DESCENT_WINDOW_SECONDS = 60 * 60;
+
+function getDungeonDayDurationSeconds() { return DUNGEON_DAY_SECONDS; }
+
+function getFloorDurationDays(floor = currentFloor) {
+  const floorNumber = Math.max(0, Math.trunc(Number(floor) || 0));
+  const blueprintDays = Number(window.FLOOR_IDENTITY_BLUEPRINTS?.[floorNumber]?.durationDays);
+  if (Number.isFinite(blueprintDays) && blueprintDays > 0) return Math.trunc(blueprintDays);
+  return ({ 0: 1, 1: 5, 2: 6, 3: 7, 4: 7 })[floorNumber] || 1;
+}
+
+function getFloorTimeLimit(floor = currentFloor) {
+  return getFloorDurationDays(floor) * DUNGEON_DAY_SECONDS;
+}
+
+function makeFloorTimeline(floor = currentFloor, startedAt = Date.now()) {
+  const durationDays = getFloorDurationDays(floor);
+  return {
+    version: 1,
+    floor: Math.max(0, Math.trunc(Number(floor) || 0)),
+    durationDays,
+    floorStartedAt: startedAt,
+    floorDeadlineAt: startedAt + durationDays * DUNGEON_DAY_SECONDS * 1000,
+    lastProcessedDay: 1
+  };
+}
+
+function syncFloorTimeFromTimeline(now = Date.now()) {
+  if (!floorTimeline || floorTimeline.floor !== currentFloor || !Number.isFinite(floorTimeline.floorDeadlineAt)) {
+    floorTimeline = makeFloorTimeline(currentFloor, now);
+  }
+  floorTimeLeft = Math.max(0, Math.ceil((floorTimeline.floorDeadlineAt - now) / 1000));
+  return floorTimeLeft;
+}
+
+function getCurrentDungeonDay(now = Date.now()) {
+  if (!floorTimeline || !Number.isFinite(floorTimeline.floorStartedAt)) return 1;
+  const elapsed = Math.max(0, now - floorTimeline.floorStartedAt);
+  return Math.min(getFloorDurationDays(currentFloor), Math.floor(elapsed / (DUNGEON_DAY_SECONDS * 1000)) + 1);
 }
 
 function getFloorLabel() {
@@ -10,11 +46,12 @@ function getFloorLabel() {
 }
 
 function isFinalDescentWindow() {
-  return floorTimeLeft <= 60;
+  return floorTimeLeft <= FINAL_DESCENT_WINDOW_SECONDS;
 }
 
 function resetFloorTimerForCurrentFloor() {
-  floorTimeLeft = getFloorTimeLimit();
+  floorTimeline = makeFloorTimeline(currentFloor);
+  floorTimeLeft = getFloorTimeLimit(currentFloor);
   collapseStarted = false;
   warnedAt360 = false;
   warnedAt240 = false;
@@ -59,6 +96,9 @@ function resetRunProgress() {
 function ensureStatsShape() {
   if (!stats || typeof stats !== "object") return;
   if (!Number.isFinite(stats.namedRoomsEntered)) stats.namedRoomsEntered = 0;
+  for (const key of ["corpsesCreated", "corpsesConsumed", "grubsSpawned", "grubsFed", "grubsPupated", "vespasEmerged"]) {
+    if (!Number.isFinite(stats[key])) stats[key] = 0;
+  }
 }
 
 
@@ -79,6 +119,7 @@ function resetState(options = {}) {
   }
   enemies = [];
   corpses = [];
+  if (typeof resetFloorEcology === "function") resetFloorEcology();
   dungeonVisuals = { floor: [], decals: [] };
   tutorialSigns = [];
   petMerchant = null;

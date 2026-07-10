@@ -471,12 +471,66 @@ const FLOOR0_ROOM_THEMES = {
 
 const FLOOR0_REQUIRED_THEME_IDS = ["supplyCloset", "ratNest", "maintenanceTunnel", "armory"];
 
+const FLOOR2_ROOM_THEMES = {
+  lichenJunction: {
+    id: "lichenJunction", name: "Lichen Junction", subtitle: "Orange growth maps the cinderblock seams better than the minimap.",
+    sizeWeights: { small: 4, medium: 5, large: 1 }, lootBias: 0.9,
+    enemies: [
+      { name: "Brindle Grub", behaviorTag: "brindle_grub", r: 8, hp: 0.58, damage: 0.48, speed: 0.9, xp: 0.5 },
+      { name: "Danger Dingo", behaviorTag: "spider_lunge", r: 14, hp: 1.28, damage: 1.22, speed: 1.08, xp: 1.2 }
+    ]
+  },
+  quadrantHall: {
+    id: "quadrantHall", name: "Quadrant Hall", subtitle: "The white floor keeps excellent records of everything dragged across it.",
+    sizeWeights: { small: 1, medium: 5, large: 4 }, lootBias: 1.0,
+    enemies: [
+      { name: "Danger Dingo", behaviorTag: "spider_lunge", r: 14, hp: 1.25, damage: 1.2, speed: 1.1, xp: 1.18 },
+      { name: "Kobold Rider", behaviorTag: "drone_skirmisher", r: 11, hp: 0.92, damage: 1.08, speed: 1.25, xp: 1.08 }
+    ]
+  },
+  infestedCorridor: {
+    id: "infestedCorridor", name: "Infested Corridor", subtitle: "The janitor mobs have mistaken neglect for catering.",
+    sizeWeights: { small: 5, medium: 4, large: 1 }, lootBias: 0.55,
+    enemies: [
+      { name: "Brindle Grub", behaviorTag: "brindle_grub", r: 8, hp: 0.55, damage: 0.45, speed: 0.92, xp: 0.48 },
+      { name: "Brindled Vespa", behaviorTag: "brindled_vespa", r: 11, hp: 1.05, damage: 1.25, speed: 1.32, xp: 1.25 }
+    ]
+  },
+  abandonedStaging: {
+    id: "abandonedStaging", name: "Abandoned Staging Room", subtitle: "Low-tier supplies remain. Their previous owners do not.",
+    sizeWeights: { small: 3, medium: 4, large: 2 }, lootBias: 2.4,
+    enemies: [
+      { name: "Brindle Grub", behaviorTag: "brindle_grub", r: 8, hp: 0.58, damage: 0.5, speed: 0.9, xp: 0.5 },
+      { name: "Mind Horror", behaviorTag: "guard_bruiser", r: 14, hp: 1.4, damage: 1.22, speed: 0.8, xp: 1.32 }
+    ]
+  },
+  distillery: {
+    id: "distillery", name: "Improvised Distillery", subtitle: "The product, the sales pitch, and the hygiene are equally hostile.",
+    sizeWeights: { small: 1, medium: 4, large: 3 }, lootBias: 1.6,
+    enemies: [
+      { name: "Kobold Rider", behaviorTag: "drone_skirmisher", r: 11, hp: 0.96, damage: 1.1, speed: 1.22, xp: 1.12 },
+      { name: "Mind Horror", behaviorTag: "guard_bruiser", r: 14, hp: 1.38, damage: 1.2, speed: 0.82, xp: 1.3 }
+    ]
+  },
+  supplyCache: {
+    id: "supplyCache", name: "Tutorial Supply Cache", subtitle: "The dungeon would like you equipped enough to die somewhere more expensive.",
+    sizeWeights: { small: 4, medium: 3, large: 1 }, lootBias: 2.8,
+    enemies: [{ name: "Brindle Grub", behaviorTag: "brindle_grub", r: 8, hp: 0.55, damage: 0.45, speed: 0.9, xp: 0.48 }]
+  },
+  stairwell: FLOOR0_ROOM_THEMES.stairwell
+};
+
+function roomThemePoolForFloor(floor = currentFloor) {
+  return Number(floor) === 2 ? FLOOR2_ROOM_THEMES : FLOOR0_ROOM_THEMES;
+}
+
 function roomThemeDefinition(room) {
-  return FLOOR0_ROOM_THEMES[room?.themeId] || null;
+  return roomThemePoolForFloor()[room?.themeId] || FLOOR0_ROOM_THEMES[room?.themeId] || null;
 }
 
 function weightedThemeForRoom(room, avoidIds = new Set()) {
-  const entries = Object.values(FLOOR0_ROOM_THEMES)
+  const pool = roomThemePoolForFloor();
+  const entries = Object.values(pool)
     .filter(theme => !avoidIds.has(theme.id) && theme.id !== "stairwell")
     .map(theme => ({ theme, weight: Math.max(0.1, theme.sizeWeights?.[room.sizeClass] ?? 1) }));
   const total = entries.reduce((sum, entry) => sum + entry.weight, 0);
@@ -485,7 +539,7 @@ function weightedThemeForRoom(room, avoidIds = new Set()) {
     roll -= entry.weight;
     if (roll <= 0) return entry.theme;
   }
-  return entries[entries.length - 1]?.theme || FLOOR0_ROOM_THEMES.storageRoom;
+  return entries[entries.length - 1]?.theme || pool.supplyCache || FLOOR0_ROOM_THEMES.storageRoom;
 }
 
 function applyRoomTheme(room, theme) {
@@ -932,9 +986,13 @@ function assignRoomThemesAndBoss(){
  }
 
  const themeableRooms = rooms.filter((room, index) => index !== 0 && room !== bossRoom);
- const earlyRooms = themeableRooms.slice(0, FLOOR0_REQUIRED_THEME_IDS.length);
- for (let i = 0; i < earlyRooms.length; i++) {
-   applyRoomTheme(earlyRooms[i], FLOOR0_ROOM_THEMES[FLOOR0_REQUIRED_THEME_IDS[i]]);
+  const requiredThemeIds = currentFloor === 2
+    ? ["supplyCache", "lichenJunction", "infestedCorridor", "quadrantHall"]
+    : FLOOR0_REQUIRED_THEME_IDS;
+  const themePool = roomThemePoolForFloor();
+  const earlyRooms = themeableRooms.slice(0, requiredThemeIds.length);
+  for (let i = 0; i < earlyRooms.length; i++) {
+    applyRoomTheme(earlyRooms[i], themePool[requiredThemeIds[i]]);
  }
 
  const recentThemeIds = new Set(earlyRooms.map(room => room.themeId).filter(Boolean));
@@ -1236,7 +1294,7 @@ function triggerBossAggro(reason = "seen") {
   if (typeof setMusicState === "function") setMusicState(MUSIC_STATES.BOSS);
 
   achievement(
-    roamingBoss ? "ROAMING BOSS AGGRO" : "BOSS AGGRO",
+    roamingBoss && currentFloor === 2 ? "WAIT, BOSSES CAN LEAVE THEIR ROOMS?" : roamingBoss ? "ROAMING BOSS AGGRO" : "BOSS AGGRO",
     roamingBoss
       ? (reason === "attack"
         ? "You attacked the roaming boss. It is angry, mobile, and taking that personally."
@@ -1341,14 +1399,14 @@ function placeBossEnemy(){
   const hp=120+lvl*32;
   const spawnRoom = roomForTile(Math.floor(player.x / TILE), Math.floor(player.y / TILE));
   const roamingBoss = isFloor2RoamingBossFloor();
-  const spawnTile = roamingBoss ? findRoamingBossSpawnTile(spawnRoom) : { x: bossRoom.cx, y: bossRoom.cy };
+  const spawnTile = { x: bossRoom.cx, y: bossRoom.cy };
   bossEnemy={
     x:spawnTile.x*TILE+TILE/2,
     y:spawnTile.y*TILE+TILE/2,
     r:20,
     level:lvl,
     boss:true,
-    name:"Skeleton Boss",
+    name:roamingBoss ? "Krakaren Clone" : "Skeleton Boss",
     enemyKey:"skeletonboss",
     hp:Math.max(300, hp),
     maxHp:Math.max(300, hp),
@@ -1357,10 +1415,11 @@ function placeBossEnemy(){
     speed:(.62+lvl*.025)*0.85,
     aggroRange:300,
     attackReach:8,
-    behaviorTag:"boss_skeleton",
+    behaviorTag:roamingBoss ? "boss_krakaren" : "boss_skeleton",
     ...enemySpriteMetadataForKey("skeletonboss"),
-    roomId:roamingBoss ? roomForTile(spawnTile.x, spawnTile.y)?.id : bossRoom.id,
+    roomId:bossRoom.id,
     roamingBoss,
+    chamberBoundUntilAggro: roamingBoss,
     canUpdateUnseen: roamingBoss,
     roamingTarget: null,
     roamingStuckFrames: 0,
@@ -1556,7 +1615,7 @@ function selectFloorAtlasTile(x, y, room) {
 }
 
 const VISUAL_FLOOR_TYPES = ["crack", "scratch", "rubble", "stain", "worn"];
-const VISUAL_DECAL_TYPES = ["debris", "brokenStone", "dust", "scorch", "coins", "marking"];
+const VISUAL_DECAL_TYPES = ["debris", "brokenStone", "dust", "scorch", "coins", "marking", "lichen"];
 const VISUAL_DECORATION_TILES = new Set([".", "S", "C", "E", "D", "L"]);
 const ENVIRONMENTAL_LIGHT_TYPES = ["torch", "lantern", "crystal", "campfire"];
 const ENVIRONMENTAL_LIGHT_COLORS = {
@@ -1578,6 +1637,7 @@ function tileHash(x, y, salt = 0) {
 
 function visualThemeForRoom(room) {
   const name = (room?.name || "").toLowerCase();
+  if (currentFloor === 2) return { density: 0.052, floorBias: "worn", weights: { marking: 0.34, lichen: 0.3, dust: 0.2, debris: 0.16 } };
   if (room?.type === "safe") return { density: 0.015, floorBias: "worn", weights: { dust: 0.7, debris: 0.3 } };
   if (room?.type === "boss") return { density: 0.026, floorBias: "stain", weights: { scorch: 0.45, brokenStone: 0.35, debris: 0.2 } };
   if (room?.themeId === "ratNest") return { density: 0.06, floorBias: "scratch", weights: { debris: 0.36, dust: 0.34, brokenStone: 0.18, marking: 0.12 } };

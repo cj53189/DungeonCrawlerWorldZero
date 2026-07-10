@@ -75,7 +75,9 @@
     nothing_whisperer: { races: ["shadowling", "mothkin", "slimeTouched"], classes: ["omenListener", "chaosAccountant"], line: "Interaction logs show repeated attempts to communicate with nothing. Something may have answered." },
     cautious_or_lost: { races: ["ratkin", "mothkin", "cockroachkin"], classes: ["escapeArtist", "survivalist"], line: "Safe-room records suggest caution, confusion, or an impressive relationship with doors." },
     risk_tolerant: { races: ["humanVariant", "ironblood", "cockroachkin"], classes: ["daredevil", "ranger", "luckyBastard"], line: "Exposure records suggest you spend a lot of time outside safety, for bravery or because nobody stopped you." },
-    gear_magpie: { races: ["goblin", "constructTouched", "ratkin"], classes: ["junkArtificer", "lootguard"], line: "Equipment records suggest a shiny-object survival strategy. Honestly, not the worst one." }
+    gear_magpie: { races: ["goblin", "constructTouched", "ratkin"], classes: ["junkArtificer", "lootguard"], line: "Equipment records suggest a shiny-object survival strategy. Honestly, not the worst one." },
+    ecology_feeder: { races: ["plagueTouched", "slimeTouched", "ratkin"], classes: ["toxicologist", "backAlleyAlchemist", "survivalist"], line: "Floor Two ecology records indicate you helped the janitor mobs complete their performance review." },
+    vespa_midwife: { races: ["mothkin", "plagueTouched", "constructTouched"], classes: ["toxicologist", "chaosAccountant", "omenListener"], line: "Transformation records show an unusual talent for turning corpses into airborne management problems." }
   };
 
   const FALLBACK_RACES = ["humanVariant", "goblin", "ratkin", "stoneblood", "mothkin"];

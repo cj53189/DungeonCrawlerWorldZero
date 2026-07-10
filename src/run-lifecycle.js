@@ -55,12 +55,14 @@ function capturePersistentCrawlerRun(status = getCrawlerPreservationStatus(), re
   const snapshotAchievements = snapshot?.achievements instanceof Set ? Array.from(snapshot.achievements) : Array.from(achievements || []);
   const playerSnapshot = snapshot?.player || {};
   return {
-    version: 2,
+    version: 3,
     runStatus: status,
     savedAt: Date.now(),
     reason,
     currentFloor,
     floorTimeLeft,
+    floorTimeline: cloneRunLifecycleValue(floorTimeline, null),
+    floorEcology: cloneRunLifecycleValue(snapshot?.floorEcology, null),
     player: {
       x: player?.x || 0,
       y: player?.y || 0,
@@ -110,14 +112,24 @@ function restorePersistentCrawlerRun(savedRun) {
     stats: savedRun.stats || {},
     audienceScore: savedRun.audienceScore || 10,
     achievementHistory: savedRun.achievementHistory || savedRun.history || [],
-    achievements: savedRun.achievements || []
+    achievements: savedRun.achievements || [],
+    floorTimeline: savedRun.floorTimeline || null,
+    floorEcology: savedRun.floorEcology || null
   };
   resetState({ preserveRun: true, snapshot, targetFloor: savedRun.currentFloor || 0 });
   currentFloor = Number(savedRun.currentFloor) || 0;
   stairwellFound = !!savedRun.stairwellFound;
   stairwellX = Number.isFinite(savedRun.stairwellX) ? savedRun.stairwellX : stairwellX;
   stairwellY = Number.isFinite(savedRun.stairwellY) ? savedRun.stairwellY : stairwellY;
-  floorTimeLeft = Number.isFinite(savedRun.floorTimeLeft) ? savedRun.floorTimeLeft : floorTimeLeft;
+  if (savedRun.floorTimeline && Number(savedRun.floorTimeline.floor) === currentFloor) {
+    floorTimeline = { ...savedRun.floorTimeline };
+    syncFloorTimeFromTimeline();
+  } else if (Number.isFinite(savedRun.floorTimeLeft)) {
+    const restoredAt = Date.now();
+    floorTimeline = makeFloorTimeline(currentFloor, restoredAt);
+    floorTimeline.floorDeadlineAt = restoredAt + Math.max(0, savedRun.floorTimeLeft) * 1000;
+    floorTimeLeft = Math.max(0, savedRun.floorTimeLeft);
+  }
   player.x = savedRun.playerPosition?.x || savedRun.player.x || player.x;
   player.y = savedRun.playerPosition?.y || savedRun.player.y || player.y;
   player.safe = !!savedRun.player.safe;

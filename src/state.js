@@ -36,6 +36,14 @@ let minimapCanvas=document.createElement("canvas"),minimapCtx=minimapCanvas.getC
 let lastVisibilityTileX=null,lastVisibilityTileY=null,visibilityDirty=true;
 let roomRevealState = { roomId: null, startFrame: 0, originX: 0, originY: 0, maxDist: 0, complete: false };
 let gameWon, gameLost, frameCount, floorTimeLeft, collapseStarted;
+let floorTimeline = {
+  version: 1,
+  floor: null,
+  durationDays: 1,
+  floorStartedAt: null,
+  floorDeadlineAt: null,
+  lastProcessedDay: 1
+};
 let warnedAt360, warnedAt240, warnedAt120, warnedAt60, warnedAt30;
 let lastObservationFrame, audienceScore, currentReputation, roomsSeen;
 

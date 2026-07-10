@@ -474,7 +474,7 @@ function updateRoamingBossWarning(enemy, visibleToPlayer) {
   const dist = Math.hypot(player.x - enemy.x, player.y - enemy.y);
   if (dist > TILE * 9) return;
   enemy.roamingWarningCooldown = 60 * 8;
-  announcer("Heavy bone-footsteps echo nearby. The roaming Skeleton Boss is close, but not in sight.");
+  announcer(`Heavy impacts echo nearby. ${enemy.name || "The roaming boss"} is close, but not in sight.`);
   addFloatingFeedbackText("THUD... THUD...", player.x, player.y - player.r - 18, { color: "#ff5c8a", size: 18 });
 }
 
@@ -490,6 +490,11 @@ function calculateEnemyMovement(enemy, targetCrawler, canSeeTarget, bossCanAlway
   const tag = enemy.behaviorTag || "";
   const state = enemy.behaviorState || (enemy.behaviorState = {});
   setEnemyAnimationState(enemy, "walk");
+
+  if (tag === "brindle_grub" && enemy.ecologyTarget) {
+    const dir = normalizeVector(enemy.ecologyTarget.x - enemy.x, enemy.ecologyTarget.y - enemy.y);
+    return { dx: dir.x * enemy.speed, dy: dir.y * enemy.speed };
+  }
 
   if (targetCrawler && (canSeeTarget || bossCanAlwaysTrack)) {
     if (tag === "spider_lunge" || tag === "spider_hit_and_run") {
@@ -591,6 +596,7 @@ function damageCrawlerFromEnemy(crawler, enemy) {
 
 function updateEnemies() {
   processPendingBossLocks();
+  if (typeof updateFloorEcology === "function") updateFloorEcology();
   for (const enemy of enemies) {
     if (enemy.isDying) {
       const deathAnim = enemy.animations?.death;
@@ -608,6 +614,7 @@ function updateEnemies() {
       continue;
     }
     if (enemy.hp <= 0) continue;
+    if (typeof updateFloorEcologyEnemy === "function" && updateFloorEcologyEnemy(enemy)) continue;
     enemy.damageCooldown = Math.max(0, enemy.damageCooldown - 1);
     if (enemy.pendingAttack) {
       enemy.visualMoving = false;
@@ -636,7 +643,7 @@ function updateEnemies() {
     const exTile = Math.floor(enemy.x / TILE), eyTile = Math.floor(enemy.y / TILE);
     const enemySeen = !!seen[eyTile]?.[exTile];
     const enemyVisible = !!visible[eyTile]?.[exTile];
-    if (!enemySeen && !collapseStarted && !(enemy.roamingBoss && enemy.canUpdateUnseen)) continue;
+    if (!enemySeen && !collapseStarted && !enemy.canUpdateUnseen) continue;
     if (enemy.roamingBoss) updateRoamingBossWarning(enemy, enemyVisible);
 
     const remoteSynced = typeof updateFloor0EnemySyncInterpolation === "function" && updateFloor0EnemySyncInterpolation(enemy);
@@ -1210,13 +1217,14 @@ function updateFloorTimer() {
   if (gameWon || gameLost) return;
   frameCount++;
   if (frameCount % 60 === 0 && !collapseStarted) {
-    floorTimeLeft = Math.max(0, floorTimeLeft - 1);
+    if (typeof syncFloorTimeFromTimeline === "function") syncFloorTimeFromTimeline();
+    else floorTimeLeft = Math.max(0, floorTimeLeft - 1);
     if (frameCount % (60 * 20) === 0 && !player.safe) audienceScore = Math.max(0, audienceScore - 1);
-    if (floorTimeLeft <= 360 && !warnedAt360) { warnedAt360 = true; announcer("Floor collapse in six minutes. This is not a threat. It is a scheduling policy."); }
-    if (floorTimeLeft <= 240 && !warnedAt240) { warnedAt240 = true; announcer("Floor collapse in four minutes. Plenty of time to panic inefficiently."); }
-    if (floorTimeLeft <= 120 && !warnedAt120) { warnedAt120 = true; achievement("NEW ACHIEVEMENT: Scheduling Conflict", "The floor is preparing to stop existing. Please wrap up any hobbies, grudges, or poor decisions.", "twoMinuteWarning"); }
-    if (floorTimeLeft <= 60 && !warnedAt60) { warnedAt60 = true; finalDescentAnnounced = true; if (typeof syncMusicToGameState === "function") syncMusicToGameState(); achievement("FINAL DESCENT WINDOW", "One minute until collapse. Descending now grants immediate access to the next floor. Remaining here grants the dungeon plausible deniability.", "finalDescentWindow"); }
-    if (floorTimeLeft <= 30 && !warnedAt30) { warnedAt30 = true; achievement("NEW ACHIEVEMENT: Time Management Goblin", "You have thirty seconds left and somehow this is still not the worst plan I've seen today.", "thirtySecondWarning"); }
+    if (floorTimeLeft <= 21600 && !warnedAt360) { warnedAt360 = true; announcer("Floor collapse in six hours. This is not a threat. It is a scheduling policy."); }
+    if (floorTimeLeft <= 14400 && !warnedAt240) { warnedAt240 = true; announcer("Floor collapse in four hours. Plenty of time to panic inefficiently."); }
+    if (floorTimeLeft <= 7200 && !warnedAt120) { warnedAt120 = true; achievement("NEW ACHIEVEMENT: Scheduling Conflict", "Two hours remain before the floor stops existing. Please wrap up any hobbies, grudges, or poor decisions.", "twoHourWarning"); }
+    if (floorTimeLeft <= 3600 && !warnedAt60) { warnedAt60 = true; finalDescentAnnounced = true; if (typeof syncMusicToGameState === "function") syncMusicToGameState(); achievement("FINAL DESCENT WINDOW", "One hour until collapse. Descending now grants immediate access to the next floor.", "finalDescentWindow"); }
+    if (floorTimeLeft <= 1800 && !warnedAt30) { warnedAt30 = true; achievement("NEW ACHIEVEMENT: Time Management Goblin", "You have thirty minutes left and somehow this is still not the worst plan I've seen today.", "thirtyMinuteWarning"); }
     if (floorTimeLeft <= 0) {
       if (multiplayer.enabled && multiplayer.usingServer && currentFloor === 0) {
         collapseStarted = true;
@@ -1284,4 +1292,3 @@ function makeDungeonObservation() {
   ][Math.floor(Math.random() * 5)]);
   announcer(obs[Math.floor(Math.random() * obs.length)]);
 }
-

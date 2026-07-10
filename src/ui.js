@@ -584,9 +584,14 @@ function hasControllerWindowOpen() {
 
 
 function formatTimer(seconds) {
-  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-  const s = Math.floor(seconds % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (days > 0) return `${days}d ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  return `${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 }
 
 
@@ -604,6 +609,8 @@ function captureRunProgress() {
       pet: player.pet ? JSON.parse(JSON.stringify(player.pet)) : null
     },
     stats: { ...stats },
+    floorTimeline: floorTimeline ? JSON.parse(JSON.stringify(floorTimeline)) : null,
+    floorEcology: typeof captureFloorEcologyState === "function" ? captureFloorEcologyState() : null,
     audienceScore,
     achievementHistory: achievementHistory.map(entry => ({ ...entry })),
     achievements: new Set(achievements)
@@ -629,8 +636,12 @@ function restoreRunProgress(snapshot) {
   player.equipment = {weapon:null,head:null,chest:null,legs:null,feet:null,accessory:null,light:null,pet:null, ...Object.fromEntries(Object.entries(snapshot.player.equipment || {}).map(([slot, item]) => [slot, item ? { ...item } : null]))};
   setActivePet(snapshot.player.pet ? JSON.parse(JSON.stringify(snapshot.player.pet)) : (player.equipment.pet || null));
   if (typeof mergeProgression === "function") player.progression = mergeProgression(snapshot.player.progression);
-
+  if (snapshot.floorTimeline && Number(snapshot.floorTimeline.floor) === currentFloor) {
+    floorTimeline = { ...snapshot.floorTimeline };
+    if (typeof syncFloorTimeFromTimeline === "function") syncFloorTimeFromTimeline();
+  }
   for (const key of Object.keys(stats)) stats[key] = snapshot.stats[key] ?? 0;
+  if (typeof restoreFloorEcologyState === "function") restoreFloorEcologyState(snapshot.floorEcology || null);
   audienceScore = snapshot.audienceScore;
   achievementHistory = snapshot.achievementHistory.map(entry => ({ ...entry }));
   achievements = new Set(snapshot.achievements);
@@ -1115,7 +1126,7 @@ function updateHUD() {
     ? Math.max(0, Math.ceil((multiplayer.collapseAt - Date.now()) / 1000))
     : floorTimeLeft;
   setText("collapseLabel", currentFloor === 0 ? "Floor 0 Collapse" : "Collapse");
-  setText("timer", displayedFloorTimeLeft <= 60 ? `FINAL ${formatTimer(displayedFloorTimeLeft)}` : formatTimer(displayedFloorTimeLeft));
+  setText("timer", displayedFloorTimeLeft <= 3600 ? `FINAL ${formatTimer(displayedFloorTimeLeft)}` : formatTimer(displayedFloorTimeLeft));
   setText("roomsSeen", roomsSeen);
   setText("roomTotal", rooms.length);
 
@@ -1167,7 +1178,7 @@ function descendStairwell() {
   stats.exitFinds++;
   changeAudience(10);
 
-  const early = floorTimeLeft > 60;
+  const early = !(typeof isFinalDescentWindow === "function" ? isFinalDescentWindow() : floorTimeLeft <= 3600);
   const timeText = formatTimer(floorTimeLeft);
 
   if (early) {

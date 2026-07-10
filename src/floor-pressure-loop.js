@@ -4,7 +4,7 @@
   if (window.__dcwFloorPressureLoopInstalled) return;
   window.__dcwFloorPressureLoopInstalled = true;
 
-  const DAY_SECONDS = 120;
+  const DAY_SECONDS = typeof getDungeonDayDurationSeconds === "function" ? getDungeonDayDurationSeconds() : 24 * 60 * 60;
   const MAX_BOSS_WEAKENS = 3;
   let floorLoopState = null;
 
@@ -53,10 +53,14 @@
   }
 
   function elapsedSeconds() {
+    if (floorTimeline && Number.isFinite(floorTimeline.floorStartedAt)) {
+      return Math.max(0, Math.floor((Date.now() - floorTimeline.floorStartedAt) / 1000));
+    }
     return Math.max(0, floorLimit() - safeNumber(floorTimeLeft, 0));
   }
 
   function currentDungeonDay() {
+    if (typeof getCurrentDungeonDay === "function") return getCurrentDungeonDay();
     return Math.max(1, Math.floor(elapsedSeconds() / DAY_SECONDS) + 1);
   }
 
@@ -70,10 +74,14 @@
   }
 
   function resetFloorPressureState() {
+    const day = currentDungeonDay();
+    const lastProcessed = floorTimeline?.floor === currentFloor
+      ? Math.max(1, Math.min(day, safeNumber(floorTimeline.lastProcessedDay, day)))
+      : day;
     floorLoopState = {
       floor: safeNumber(currentFloor, 0),
       floorLimit: floorLimit(),
-      day: currentDungeonDay(),
+      day: lastProcessed,
       lastElapsedSecond: -1,
       stairwellsPopulated: isStairwellPopulatedNow(),
       dormantStairwellSeen: false,
@@ -343,6 +351,7 @@
     const day = currentDungeonDay();
     while (st.day < day) {
       st.day++;
+      if (floorTimeline?.floor === currentFloor) floorTimeline.lastProcessedDay = st.day;
       addFloorMessage(
         `${getFloorIdentity().name.toUpperCase()} · DAY ${st.day}`,
         floorDayMessage(st.day),
@@ -425,7 +434,7 @@
         return;
       }
       const st = state();
-      if (floorTimeLeft > 60 && !st.earlyDescentPenaltyApplied) {
+      if (!(typeof isFinalDescentWindow === "function" ? isFinalDescentWindow() : floorTimeLeft <= 3600) && !st.earlyDescentPenaltyApplied) {
         st.earlyDescentPenaltyApplied = true;
         if (typeof changeAudience === "function") changeAudience(-6);
         addFloorMessage(
@@ -471,7 +480,11 @@
       const stairHud = document.getElementById("stairHud");
       const stairStatus = document.getElementById("stairStatus");
       const collapseLabel = document.getElementById("collapseLabel");
-      if (collapseLabel) collapseLabel.textContent = `Day ${day} · Collapse`;
+      if (collapseLabel) {
+        const duration = typeof getFloorDurationDays === "function" ? getFloorDurationDays() : 1;
+        collapseLabel.textContent = `Day ${day}/${duration} · Collapse`;
+        if (floorTimeline?.floorDeadlineAt) collapseLabel.title = `Deadline: ${new Date(floorTimeline.floorDeadlineAt).toLocaleString()}`;
+      }
       if (stairStatus) {
         stairStatus.textContent = !isStairwellPopulatedNow()
           ? `Dormant ${typeof formatTimer === "function" ? formatTimer(delayRemaining) : delayRemaining}`
@@ -482,7 +495,7 @@
           stairHud.textContent = `Stairs populate in ${typeof formatTimer === "function" ? formatTimer(delayRemaining) : `${delayRemaining}s`}`;
           stairHud.classList.toggle("visible", st.dormantStairwellSeen || delayRemaining <= 30);
         } else if (stairwellFound) {
-          stairHud.textContent = floorTimeLeft > 60 ? "Stairwell marked · early descent = stasis" : "Stairwell marked · final window";
+          stairHud.textContent = !(typeof isFinalDescentWindow === "function" ? isFinalDescentWindow() : floorTimeLeft <= 3600) ? "Stairwell marked · early descent = stasis" : "Stairwell marked · final window";
           stairHud.classList.add("visible");
         } else {
           stairHud.textContent = "Stairwells populated · locate an exit";

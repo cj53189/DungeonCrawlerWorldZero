@@ -136,7 +136,7 @@
       bossEnemy.roamingDoorSmashCooldown = Math.max(0, bossEnemy.roamingDoorSmashCooldown || 0);
       if (bossEnemy.roamingDoorSmashCooldown <= 0 && typeof announcer === "function") {
         bossEnemy.roamingDoorSmashCooldown = 60 * 10;
-        announcer("The roaming Skeleton Boss forces a door open somewhere nearby. Subtlety has left the floor.");
+        announcer(`${bossEnemy.name || "The roaming boss"} forces a door open somewhere nearby. Subtlety has left the floor.`);
       }
     }
   }
@@ -176,6 +176,11 @@
 
     if (!enemy?.roamingBoss) {
       return originalCalculateRoamingBossMovement(enemy, targetCrawler, canSeeTarget, bossCanAlwaysTrack, dist);
+    }
+
+    if (enemy.chamberBoundUntilAggro && !bossAggroed && !canSeeTarget) {
+      setEnemyAnimationState(enemy, "idle");
+      return { dx: 0, dy: 0 };
     }
 
     const hellState = enemy.bulletHellState;

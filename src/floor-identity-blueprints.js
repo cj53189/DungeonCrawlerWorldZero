@@ -8,6 +8,7 @@
   window.DEFAULT_FLOOR_IDENTITY_BLUEPRINT = freezeBlueprint({
     id: "unclassified_floor",
     name: "Unclassified Floor",
+    durationDays: 1,
     stayReason: "Gather resources and improve the odds of surviving descent.",
     uniqueEvent: "The dungeon changes its entertainment schedule.",
     coreDecision: "Leave safely or remain for optional rewards.",
@@ -29,6 +30,7 @@
     0: freezeBlueprint({
       id: "arrival_crawl",
       name: "The Arrival Crawl",
+      durationDays: 1,
       stayReason: "Gather starter gear, XP, tutorial knowledge, and boss-weakening rewards.",
       uniqueEvent: "Discover the first dormant stairwell before it populates.",
       coreDecision: "Rush the exit or enter Floor 1 properly equipped.",
@@ -59,6 +61,7 @@
     1: freezeBlueprint({
       id: "companion_market",
       name: "The Companion Market",
+      durationDays: 5,
       stayReason: "Earn coins, visit the companion merchant, and test whether support is worth the investment.",
       uniqueEvent: "Run Companion Showcase, a planned threat that punishes solo tunnel vision.",
       coreDecision: "Buy a companion now or save early money for equipment.",
@@ -87,30 +90,39 @@
     }),
 
     2: freezeBlueprint({
-      id: "parking_garage_kingdom",
-      name: "The Parking Garage Kingdom",
-      stayReason: "Scavenge vehicles, emergency bags, batteries, fuel, scrap, and radios.",
-      uniqueEvent: "Car Alarm Chorus, a planned linked-alarm threat map.",
-      coreDecision: "Loot quietly or deliberately use noise to redirect enemies.",
-      environmentalStory: "Crashed barricades, trapped vehicles, and abandoned bags document failed escapes.",
-      aiInterference: "The AI uses speakers and alarms to imitate footsteps, survivors, and player noises.",
-      lootBias: Object.freeze(["scrap", "battery", "emergency_supplies", "tools"]),
-      enemyFlavor: Object.freeze(["garage_guard", "noise_hunter", "roaming_boss"]),
+      id: "final_tutorial_quadrant",
+      name: "The Final Tutorial",
+      durationDays: 6,
+      source: Object.freeze({
+        book: 1,
+        seriesFloor: 2,
+        fidelity: "compressed_adaptation",
+        chapters: Object.freeze([29, 30, 31, 32, 33, 34, 35, 37, 40, 41])
+      }),
+      stayReason: "Gather build-defining loot before Floor 3 while learning to manage the corpse ecology.",
+      uniqueEvent: "Brindle Grubs feed on corpses, pupate, and emerge as Brindled Vespas.",
+      coreDecision: "Loot and clear corpses, keep moving, or risk feeding the floor's janitor mobs.",
+      environmentalStory: "White floors, orange lichen, cinderblock passages, and increasingly infested neighborhoods mark the final tutorial quadrant.",
+      aiInterference: "The AI notices corpse farming, cleanup, retreating, and attempts to weaponize the ecology.",
+      lootBias: Object.freeze(["low_tier_box", "bandage", "torch", "gold", "crafting_material"]),
+      enemyFlavor: Object.freeze(["brindle_grub", "brindled_vespa", "danger_dingo", "kobold_rider", "mind_horror"]),
       dayMessages: Object.freeze([
-        "The garage has validated your parking and invalidated your escape plan.",
-        "Vehicle alarms are testing the local food chain.",
-        "Every dark row now sounds occupied."
+        "Day two: audience metrics are live. The cleanup crew remains hungry.",
+        "Day three: Brindle Grub density is rising around abandoned corpses.",
+        "Day four: pupae have been reported. Leaving them intact is a lifestyle choice.",
+        "Day five: Brindled Vespas are emerging from neglected neighborhoods.",
+        "Day six: final tutorial privileges are ending with the floor."
       ]),
-      recapLine: "Scavenging report filed. Noise discipline remains theoretical.",
+      recapLine: "Final tutorial report filed. Corpse management has been added to your permanent record.",
       aiLines: Object.freeze({
-        dormantStairwell: "The exit ramp exists. Traffic control has declined your departure.",
-        stairsPopulated: "Exit access is active. Please validate your blood loss before leaving.",
-        earlyDescent: "You left usable trunks unopened. The sponsors are calling it restraint."
+        dormantStairwell: "The future exit is marked. The final tutorial has not finished grading the remains.",
+        stairsPopulated: "The stairwells are active. Floor 3 classification is accepting survivors.",
+        earlyDescent: "You left before the ecology finished escalating. Survival remains an annoyingly defensible answer."
       }),
       eventCopy: Object.freeze({
         hazardEscalation: Object.freeze({
-          title: "CAR ALARM CHORUS",
-          start: "Day {day}: alarms are spreading across the garage. Enemies are moving faster."
+          title: "JANITOR MOB ESCALATION",
+          start: "Day {day}: the cleanup population is maturing. Corpses are no longer passive scenery."
         })
       })
     }),
@@ -118,6 +130,7 @@
     3: freezeBlueprint({
       id: "identity_floor",
       name: "The Identity Floor",
+      durationDays: 7,
       stayReason: "Review race and class offers, investigate transformation clues, and prepare a permanent build decision.",
       uniqueEvent: "Preview Chamber, a planned temporary trial of possible future builds.",
       coreDecision: "Choose survivability, damage, utility, mobility, social leverage, or wildcard power.",
@@ -148,6 +161,7 @@
     4: freezeBlueprint({
       id: "mall_that_wants_you_back",
       name: "The Mall That Wants You Back",
+      durationDays: 7,
       stayReason: "Loot specialized stores, cosmetics, food, tools, weapons, and arcade rewards.",
       uniqueEvent: "Midnight Sale, a planned simultaneous store opening with rare loot and competing threats.",
       coreDecision: "Risk high-value stores or safely clear lower-value shops.",
