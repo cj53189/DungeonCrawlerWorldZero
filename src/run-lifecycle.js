@@ -61,6 +61,7 @@ function capturePersistentCrawlerRun(status = getCrawlerPreservationStatus(), re
     reason,
     currentFloor,
     floorTimeLeft,
+    floorPressure: typeof captureFloorPressureState === "function" ? cloneRunLifecycleValue(captureFloorPressureState(), null) : null,
     player: {
       x: player?.x || 0,
       y: player?.y || 0,
@@ -118,6 +119,7 @@ function restorePersistentCrawlerRun(savedRun) {
   stairwellX = Number.isFinite(savedRun.stairwellX) ? savedRun.stairwellX : stairwellX;
   stairwellY = Number.isFinite(savedRun.stairwellY) ? savedRun.stairwellY : stairwellY;
   floorTimeLeft = Number.isFinite(savedRun.floorTimeLeft) ? savedRun.floorTimeLeft : floorTimeLeft;
+  if (savedRun.floorPressure && typeof restoreFloorPressureState === "function") restoreFloorPressureState(savedRun.floorPressure);
   player.x = savedRun.playerPosition?.x || savedRun.player.x || player.x;
   player.y = savedRun.playerPosition?.y || savedRun.player.y || player.y;
   player.safe = !!savedRun.player.safe;
