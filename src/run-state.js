@@ -1,8 +1,21 @@
 
+const REAL_DUNGEON_DAY_SECONDS = 24 * 60 * 60;
+const FLOOR_DAY_LIMITS = Object.freeze({ 0: 1, 1: 5, 2: 6, 3: 8, 4: 9 });
+
+function getDungeonDaySeconds() {
+  // Production uses real-world days. A query override keeps multi-day systems testable
+  // without making a browser playtest last until next Tuesday.
+  const requested = Number(new URLSearchParams(location.search).get("dcwDaySeconds"));
+  return Number.isFinite(requested) && requested >= 30 ? Math.floor(requested) : REAL_DUNGEON_DAY_SECONDS;
+}
+
+function getFloorDayLimit(floor = currentFloor) {
+  const key = Math.max(0, Math.trunc(Number(floor) || 0));
+  return FLOOR_DAY_LIMITS[key] || Math.min(12, 5 + key);
+}
+
 function getFloorTimeLimit() {
-  // Prototype timing. Later floors get shorter, matching the book's pressure curve.
-  if (currentFloor === 0) return 15 * 60;
-  return Math.max(300, 600 - currentFloor * 60);
+  return getFloorDayLimit() * getDungeonDaySeconds();
 }
 
 function getFloorLabel() {
