@@ -43,8 +43,7 @@
     "./src/origin-profile-hooks.js",
     "./src/safe-room-logout.js",
     "./src/mobile-skills-layout-refresh.js",
-    "./src/mobile-inventory-portrait-fix.js",
-    "./src/floor-pressure-loop.js"
+    "./src/mobile-inventory-portrait-fix.js"
   ];
 
   for (const src of lateFeatureModules) loadScript(src);
