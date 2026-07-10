@@ -87,30 +87,30 @@
     }),
 
     2: freezeBlueprint({
-      id: "parking_garage_kingdom",
-      name: "The Parking Garage Kingdom",
-      stayReason: "Scavenge vehicles, emergency bags, batteries, fuel, scrap, and radios.",
-      uniqueEvent: "Car Alarm Chorus, a planned linked-alarm threat map.",
-      coreDecision: "Loot quietly or deliberately use noise to redirect enemies.",
-      environmentalStory: "Crashed barricades, trapped vehicles, and abandoned bags document failed escapes.",
-      aiInterference: "The AI uses speakers and alarms to imitate footsteps, survivors, and player noises.",
-      lootBias: Object.freeze(["scrap", "battery", "emergency_supplies", "tools"]),
-      enemyFlavor: Object.freeze(["garage_guard", "noise_hunter", "roaming_boss"]),
+      id: "second_floor_ecosystem",
+      name: "The Second Floor Territories",
+      stayReason: "Explore competing monster territories, rescue stranded crawlers, harvest improvised materials, and interfere with threats before they mature.",
+      uniqueEvent: "Territory Breakdown, where a contained threat escapes and changes nearby regions.",
+      coreDecision: "Leave a dangerous ecosystem intact, exploit it for supplies, or protect other crawlers from the consequences.",
+      environmentalStory: "Goblin machinery, survivor-built transports, improvised workshops, nests, and abandoned safe rooms show several groups trying to survive the same floor.",
+      aiInterference: "The AI breaks containment, moves bosses beyond their chambers, and turns helpful routes into public spectacles.",
+      lootBias: Object.freeze(["scrap", "alchemy_material", "fuel", "tools", "improvised_transport"]),
+      enemyFlavor: Object.freeze(["goblin_engineer", "territorial_scavenger", "kobold_rider", "infestation", "roaming_boss"]),
       dayMessages: Object.freeze([
-        "The garage has validated your parking and invalidated your escape plan.",
-        "Vehicle alarms are testing the local food chain.",
-        "Every dark row now sounds occupied."
+        "The territories have started noticing one another. This will improve nothing.",
+        "Uncontained nests are entering their next stage. Remaining uninvolved is still a choice, technically.",
+        "Boss-room boundaries have been reclassified as suggestions."
       ]),
-      recapLine: "Scavenging report filed. Noise discipline remains theoretical.",
+      recapLine: "Territory report filed. Every solved problem appears to have fed a different one.",
       aiLines: Object.freeze({
-        dormantStairwell: "The exit ramp exists. Traffic control has declined your departure.",
-        stairsPopulated: "Exit access is active. Please validate your blood loss before leaving.",
-        earlyDescent: "You left usable trunks unopened. The sponsors are calling it restraint."
+        dormantStairwell: "You found the exit location. The local ecosystem has not finished becoming your problem.",
+        stairsPopulated: "Stairwells are active. Several territories would like to discuss your travel plans.",
+        earlyDescent: "You are leaving before the nests hatch. The surviving crawlers may send a review."
       }),
       eventCopy: Object.freeze({
         hazardEscalation: Object.freeze({
-          title: "CAR ALARM CHORUS",
-          start: "Day {day}: alarms are spreading across the garage. Enemies are moving faster."
+          title: "TERRITORY BREAKDOWN",
+          start: "Day {day}: containment has failed. Patrols are crossing borders and the floor's food chain is improvising."
         })
       })
     }),
