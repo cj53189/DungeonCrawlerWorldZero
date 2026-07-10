@@ -1,7 +1,7 @@
 // Emergency-grade shop exit controls.
-// This adds a persistent bottom Leave Shop button outside the scroll content and
-// closes the panel on touchend/pointerup as well as click. It is intentionally
-// independent from the older pet merchant close path.
+// This adds a persistent bottom Leave Shop button outside the old panel scroll content and
+// closes the panel on touchend/pointerup as well as click. Feature bootstrapping lives in
+// feature-loader.js; this file only owns hard-exit compatibility for the legacy panel.
 (function installSafeRoomShopHardExit() {
   if (window.__dcwSafeRoomShopHardExitInstalled) return;
   window.__dcwSafeRoomShopHardExitInstalled = true;
@@ -172,33 +172,12 @@
     }).observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] });
   }
 
-  function loadShopV2ScrollFix() {
-    if (document.querySelector('script[src="./src/safe-room-shop-v2-scroll-fix.js"]')) return;
-    const scrollFix = document.createElement("script");
-    scrollFix.src = "./src/safe-room-shop-v2-scroll-fix.js";
-    document.head.appendChild(scrollFix);
-  }
-
-  function loadShopV2() {
-    const existing = document.querySelector('script[src="./src/safe-room-shop-v2.js"]');
-    if (existing) {
-      if (window.__dcwSafeRoomShopV2Installed) loadShopV2ScrollFix();
-      else existing.addEventListener("load", loadShopV2ScrollFix, { once: true });
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "./src/safe-room-shop-v2.js";
-    script.addEventListener("load", loadShopV2ScrollFix, { once: true });
-    document.head.appendChild(script);
-  }
-
   function install() {
     injectStyles();
     ensureHardExitButton();
     bindDocumentFallback();
     patchCloseGlobals();
     watchPanel();
-    loadShopV2();
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
@@ -206,16 +185,4 @@
 
   const retry = setInterval(install, 200);
   setTimeout(() => clearInterval(retry), 8000);
-})();
-
-// Source-style floor pressure loop loader.
-(function loadFloorPressureLoop() {
-  if (window.__dcwFloorPressureLoopScriptRequested) return;
-  window.__dcwFloorPressureLoopScriptRequested = true;
-  const existing = document.querySelector('script[src="./src/floor-pressure-loop.js"]');
-  if (existing) return;
-  const script = document.createElement("script");
-  script.src = "./src/floor-pressure-loop.js";
-  script.defer = true;
-  document.head.appendChild(script);
 })();
