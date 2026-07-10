@@ -24,6 +24,30 @@
     return String(value).replace(/[&<>\"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[ch]));
   }
 
+  function getFloorIdentity(floor = currentFloor) {
+    const key = Math.max(0, Math.trunc(safeNumber(floor, 0)));
+    return window.FLOOR_IDENTITY_BLUEPRINTS?.[key]
+      || window.DEFAULT_FLOOR_IDENTITY_BLUEPRINT
+      || { name: `Floor ${key}`, dayMessages: [], aiLines: {}, eventCopy: {} };
+  }
+
+  function floorCopy(path, values = {}, fallback = "") {
+    const value = path.split(".").reduce((current, key) => current?.[key], getFloorIdentity());
+    const template = typeof value === "string" ? value : fallback;
+    return template.replace(/\{(\w+)\}/g, (match, key) => values[key] == null ? match : String(values[key]));
+  }
+
+  function floorEventTitle(eventType, fallback) {
+    const custom = getFloorIdentity().eventCopy?.[eventType]?.title;
+    return custom || `${getFloorIdentity().name.toUpperCase()} · ${fallback}`;
+  }
+
+  function floorDayMessage(day) {
+    const messages = getFloorIdentity().dayMessages || [];
+    if (!messages.length) return "The floor has refreshed its opportunities and threats. Staying alive remains optional but recommended.";
+    return messages[Math.max(0, day - 2) % messages.length];
+  }
+
   function floorLimit() {
     return typeof getFloorTimeLimit === "function" ? safeNumber(getFloorTimeLimit(), safeNumber(floorTimeLeft, 0)) : safeNumber(floorTimeLeft, 0);
   }
@@ -86,8 +110,8 @@
     if (st.stairwellsPopulated || !isStairwellPopulatedNow()) return;
     st.stairwellsPopulated = true;
     addFloorMessage(
-      "FLOOR RULE: STAIRWELLS POPULATED",
-      "The stairwells are now active. Leaving is possible. Leaving with a boring brand remains socially punishable.",
+      `${getFloorIdentity().name.toUpperCase()} · STAIRWELLS POPULATED`,
+      floorCopy("aiLines.stairsPopulated", {}, "The stairwells are now active. Leaving is possible. Leaving with a boring brand remains socially punishable."),
       `stairwell_populated_${currentFloor}`
     );
     if (typeof baseDiscoverStairwellIfVisible === "function") baseDiscoverStairwellIfVisible();
@@ -141,8 +165,12 @@
     minimapDirty = true;
     visibilityDirty = true;
     addFloorMessage(
-      "SPONSOR CACHE DROPPED",
-      `Day ${day}: a reward cache landed in ${room.name || "an unexplored room"}. The dungeon recommends greed with cardio.`,
+      floorEventTitle("sponsorCache", "SPONSOR CACHE DROPPED"),
+      floorCopy(
+        "eventCopy.sponsorCache.start",
+        { day, room: room.name || "an unexplored room" },
+        `Day ${day}: a reward cache landed in ${room.name || "an unexplored room"}. The dungeon recommends greed with cardio.`
+      ),
       `sponsor_cache_${currentFloor}_${day}`
     );
     return true;
@@ -178,7 +206,7 @@
     if (typeof applyEnemyIdentity === "function") applyEnemyIdentity(enemy, { name: baseName });
     enemies.push(enemy);
     addFloorMessage(
-      "BOUNTY EVENT ACTIVE",
+      floorEventTitle("bountyElite", "BOUNTY EVENT ACTIVE"),
       `Day ${day}: a named elite has spawned in ${room.name || "the floor"}. Kill it for fame, cash, and boss interference privileges.`,
       `bounty_elite_${currentFloor}_${day}`
     );
@@ -198,8 +226,12 @@
       failed: false
     };
     addFloorMessage(
-      "AUDIENCE CHALLENGE",
-      `Day ${day}: kill 3 enemies before the next day cycle. The viewers demand measurable stupidity.`,
+      floorEventTitle("audienceChallenge", "AUDIENCE CHALLENGE"),
+      floorCopy(
+        "eventCopy.audienceChallenge.start",
+        { day },
+        `Day ${day}: kill 3 enemies before the next day cycle. The viewers demand measurable stupidity.`
+      ),
       st.activeChallenge.id
     );
     return true;
@@ -215,8 +247,12 @@
     }
     if (typeof changeAudience === "function") changeAudience(3);
     addFloorMessage(
-      "FLOOR ESCALATION",
-      `Day ${day}: enemies are moving faster. The dungeon has replaced pacing with poor boundaries.`,
+      floorEventTitle("hazardEscalation", "FLOOR ESCALATION"),
+      floorCopy(
+        "eventCopy.hazardEscalation.start",
+        { day },
+        `Day ${day}: enemies are moving faster. The dungeon has replaced pacing with poor boundaries.`
+      ),
       `floor_escalation_${currentFloor}_${day}`
     );
     return true;
@@ -245,8 +281,12 @@
     player.coins += 24 + currentFloor * 6;
     if (typeof addItem === "function" && typeof generateLootBox === "function") addItem(generateLootBox(true));
     addFloorMessage(
-      "AUDIENCE CHALLENGE CLEARED",
-      "The viewers are briefly satisfied. You receive coins, a prize box, and a small reduction in future boss nonsense.",
+      floorEventTitle("audienceChallenge", "AUDIENCE CHALLENGE CLEARED"),
+      floorCopy(
+        "eventCopy.audienceChallenge.complete",
+        {},
+        "The viewers are briefly satisfied. You receive coins, a prize box, and a small reduction in future boss nonsense."
+      ),
       `${challenge.id}_complete`
     );
     weakenBossFromDiversion("Audience challenge cleared");
@@ -278,8 +318,12 @@
       if (typeof changeAudience === "function") changeAudience(8);
       weakenBossFromDiversion("Sponsor cache recovered");
       addFloorMessage(
-        "SPONSOR CACHE RECOVERED",
-        "You opened the floor event cache. The sponsors applaud the greedy little detour.",
+        floorEventTitle("sponsorCache", "SPONSOR CACHE RECOVERED"),
+        floorCopy(
+          "eventCopy.sponsorCache.complete",
+          {},
+          "You opened the floor event cache. The sponsors applaud the greedy little detour."
+        ),
         `sponsor_cache_opened_${currentFloor}_${cache.day}_${cache.x}_${cache.y}`
       );
     }
@@ -300,8 +344,8 @@
     while (st.day < day) {
       st.day++;
       addFloorMessage(
-        `DUNGEON DAY ${st.day}`,
-        "The floor has refreshed its opportunities and threats. Staying alive remains optional but recommended.",
+        `${getFloorIdentity().name.toUpperCase()} · DAY ${st.day}`,
+        floorDayMessage(st.day),
         `dungeon_day_${currentFloor}_${st.day}`
       );
       triggerDailyEvent(st.day);
@@ -360,8 +404,8 @@
         if (!st.dormantStairwellSeen) {
           st.dormantStairwellSeen = true;
           addFloorMessage(
-            "DORMANT STAIRWELL SHAFT",
-            "You found where the exit will be. It has not populated yet. Congratulations on locating a future problem.",
+            `${getFloorIdentity().name.toUpperCase()} · DORMANT STAIRWELL`,
+            floorCopy("aiLines.dormantStairwell", {}, "You found where the exit will be. It has not populated yet. Congratulations on locating a future problem."),
             `dormant_stairwell_${currentFloor}`
           );
           if (typeof updateHUD === "function") updateHUD();
@@ -385,8 +429,8 @@
         st.earlyDescentPenaltyApplied = true;
         if (typeof changeAudience === "function") changeAudience(-6);
         addFloorMessage(
-          "AUDIENCE DROP: EARLY DESCENT",
-          "You chose the stairs before the floor finished becoming interesting. Survival is valid. Ratings are judgmental.",
+          `${getFloorIdentity().name.toUpperCase()} · EARLY DESCENT`,
+          floorCopy("aiLines.earlyDescent", {}, "You chose the stairs before the floor finished becoming interesting. Survival is valid. Ratings are judgmental."),
           `early_descent_penalty_${currentFloor}`
         );
       }
@@ -457,6 +501,7 @@
       const statsBox = document.getElementById("recapStats");
       if (!statsBox) return result;
       const st = state();
+      const identity = getFloorIdentity();
       const challenge = st.activeChallenge;
       const eventText = challenge && !challenge.rewarded && !challenge.failed
         ? `Challenge: ${Math.max(0, challenge.killsNeeded - (safeNumber(stats?.enemiesKilled, 0) - challenge.startedKills))} kills left`
@@ -464,6 +509,8 @@
           ? "Sponsor cache active"
           : "No active event";
       statsBox.insertAdjacentHTML("beforeend", [
+        `<div class=\"recapLine\"><span>Floor Identity</span><span>${esc(identity.name)}</span></div>`,
+        `<div class=\"recapLine\"><span>Floor Read</span><span>${esc(identity.recapLine || identity.stayReason || "Unclassified")}</span></div>`,
         `<div class=\"recapLine\"><span>Dungeon Day</span><span>${currentDungeonDay()}</span></div>`,
         `<div class=\"recapLine\"><span>Stairs</span><span>${esc(isStairwellPopulatedNow() ? (stairwellFound ? "Marked" : "Populated") : "Dormant")}</span></div>`,
         `<div class=\"recapLine\"><span>Floor Event</span><span>${esc(eventText)}</span></div>`,
