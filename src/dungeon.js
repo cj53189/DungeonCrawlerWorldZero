@@ -1,8 +1,21 @@
+let singlePlayerDungeonSeed = null;
+
+function createSinglePlayerDungeonSeed(floor = currentFloor) {
+  const randomPart = globalThis.crypto?.randomUUID?.()
+    || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return `single-player-floor-${Math.trunc(Number(floor) || 0)}-${randomPart}`;
+}
+
+function getActiveDungeonSeed() {
+  const sharedSeed = getSharedMultiplayerFloorSeed();
+  if (sharedSeed) return sharedSeed;
+  if (!singlePlayerDungeonSeed) singlePlayerDungeonSeed = createSinglePlayerDungeonSeed();
+  return singlePlayerDungeonSeed;
+}
+
 function generateDungeon() {
   if (multiplayer?.arena) return generatePvpArena();
-  const seed = getSharedMultiplayerFloorSeed();
-  if (!seed) return generateDungeonLayout();
-  return withSeededRandom(seed, generateDungeonLayout);
+  return withSeededRandom(getActiveDungeonSeed(), generateDungeonLayout);
 }
 
 
