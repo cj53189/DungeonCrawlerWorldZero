@@ -83,12 +83,26 @@ function resetState(options = {}) {
   const snapshot = options.snapshot || null;
   const targetFloor = Number(options.targetFloor);
   const hasTargetFloor = Number.isFinite(targetFloor);
+  const previousFloor = currentFloor;
+  const requestedDungeonSeed = typeof options.dungeonSeed === "string" && options.dungeonSeed
+    ? options.dungeonSeed
+    : null;
 
   if (!preserveRun) {
     resetRunProgress();
   }
   if (hasTargetFloor) {
     currentFloor = Math.trunc(targetFloor);
+  }
+  if (typeof singlePlayerDungeonSeed !== "undefined") {
+    const changedFloor = hasTargetFloor && Math.trunc(targetFloor) !== Math.trunc(Number(previousFloor) || 0);
+    const expectedSeedPrefix = `single-player-floor-${Math.trunc(Number(currentFloor) || 0)}-`;
+    const seedTargetsCurrentFloor = typeof singlePlayerDungeonSeed === "string"
+      && singlePlayerDungeonSeed.startsWith(expectedSeedPrefix);
+    if (!preserveRun || changedFloor || (!requestedDungeonSeed && !seedTargetsCurrentFloor)) {
+      singlePlayerDungeonSeed = null;
+    }
+    if (requestedDungeonSeed) singlePlayerDungeonSeed = requestedDungeonSeed;
   }
   enemies = [];
   corpses = [];

@@ -50,16 +50,65 @@ function updateRunLifecycleStatus(nextStatus = null) {
   return runStatus;
 }
 
+function capturePersistentFloorState() {
+  return {
+    version: 1,
+    map: cloneRunLifecycleValue(map, null),
+    seen: cloneRunLifecycleValue(seen, null),
+    enemies: cloneRunLifecycleValue(enemies, []),
+    corpses: cloneRunLifecycleValue(corpses, []),
+    openedChests: openedChests instanceof Set ? Array.from(openedChests) : [],
+    tutorialSigns: cloneRunLifecycleValue(tutorialSigns, []),
+    petMerchant: cloneRunLifecycleValue(petMerchant, null),
+    bossRoomId: bossRoom?.id ?? null,
+    bossEnemyId: bossEnemy?.id ?? null,
+    currentRoomName,
+    currentRoomSubtitle,
+    roomsSeen
+  };
+}
+
+function restorePersistentFloorState(savedRun) {
+  const floorState = savedRun?.floorState;
+  if (!floorState || !Array.isArray(floorState.map)) return false;
+
+  const restoredMap = cloneRunLifecycleValue(floorState.map, null);
+  if (!Array.isArray(restoredMap)) return false;
+  map = restoredMap;
+
+  const restoredSeen = cloneRunLifecycleValue(floorState.seen, null);
+  if (Array.isArray(restoredSeen)) seen = restoredSeen;
+
+  enemies = cloneRunLifecycleValue(floorState.enemies, []);
+  corpses = cloneRunLifecycleValue(floorState.corpses, []);
+  openedChests = new Set(Array.isArray(floorState.openedChests) ? floorState.openedChests : []);
+  tutorialSigns = cloneRunLifecycleValue(floorState.tutorialSigns, []);
+  petMerchant = cloneRunLifecycleValue(floorState.petMerchant, null);
+
+  bossRoom = rooms.find(room => room.id === floorState.bossRoomId) || bossRoom;
+  bossEnemy = enemies.find(enemy => enemy.id === floorState.bossEnemyId) || null;
+  if (typeof floorState.currentRoomName === "string") currentRoomName = floorState.currentRoomName;
+  if (typeof floorState.currentRoomSubtitle === "string") currentRoomSubtitle = floorState.currentRoomSubtitle;
+  if (Number.isFinite(Number(floorState.roomsSeen))) roomsSeen = Number(floorState.roomsSeen);
+
+  minimapDirty = true;
+  visibilityDirty = true;
+  if (typeof buildDungeonVisuals === "function") buildDungeonVisuals();
+  return true;
+}
+
 function capturePersistentCrawlerRun(status = getCrawlerPreservationStatus(), reason = "checkpoint") {
   const snapshot = typeof captureRunProgress === "function" ? captureRunProgress() : null;
   const snapshotAchievements = snapshot?.achievements instanceof Set ? Array.from(snapshot.achievements) : Array.from(achievements || []);
   const playerSnapshot = snapshot?.player || {};
   return {
-    version: 2,
+    version: 3,
     runStatus: status,
     savedAt: Date.now(),
     reason,
     currentFloor,
+    dungeonSeed: typeof singlePlayerDungeonSeed === "string" ? singlePlayerDungeonSeed : null,
+    floorState: capturePersistentFloorState(),
     floorTimeLeft,
     floorPressure: typeof captureFloorPressureState === "function" ? cloneRunLifecycleValue(captureFloorPressureState(), null) : null,
     player: {
@@ -113,15 +162,23 @@ function restorePersistentCrawlerRun(savedRun) {
     achievementHistory: savedRun.achievementHistory || savedRun.history || [],
     achievements: savedRun.achievements || []
   };
-  resetState({ preserveRun: true, snapshot, targetFloor: savedRun.currentFloor || 0 });
+  resetState({
+    preserveRun: true,
+    snapshot,
+    targetFloor: savedRun.currentFloor || 0,
+    dungeonSeed: savedRun.dungeonSeed || null
+  });
+  restorePersistentFloorState(savedRun);
   currentFloor = Number(savedRun.currentFloor) || 0;
   stairwellFound = !!savedRun.stairwellFound;
   stairwellX = Number.isFinite(savedRun.stairwellX) ? savedRun.stairwellX : stairwellX;
   stairwellY = Number.isFinite(savedRun.stairwellY) ? savedRun.stairwellY : stairwellY;
   floorTimeLeft = Number.isFinite(savedRun.floorTimeLeft) ? savedRun.floorTimeLeft : floorTimeLeft;
   if (savedRun.floorPressure && typeof restoreFloorPressureState === "function") restoreFloorPressureState(savedRun.floorPressure);
-  player.x = savedRun.playerPosition?.x || savedRun.player.x || player.x;
-  player.y = savedRun.playerPosition?.y || savedRun.player.y || player.y;
+  const savedX = Number(savedRun.playerPosition?.x ?? savedRun.player.x);
+  const savedY = Number(savedRun.playerPosition?.y ?? savedRun.player.y);
+  if (Number.isFinite(savedX)) player.x = savedX;
+  if (Number.isFinite(savedY)) player.y = savedY;
   player.safe = !!savedRun.player.safe;
   player.wasSafe = !!savedRun.player.safe;
   runStatus = savedRun.runStatus || RUN_STATUS.ACTIVE;
