@@ -96,7 +96,12 @@ function resetState(options = {}) {
   }
   if (typeof singlePlayerDungeonSeed !== "undefined") {
     const changedFloor = hasTargetFloor && Math.trunc(targetFloor) !== Math.trunc(Number(previousFloor) || 0);
-    if (!preserveRun || changedFloor) singlePlayerDungeonSeed = null;
+    const expectedSeedPrefix = `single-player-floor-${Math.trunc(Number(currentFloor) || 0)}-`;
+    const seedTargetsCurrentFloor = typeof singlePlayerDungeonSeed === "string"
+      && singlePlayerDungeonSeed.startsWith(expectedSeedPrefix);
+    if (!preserveRun || changedFloor || (!requestedDungeonSeed && !seedTargetsCurrentFloor)) {
+      singlePlayerDungeonSeed = null;
+    }
     if (requestedDungeonSeed) singlePlayerDungeonSeed = requestedDungeonSeed;
   }
   enemies = [];
