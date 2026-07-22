@@ -11,7 +11,11 @@ function isMobileLike() {
 const TOUCH_CONTROLS_STORAGE_KEY = "dcwz.touchControlsEnabled";
 
 function readTouchControlsEnabled() {
-  try { return localStorage.getItem(TOUCH_CONTROLS_STORAGE_KEY) === "true"; } catch { return false; }
+  try {
+    const storedValue = localStorage.getItem(TOUCH_CONTROLS_STORAGE_KEY);
+    if (storedValue === null) return null;
+    return storedValue === "true";
+  } catch { return null; }
 }
 
 function writeTouchControlsEnabled(enabled) {
@@ -19,7 +23,7 @@ function writeTouchControlsEnabled(enabled) {
 }
 
 function getDefaultInputMethod() {
-  return "keyboard";
+  return isMobileLike() && inputState?.touchControlsEnabled ? "touch" : "keyboard";
 }
 
 function setTouchControlsEnabled(enabled, persist = true) {
@@ -384,7 +388,9 @@ function initInputControls() {
   setupPanelCloseButtons();
   setupDirectPanelButtonFallbacks();
   setupInventoryButtonFallback();
-  inputState.touchControlsEnabled = readTouchControlsEnabled();
+  const savedTouchControlsPreference = readTouchControlsEnabled();
+  inputState.touchControlsEnabled = savedTouchControlsPreference ?? isMobileLike();
+  inputState.lastActiveInputMethod = getDefaultInputMethod();
   if (typeof setupUiLayoutEditor === "function") setupUiLayoutEditor();
   updateTouchControlsToggle();
   updateInputVisibility();
