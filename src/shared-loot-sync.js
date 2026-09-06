@@ -27,6 +27,33 @@
     return multiplayer.floor0WorldState;
   }
 
+  function ensureCorpseGrantDedupState() {
+    if (typeof multiplayerNetwork !== "object" || !multiplayerNetwork) return null;
+    if (!(multiplayerNetwork.appliedPlayerCorpseGrantIds instanceof Set)) multiplayerNetwork.appliedPlayerCorpseGrantIds = new Set();
+    return multiplayerNetwork.appliedPlayerCorpseGrantIds;
+  }
+
+  function rememberCorpseGrant(grantId) {
+    if (!grantId) return;
+    const applied = ensureCorpseGrantDedupState();
+    if (!applied) return;
+    applied.add(grantId);
+    while (applied.size > 512) {
+      const oldest = applied.values().next().value;
+      if (!oldest) break;
+      applied.delete(oldest);
+    }
+  }
+
+  function applyCorpseGrantRemainder(message = {}) {
+    const corpse = typeof getCorpseById === "function" ? getCorpseById(message.corpseId) : null;
+    if (!corpse) return;
+    corpse.loot = (message.remainingLoot || []).map(item => ({ ...item }));
+    if (typeof activeLootCorpseId !== "undefined" && activeLootCorpseId === corpse.id && typeof renderCorpseLootWindow === "function") {
+      renderCorpseLootWindow(corpse);
+    }
+  }
+
   function sharedCorpseId(enemy) {
     return enemy?.enemyId ? `corpse_${enemy.enemyId}` : null;
   }
@@ -194,6 +221,24 @@
 
   window.ensureBossLootContainer = ensureBossLootContainer;
   window.applySharedLootContainer = applySharedLootContainer;
+
+  if (typeof applyPlayerCorpseLootTaken === "function" && !applyPlayerCorpseLootTaken.__grantDedupWrapped) {
+    const originalApplyPlayerCorpseLootTaken = applyPlayerCorpseLootTaken;
+    applyPlayerCorpseLootTaken = function applyPlayerCorpseLootTakenWithGrantDedup(message = {}, ...args) {
+      const grantId = typeof message.grantId === "string" ? message.grantId : "";
+      const isLocalGrant = !!(grantId && message.looterPlayerId === multiplayer?.playerId);
+      const applied = isLocalGrant ? ensureCorpseGrantDedupState() : null;
+      if (isLocalGrant && applied?.has(grantId)) {
+        applyCorpseGrantRemainder(message);
+        return true;
+      }
+
+      const result = originalApplyPlayerCorpseLootTaken.apply(this, [message, ...args]);
+      if (isLocalGrant && result !== false) rememberCorpseGrant(grantId);
+      return result;
+    };
+    applyPlayerCorpseLootTaken.__grantDedupWrapped = true;
+  }
 
   if (typeof resetFloor0WorldState === "function" && !resetFloor0WorldState.__sharedLootWrapped) {
     const originalResetFloor0WorldState = resetFloor0WorldState;
