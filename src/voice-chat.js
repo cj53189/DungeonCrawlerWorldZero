@@ -15,7 +15,8 @@ var voiceChat = {
   remoteLastSeen: new Map(),
   selfMuted: true,
   initialized: false,
-  lastError: null
+  lastError: null,
+  sessionGeneration: 0
 };
 
 const VOICE_ICE_CONFIG = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
@@ -307,8 +308,16 @@ async function requestVoiceMicrophone() {
     return null;
   }
 
+  const requestGeneration = voiceChat.sessionGeneration;
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (requestGeneration !== voiceChat.sessionGeneration || !voiceChat.enabled) {
+      for (const track of stream.getTracks?.() || []) {
+        track.enabled = false;
+        track.stop();
+      }
+      return null;
+    }
     voiceChat.localStream = stream;
     voiceChat.lastError = null;
     updateLocalVoiceTrackState();
@@ -318,6 +327,7 @@ async function requestVoiceMicrophone() {
     if (typeof updateVoiceChatUi === "function") updateVoiceChatUi();
     return stream;
   } catch (err) {
+    if (requestGeneration !== voiceChat.sessionGeneration) return null;
     voiceChat.lastError = err?.message || "Microphone permission was denied.";
     updateLocalVoiceTrackState();
     if (typeof announcer === "function") announcer("Voice chat could not access your microphone. Check browser permissions to use push-to-talk.");
@@ -335,6 +345,7 @@ function startVoiceForLobby() {
 }
 
 function stopVoiceChat(reason = "stopped") {
+  voiceChat.sessionGeneration += 1;
   setVoicePushToTalkActive(false);
   const knownPeerIds = Array.from(new Set([
     ...voiceChat.peers.keys(),
