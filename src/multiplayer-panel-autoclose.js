@@ -274,22 +274,17 @@
     const localId = multiplayer.playerId || "local_crawler";
     if (player.hp > 0 && multiplayer.localStatus !== "downed" && multiplayer.localFloor0Status !== "failed") remainingIds.add(localId);
 
-    for (const member of multiplayer.lobbyMembers || []) {
-      if (!member?.id || member.id === localId) continue;
-      if (member.floor0Status === "failed") continue;
-      remainingIds.add(member.id);
-    }
-
     if (multiplayer.remotePlayers instanceof Map) {
       for (const [id, crawler] of multiplayer.remotePlayers.entries()) {
         if (!id || id === localId) continue;
+        if (Number.isFinite(Number(crawler?.currentFloor)) && Number(crawler.currentFloor) !== Number(currentFloor)) continue;
         if (crawler?.status === "downed" || crawler?.status === "failed") continue;
         if (Number(crawler?.hp ?? 1) <= 0) continue;
         remainingIds.add(id);
       }
     }
 
-    return remainingIds.size || (player.hp > 0 ? 1 : 0);
+    return remainingIds.size;
   }
 
   function patchRecapRemainingCrawlers() {
