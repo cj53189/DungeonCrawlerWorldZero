@@ -36,6 +36,7 @@
   }
 
   const lateFeatureModules = [
+    "./src/simulation-timebase.js",
     "./src/haptics.js",
     "./src/spawn-allocation-ui.js",
     "./src/floor3-offers.js",
