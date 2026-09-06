@@ -61,7 +61,7 @@ function capturePersistentFloorState() {
     tutorialSigns: cloneRunLifecycleValue(tutorialSigns, []),
     petMerchant: cloneRunLifecycleValue(petMerchant, null),
     bossRoomId: bossRoom?.id ?? null,
-    bossEnemyId: bossEnemy?.id ?? null,
+    bossEnemyId: bossEnemy?.enemyId ?? bossEnemy?.id ?? null,
     currentRoomName,
     currentRoomSubtitle,
     roomsSeen
@@ -86,7 +86,13 @@ function restorePersistentFloorState(savedRun) {
   petMerchant = cloneRunLifecycleValue(floorState.petMerchant, null);
 
   bossRoom = rooms.find(room => room.id === floorState.bossRoomId) || bossRoom;
-  bossEnemy = enemies.find(enemy => enemy.id === floorState.bossEnemyId) || null;
+  const savedBossEnemyId = floorState.bossEnemyId;
+  bossEnemy = enemies.find(enemy => {
+    if (!enemy?.boss || savedBossEnemyId == null) return false;
+    return enemy.enemyId === savedBossEnemyId || enemy.id === savedBossEnemyId;
+  }) || enemies.find(enemy => enemy?.boss && enemy.hp > 0)
+    || enemies.find(enemy => enemy?.boss)
+    || null;
   if (typeof floorState.currentRoomName === "string") currentRoomName = floorState.currentRoomName;
   if (typeof floorState.currentRoomSubtitle === "string") currentRoomSubtitle = floorState.currentRoomSubtitle;
   if (Number.isFinite(Number(floorState.roomsSeen))) roomsSeen = Number(floorState.roomsSeen);
