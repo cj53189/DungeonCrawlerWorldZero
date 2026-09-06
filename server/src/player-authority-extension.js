@@ -5,6 +5,7 @@ function resetPlayerLifeAuthority(player) {
   player.pvpDowned = false;
   player.pvpDamageAuthorityUntil = 0;
   player.lastPvpDownCredit = null;
+  player.playerCorpseId = null;
 }
 
 function isCrawlerDowned(player) {
