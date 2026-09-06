@@ -8,6 +8,7 @@ const { LeaderboardStore } = require("./leaderboard-store");
 const { applyQuickPartyExtension } = require("./quick-party-extension");
 const { applySharedLootExtension } = require("./shared-loot-extension");
 const { CLIENT_MESSAGES, SERVER_MESSAGES, parseClientMessage, safeSend } = require("./protocol");
+const { authorizeReconnect, ensureResumeCredential, isCurrentPlayerSocket } = require("./session-auth");
 
 applyQuickPartyExtension(LobbyManager);
 applySharedLootExtension(LobbyManager);
@@ -358,7 +359,7 @@ function makePlayerId() {
 wss.on("connection", (ws) => {
   let playerId = makePlayerId();
   rooms.registerClient(ws, playerId);
-  safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4 });
+  safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4, provisional: true });
   sendLeaderboard(ws);
 
   ws.on("message", (raw) => {
@@ -368,17 +369,38 @@ wss.on("connection", (ws) => {
       return;
     }
 
+    if (!isCurrentPlayerSocket(rooms, playerId, ws)) {
+      safeSend(ws, SERVER_MESSAGES.ERROR, { message: "This multiplayer session has been superseded." });
+      if (typeof ws.close === "function") ws.close(4001, "Session superseded");
+      return;
+    }
+
     try {
       switch (message.type) {
         case CLIENT_MESSAGES.HELLO: {
           const reconnectPlayerId = typeof message.playerId === "string" ? message.playerId.trim() : "";
           const reconnectRunId = typeof message.runId === "string" ? message.runId.trim() : "";
-          if (reconnectPlayerId && reconnectRunId && reconnectPlayerId !== playerId && rooms.reconnectClient(ws, reconnectPlayerId, reconnectRunId)) {
+          if (reconnectPlayerId && reconnectRunId && reconnectPlayerId !== playerId) {
+            const reconnect = authorizeReconnect(rooms, ws, {
+              playerId: reconnectPlayerId,
+              runId: reconnectRunId,
+              resumeCredential: message.resumeCredential
+            });
+            if (!reconnect.ok) {
+              safeSend(ws, SERVER_MESSAGES.ERROR, { message: "Reconnect rejected." });
+              if (typeof ws.close === "function") ws.close(4003, "Reconnect rejected");
+              return;
+            }
             rooms.clients.delete(playerId);
-            playerId = reconnectPlayerId;
+            playerId = reconnect.playerId;
           }
           rooms.updateClientProfile(playerId, message.profile || message);
-          safeSend(ws, SERVER_MESSAGES.WELCOME, { playerId, targetPlayers: 4 });
+          const client = rooms.clients.get(playerId);
+          safeSend(ws, SERVER_MESSAGES.WELCOME, {
+            playerId,
+            targetPlayers: 4,
+            resumeCredential: ensureResumeCredential(client)
+          });
           sendLeaderboard(ws);
           break;
         }
@@ -455,8 +477,11 @@ wss.on("connection", (ws) => {
     }
   });
 
-  ws.on("close", () => rooms.unregisterClient(playerId));
-  ws.on("error", () => rooms.unregisterClient(playerId));
+  const unregisterCurrentSocket = () => {
+    if (isCurrentPlayerSocket(rooms, playerId, ws)) rooms.unregisterClient(playerId);
+  };
+  ws.on("close", unregisterCurrentSocket);
+  ws.on("error", unregisterCurrentSocket);
 });
 
 function startServer() {
