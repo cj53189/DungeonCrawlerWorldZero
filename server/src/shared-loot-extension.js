@@ -1,4 +1,5 @@
 const { randomUUID } = require("crypto");
+const { SERVER_MESSAGES } = require("./protocol");
 const { applyEnemyAuthorityExtension } = require("./enemy-authority-extension");
 const { applyPlayerAuthorityExtension } = require("./player-authority-extension");
 
@@ -130,6 +131,21 @@ function applySharedLootExtension(LobbyManager) {
       this.markSharedLootContainerTaken(lobby, normalized.id || event.id);
     }
     return normalized;
+  };
+
+  const originalBroadcast = LobbyManager.prototype.broadcast;
+  LobbyManager.prototype.broadcast = function broadcastWithCorpseGrantIdentity(lobby, type, payload = {}) {
+    if (type === SERVER_MESSAGES.PLAYER_CORPSE_LOOT_TAKEN) {
+      const grantId = typeof payload.grantId === "string" && payload.grantId
+        ? payload.grantId
+        : `player_corpse_grant_${randomUUID().replace(/-/g, "")}`;
+      return originalBroadcast.apply(this, [lobby, type, {
+        ...payload,
+        grantId,
+        eventId: grantId
+      }]);
+    }
+    return originalBroadcast.apply(this, [lobby, type, payload]);
   };
 
   applyEnemyAuthorityExtension(LobbyManager);
