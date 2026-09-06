@@ -151,7 +151,8 @@ function applyQuickPartyExtension(LobbyManager) {
     let lobby = Array.from(this.lobbies.values()).find(candidate => (
       candidate.mode === LOBBY_MODES.QUICK_MATCH &&
       candidate.floor === 0 &&
-      candidate.joinState === "open"
+      candidate.joinState === "open" &&
+      candidate.status === LOBBY_STATUS.STAGING
     ));
 
     if (!lobby) {
