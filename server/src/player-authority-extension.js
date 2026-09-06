@@ -1,4 +1,5 @@
 const { SERVER_MESSAGES, safeSend } = require("./protocol");
+const { applyRunRetentionExtension } = require("./run-retention-extension");
 
 function resetPlayerLifeAuthority(player) {
   if (!player) return;
@@ -72,6 +73,8 @@ function applyPlayerAuthorityExtension(LobbyManager) {
 
     return accepted;
   };
+
+  applyRunRetentionExtension(LobbyManager);
 }
 
 module.exports = {
