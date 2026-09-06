@@ -470,7 +470,7 @@
 
   generateDungeon = function generateDungeonWithFloor3BroadcastDistrict() {
     if (currentFloor === 3 && !multiplayer?.arena) {
-      const seed = typeof getSharedMultiplayerFloorSeed === "function" ? getSharedMultiplayerFloorSeed() : null;
+      const seed = typeof getActiveDungeonSeed === "function" ? getActiveDungeonSeed() : null;
       if (seed && typeof withSeededRandom === "function") {
         return withSeededRandom(seed, generateFloor3BroadcastDistrictLayout);
       }
