@@ -49,7 +49,7 @@
         padding: 8px 6px max(8px, env(safe-area-inset-bottom)) !important;
         border-top: 1px solid rgba(255,216,107,0.16) !important;
         background: linear-gradient(180deg, rgba(20,13,9,0), rgba(20,13,9,0.96) 24%) !important;
-        font-size: 10px !important;
+        font-size: 12px !important;
         line-height: 1.25 !important;
         text-align: center !important;
       }
@@ -110,7 +110,7 @@
       html body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .skillRow span {
         display: block !important;
         margin-top: 3px !important;
-        font-size: 10px !important;
+        font-size: 12px !important;
         line-height: 1.28 !important;
         white-space: normal !important;
       }
@@ -122,12 +122,12 @@
       }
 
       html body.inventorySkillsMobileLayout #inventoryPanel.open[data-inventory-category="skills"] .spendPointBtn {
-        min-width: 0 !important;
+        min-width: 48px !important;
         width: fit-content !important;
-        min-height: 32px !important;
+        min-height: 48px !important;
         margin-top: 7px !important;
-        padding: 6px 9px !important;
-        font-size: 10px !important;
+        padding: 10px 12px !important;
+        font-size: 12px !important;
         line-height: 1 !important;
       }
 
